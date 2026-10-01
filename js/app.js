@@ -8,25 +8,27 @@ const LOGO_BASE64 = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAIwAAACMCAYAA
 const logoBase64 = LOGO_BASE64;
 
 // ============================================================
-// FASE 11: CONFIGURACIÃ“N GOOGLE API & RESPALDO
 // ============================================================
-const GDRIVE_CLIENT_ID = '225597172709-ql0hh87u6d6kuqo6tupa0v7e9sd9rqko.apps.googleusercontent.com';
-const GDRIVE_API_KEY = 'TU_API_KEY_AQUI';
-const GDRIVE_SCOPES = 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/spreadsheets';
-
+// PERSISTENCIA Y BACKEND GOOGLE APPS SCRIPT (HOGARFLEX_DB)
+// ============================================================
 const BACKUP_LAST_SHEETS_KEY = "hogarflex_last_backup_date";
 const BACKUP_AUTO_CLOSE_KEY = "hogarflex_auto_backup_on_close";
-const GDRIVE_TOKEN_KEY = "hogarflex_gdrive_token";
-const GDRIVE_EMAIL_KEY = "hogarflex_gdrive_email";
+const APPS_SCRIPT_URL_KEY = "hogarflex_apps_script_url";
 
-const savedGdriveToken = sessionStorage.getItem(GDRIVE_TOKEN_KEY) || localStorage.getItem(GDRIVE_TOKEN_KEY);
-if (savedGdriveToken && savedGdriveToken.startsWith("demo_token_")) {
-  sessionStorage.removeItem(GDRIVE_TOKEN_KEY);
-  sessionStorage.removeItem(GDRIVE_EMAIL_KEY);
+// URL base de la Web App desplegada en Google Apps Script
+// Se puede configurar o actualizar desde la sección de Respaldo de la app
+const DEFAULT_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwO4U-hogarflex_backend/exec";
+
+function getAppsScriptUrl() {
+  return localStorage.getItem(APPS_SCRIPT_URL_KEY) || DEFAULT_APPS_SCRIPT_URL;
 }
-let gdriveAccessToken = sessionStorage.getItem(GDRIVE_TOKEN_KEY) || localStorage.getItem(GDRIVE_TOKEN_KEY) || null;
-let gdriveUserEmail = sessionStorage.getItem(GDRIVE_EMAIL_KEY) || localStorage.getItem(GDRIVE_EMAIL_KEY) || null;
-let gdriveTokenClient = null;
+
+function setAppsScriptUrl(url) {
+  if (url && typeof url === "string") {
+    localStorage.setItem(APPS_SCRIPT_URL_KEY, url.trim());
+  }
+}
+
 let isExportingSheets = false;
 let isImportingSheets = false;
 let isExportingReceipts = false;
@@ -59,8 +61,9 @@ function triggerAutoCloudBackup(source = "datos") {
       return;
     }
 
-    if (!gdriveAccessToken) {
-      console.warn(`[HogarFlex Cloud Auto-Backup] ℹ️ Google Drive no conectado aún. Los cambios en (${reasons}) se guardaron en localStorage.`);
+    const scriptUrl = getAppsScriptUrl();
+    if (!scriptUrl) {
+      console.warn(`[HogarFlex Cloud Auto-Backup] ℹ️ URL de Apps Script no configurada. Los cambios en (${reasons}) se guardaron en localStorage.`);
       return;
     }
 
@@ -7704,8 +7707,6 @@ window.testJsPDF = testJsPDF;
 
 // Inicializar módulo de Respaldo
 function initBackupModule() {
-  const btnConnect = document.getElementById("btn-connect-google");
-  const btnDisconnect = document.getElementById("btn-disconnect-google");
   const btnExportSheets = document.getElementById("btn-export-sheets");
   const btnImportSheets = document.getElementById("btn-import-sheets");
   const btnCloudSaveHeader = document.getElementById("btn-cloud-save-header");
@@ -7713,16 +7714,61 @@ function initBackupModule() {
   const btnRetrySheets = document.getElementById("btn-retry-sheets");
   const btnExportReceipts = document.getElementById("btn-export-receipts");
   const toggleAutoBackup = document.getElementById("toggle-auto-backup");
+  const btnSaveUrl = document.getElementById("btn-save-apps-script-url");
+  const btnTestUrl = document.getElementById("btn-test-apps-script-url");
+  const inputUrl = document.getElementById("input-apps-script-url");
 
-  if (btnConnect) {
-    btnConnect.addEventListener("click", () => {
-      connectWithGoogle();
+  if (inputUrl) {
+    inputUrl.value = getAppsScriptUrl();
+  }
+
+  if (btnSaveUrl && inputUrl) {
+    btnSaveUrl.addEventListener("click", () => {
+      const val = inputUrl.value.trim();
+      if (!val) {
+        alert("Por favor ingresa una URL válida de Google Apps Script.");
+        return;
+      }
+      setAppsScriptUrl(val);
+      updateBackendStatusUI(true, "URL guardada exitosamente");
+      showCloudSyncToast("✅ URL de Apps Script guardada", "success");
     });
   }
 
-  if (btnDisconnect) {
-    btnDisconnect.addEventListener("click", () => {
-      disconnectGoogle();
+  if (btnTestUrl && inputUrl) {
+    btnTestUrl.addEventListener("click", async () => {
+      const val = inputUrl.value.trim() || getAppsScriptUrl();
+      if (!val) {
+        alert("Ingresa una URL antes de probar.");
+        return;
+      }
+      const feedback = document.getElementById("backend-url-feedback");
+      if (feedback) {
+        feedback.className = "";
+        feedback.style.color = "#1d4ed8";
+        feedback.textContent = "⏳ Conectando con Google Apps Script...";
+        feedback.classList.remove("hidden");
+      }
+      try {
+        const testUrl = val + (val.includes("?") ? "&" : "?") + "action=read";
+        const res = await fetch(testUrl, { method: "GET" });
+        const json = await res.json();
+        if (json && json.success) {
+          if (feedback) {
+            feedback.style.color = "#15803d";
+            feedback.textContent = "✅ Conexión exitosa con HogarFlex_DB en Google Apps Script!";
+          }
+          setAppsScriptUrl(val);
+          updateBackendStatusUI(true);
+        } else {
+          throw new Error(json.error || "Respuesta no válida del Apps Script");
+        }
+      } catch (err) {
+        if (feedback) {
+          feedback.style.color = "#b91c1c";
+          feedback.textContent = "❌ Error al conectar: " + err.message;
+        }
+      }
     });
   }
 
@@ -7773,10 +7819,10 @@ function initBackupModule() {
   window.addEventListener("online", updateNetworkStatus);
   window.addEventListener("offline", updateNetworkStatus);
 
-  // Respaldo automático al cerrar o recargar (PASO 6)
+  // Respaldo automático al cerrar o recargar
   const handleAutoBackupBeforeUnload = () => {
     const isAutoEnabled = localStorage.getItem(BACKUP_AUTO_CLOSE_KEY) === "true";
-    if (isAutoEnabled && navigator.onLine && gdriveAccessToken) {
+    if (isAutoEnabled && navigator.onLine && getAppsScriptUrl()) {
       exportToGoogleSheets(true);
     }
   };
@@ -7784,10 +7830,9 @@ function initBackupModule() {
   window.addEventListener("beforeunload", handleAutoBackupBeforeUnload);
   window.addEventListener("pagehide", handleAutoBackupBeforeUnload);
 
-  // Comprobar estado de conexión guardado
-  if (gdriveAccessToken) {
-    updateGoogleConnectUI(true);
-    // Sincronización automática desde la nube al arrancar
+  // Sincronización automática desde la nube al arrancar
+  if (getAppsScriptUrl()) {
+    updateBackendStatusUI(true);
     setTimeout(() => {
       importFromGoogleSheets(true);
     }, 600);
@@ -7810,8 +7855,13 @@ function updateNetworkStatus() {
 function renderBackupSection() {
   updateNetworkStatus();
 
-  // Actualizar UI de Google conectado
-  updateGoogleConnectUI(!!gdriveAccessToken);
+  // Actualizar UI del backend de Google Apps Script
+  updateBackendStatusUI(!!getAppsScriptUrl());
+
+  const inputUrl = document.getElementById("input-apps-script-url");
+  if (inputUrl && !inputUrl.value) {
+    inputUrl.value = getAppsScriptUrl();
+  }
 
   // Actualizar fecha del último respaldo
   const lastSheetsBackup = localStorage.getItem(BACKUP_LAST_SHEETS_KEY);
@@ -7838,136 +7888,36 @@ function renderBackupSection() {
   }
 }
 
-// Actualizar interfaz según estado de autorización de Google (PASO 3)
-function updateGoogleConnectUI(isConnected) {
-  const badge = document.getElementById("gdrive-status-badge");
-  const userInfo = document.getElementById("gdrive-user-info");
-  const emailText = document.getElementById("gdrive-user-email-text");
-  const btnConnect = document.getElementById("btn-connect-google");
-  const btnDisconnect = document.getElementById("btn-disconnect-google");
-  const btnExportSheets = document.getElementById("btn-export-sheets");
-  const btnExportReceipts = document.getElementById("btn-export-receipts");
-  const btnImportSheets = document.getElementById("btn-import-sheets");
+// Actualizar interfaz según estado del Backend Google Apps Script
+function updateBackendStatusUI(isConnected, message = "") {
+  const badge = document.getElementById("backend-status-badge");
+  const feedback = document.getElementById("backend-url-feedback");
   const btnCloudSave = document.getElementById("btn-cloud-save-header");
   const btnCloudReload = document.getElementById("btn-cloud-reload-header");
 
-  if (isConnected && gdriveAccessToken) {
+  if (isConnected && getAppsScriptUrl()) {
     if (badge) {
       badge.innerHTML = `<span class="badge" style="background:#dcfce7;color:#15803d;padding:6px 12px;border-radius:20px;font-size:0.84rem;font-weight:700;">🟢 Conectado</span>`;
     }
-    if (userInfo && emailText) {
-      emailText.textContent = `✅ Conectado como ${gdriveUserEmail || 'cuenta de Google'}`;
-      userInfo.classList.remove("hidden");
-    }
-    if (btnConnect) btnConnect.classList.add("hidden");
-    if (btnDisconnect) btnDisconnect.classList.remove("hidden");
-    if (btnExportSheets) btnExportSheets.removeAttribute("disabled");
-    if (btnExportReceipts) btnExportReceipts.removeAttribute("disabled");
-    if (btnImportSheets) btnImportSheets.removeAttribute("disabled");
     if (btnCloudSave) {
-      btnCloudSave.removeAttribute("disabled");
-      btnCloudSave.title = "Guardar en la nube (Google Sheets)";
+      btnCloudSave.title = "Guardar en la nube (Google Sheets vía Apps Script)";
     }
     if (btnCloudReload) {
-      btnCloudReload.removeAttribute("disabled");
-      btnCloudReload.title = "Recargar desde la nube (Google Sheets)";
+      btnCloudReload.title = "Recargar desde la nube (Google Sheets vía Apps Script)";
+    }
+    if (feedback && message) {
+      feedback.style.color = "#15803d";
+      feedback.textContent = message;
+      feedback.classList.remove("hidden");
     }
   } else {
     if (badge) {
-      badge.innerHTML = `<span class="badge" style="background:#f1f5f9;color:#64748b;padding:6px 12px;border-radius:20px;font-size:0.84rem;font-weight:600;">⚪ No conectado</span>`;
-    }
-    if (userInfo) userInfo.classList.add("hidden");
-    if (btnConnect) btnConnect.classList.remove("hidden");
-    if (btnDisconnect) btnDisconnect.classList.add("hidden");
-    if (btnExportSheets) btnExportSheets.setAttribute("disabled", "true");
-    if (btnExportReceipts) btnExportReceipts.setAttribute("disabled", "true");
-    if (btnImportSheets) btnImportSheets.setAttribute("disabled", "true");
-    if (btnCloudSave) {
-      btnCloudSave.title = "Conecta tu cuenta de Google para guardar en la nube";
-    }
-    if (btnCloudReload) {
-      btnCloudReload.title = "Conecta tu cuenta de Google para recargar desde la nube";
+      badge.innerHTML = `<span class="badge" style="background:#fef3c7;color:#92400e;padding:6px 12px;border-radius:20px;font-size:0.84rem;font-weight:600;">🟡 Pendiente URL</span>`;
     }
   }
 }
 
-// Conectar con Google (PASO 3)
-function connectWithGoogle() {
-  if (!navigator.onLine) {
-    alert("Sin conexión. El respaldo se hará cuando vuelva el internet.");
-    return;
-  }
-  if (GDRIVE_CLIENT_ID === "TU_CLIENT_ID_AQUI" || !GDRIVE_CLIENT_ID) {
-    alert("Respaldo no configurado");
-    return;
-  }
-
-  // Flujo Google Identity Services (GIS)
-  if (window.google && window.google.accounts && window.google.accounts.oauth2) {
-    try {
-      if (!gdriveTokenClient) {
-        gdriveTokenClient = window.google.accounts.oauth2.initTokenClient({
-          client_id: GDRIVE_CLIENT_ID,
-          scope: GDRIVE_SCOPES,
-          callback: async (tokenResponse) => {
-            if (tokenResponse.error) {
-              console.error("Error de autorización:", tokenResponse);
-              alert("No se pudo autorizar la cuenta de Google: " + tokenResponse.error);
-              return;
-            }
-            gdriveAccessToken = tokenResponse.access_token;
-            sessionStorage.setItem(GDRIVE_TOKEN_KEY, gdriveAccessToken);
-            localStorage.setItem(GDRIVE_TOKEN_KEY, gdriveAccessToken);
-            await fetchGoogleUserEmail(gdriveAccessToken);
-            updateGoogleConnectUI(true);
-
-            await importFromGoogleSheets(true);
-
-          }
-        });
-      }
-      gdriveTokenClient.requestAccessToken({ prompt: "consent" });
-    } catch (err) {
-      console.error("Error al iniciar token client:", err);
-      alert("Error al inicializar la conexión con Google: " + err.message);
-    }
-  } else {
-    alert("Las librerías de Google se están cargando. Por favor verifica tu conexión e intenta nuevamente.");
-  }
-}
-
-// Obtener email del usuario de Google
-async function fetchGoogleUserEmail(token) {
-  try {
-    const res = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
-      headers: { Authorization: `Bearer ${token}` }
-    });
-    if (res.ok) {
-      const data = await res.json();
-      gdriveUserEmail = data.email || "Usuario de Google";
-      sessionStorage.setItem(GDRIVE_EMAIL_KEY, gdriveUserEmail);
-    } else {
-      gdriveUserEmail = "Cuenta autorizada";
-    }
-  } catch (e) {
-    console.warn("No se pudo obtener el email de Google:", e);
-    gdriveUserEmail = "Cuenta autorizada";
-  }
-}
-
-// Desconectar Google
-function disconnectGoogle() {
-  gdriveAccessToken = null;
-  gdriveUserEmail = null;
-  sessionStorage.removeItem(GDRIVE_TOKEN_KEY);
-  sessionStorage.removeItem(GDRIVE_EMAIL_KEY);
-  localStorage.removeItem(GDRIVE_TOKEN_KEY);
-  localStorage.removeItem(GDRIVE_EMAIL_KEY);
-  localStorage.removeItem("hogarflex_spreadsheet_id");
-  updateGoogleConnectUI(false);
-}
-
-// EXPORTAR A GOOGLE SHEETS (PASO 4)
+// EXPORTAR A GOOGLE SHEETS VÍA APPS SCRIPT
 async function exportToGoogleSheets(isSilent = false) {
   console.log(`[HogarFlex Cloud Export] 🚀 Iniciando exportToGoogleSheets(isSilent = ${isSilent})...`);
   if (isExportingSheets) return;
@@ -7977,23 +7927,22 @@ async function exportToGoogleSheets(isSilent = false) {
     return;
   }
 
-  if (!gdriveAccessToken) {
+  const scriptUrl = getAppsScriptUrl();
+  if (!scriptUrl) {
     if (!isSilent) {
-      const wantConnect = confirm("Debes conectar tu cuenta de Google antes de guardar en la nube. ¿Deseas conectarla ahora?");
-      if (wantConnect) connectWithGoogle();
+      showSheetsStatus("Por favor configura la URL de Google Apps Script en la sección de Respaldo.", "error");
     }
     return;
   }
 
   isExportingSheets = true;
   setCloudButtonsLoading(true, "export");
-  const statusEl = document.getElementById("sheets-status-msg");
   const retryBtn = document.getElementById("btn-retry-sheets");
   const exportBtn = document.getElementById("btn-export-sheets");
 
   if (!isSilent) {
-    showCloudSyncToast("⏳ Guardando datos en Google Sheets...", "info");
-    showSheetsStatus("⏳ Procesando respaldo de datos en Google Sheets...", "info");
+    showCloudSyncToast("⏳ Guardando datos en Google Sheets vía Apps Script...", "info");
+    showSheetsStatus("⏳ Procesando sincronización con HogarFlex_DB...", "info");
     if (exportBtn) exportBtn.setAttribute("disabled", "true");
     if (retryBtn) retryBtn.classList.add("hidden");
   }
@@ -8086,132 +8035,42 @@ async function exportToGoogleSheets(isSilent = false) {
       ["Total Ventas Directas", String(sales.length)]
     ];
 
-    // Si es modo demo (token simulado)
-    if (gdriveAccessToken.startsWith("demo_token_")) {
-      await new Promise((r) => setTimeout(r, 800));
-      localStorage.setItem(BACKUP_LAST_SHEETS_KEY, nowStr);
-      renderBackupSection();
-      if (!isSilent) {
-        showSheetsStatus(`✅ Respaldo completado: ${nowStr} (Modo Demostración)`, "success");
+    // 2. Enviar datos al Google Apps Script (POST)
+    // Se envía como string simple para evitar el preflight CORS OPTIONS
+    const payload = {
+      action: "write",
+      data: {
+        Clientes: clientsData,
+        "Créditos": creditsData,
+        Pagos: paymentsData,
+        "Ventas_Directas": salesData,
+        Config: configData
       }
-      return;
-    }
+    };
 
-    // 2. Buscar o crear el archivo "HogarFlex_DB" en Google Drive
-    const searchRes = await fetch(
-      "https://www.googleapis.com/drive/v3/files?q=name='HogarFlex_DB' and mimeType='application/vnd.google-apps.spreadsheet' and trashed=false&fields=files(id,name)",
-      { headers: { Authorization: `Bearer ${gdriveAccessToken}` } }
-    );
-
-    if (searchRes.status === 401) {
-      disconnectGoogle();
-      throw new Error("La sesión de Google expiró. Por favor vuelve a conectar tu cuenta.");
-    }
-
-    if (!searchRes.ok) {
-      const errJson = await searchRes.json().catch(() => ({}));
-      throw new Error(errJson.error?.message || `Error en Google Drive API (${searchRes.status})`);
-    }
-
-    const searchData = await searchRes.json();
-    let spreadsheetId = searchData.files && searchData.files.length > 0 ? searchData.files[0].id : null;
-
-    if (!spreadsheetId) {
-      // Crear nueva hoja de cálculo con las 5 pestañas
-      const createRes = await fetch("https://sheets.googleapis.com/v4/spreadsheets", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${gdriveAccessToken}`,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          properties: { title: "HogarFlex_DB" },
-          sheets: [
-            { properties: { title: "Clientes" } },
-            { properties: { title: "Créditos" } },
-            { properties: { title: "Pagos" } },
-            { properties: { title: "Ventas_Directas" } },
-            { properties: { title: "Config" } }
-          ]
-        })
-      });
-
-      if (!createRes.ok) {
-        const errJson = await createRes.json().catch(() => ({}));
-        throw new Error(errJson.error?.message || "No se pudo crear la hoja HogarFlex_DB");
-      }
-      const newSheetObj = await createRes.json();
-      spreadsheetId = newSheetObj.spreadsheetId;
-    } else {
-      // Si ya existía, asegurarse de que las 5 pestañas existan
-      const metaRes = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}?fields=sheets.properties`, {
-        headers: { Authorization: `Bearer ${gdriveAccessToken}` }
-      });
-      if (metaRes.ok) {
-        const metaData = await metaRes.json();
-        const existingTitles = (metaData.sheets || []).map((s) => s.properties.title);
-        const requiredTitles = ["Clientes", "Créditos", "Pagos", "Ventas_Directas", "Config"];
-        const missing = requiredTitles.filter((t) => !existingTitles.includes(t));
-        if (missing.length > 0) {
-          await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}:batchUpdate`, {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${gdriveAccessToken}`,
-              "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-              requests: missing.map((title) => ({ addSheet: { properties: { title } } }))
-            })
-          });
-        }
-      }
-    }
-
-    // 3. Limpiar y escribir los datos en las 5 pestañas
-    await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values:batchClear`, {
+    const res = await fetch(scriptUrl, {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${gdriveAccessToken}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        ranges: ["Clientes!A:Z", "Créditos!A:Z", "Pagos!A:Z", "Ventas_Directas!A:Z", "Config!A:Z"]
-      })
+      body: JSON.stringify(payload)
     });
 
-    const updateRes = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values:batchUpdate`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${gdriveAccessToken}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        valueInputOption: "USER_ENTERED",
-        data: [
-          { range: "Clientes!A1", values: clientsData },
-          { range: "Créditos!A1", values: creditsData },
-          { range: "Pagos!A1", values: paymentsData },
-          { range: "Ventas_Directas!A1", values: salesData },
-          { range: "Config!A1", values: configData }
-        ]
-      })
-    });
+    if (!res.ok) {
+      throw new Error(`Error en el servidor de Apps Script (${res.status})`);
+    }
 
-    if (!updateRes.ok) {
-      const errJson = await updateRes.json().catch(() => ({}));
-      throw new Error(errJson.error?.message || "Error al escribir datos en Google Sheets");
+    const json = await res.json();
+    if (!json.success) {
+      throw new Error(json.error || "No se pudo escribir en el spreadsheet.");
     }
 
     localStorage.setItem(BACKUP_LAST_SHEETS_KEY, nowStr);
-    localStorage.setItem("hogarflex_spreadsheet_id", spreadsheetId);
     renderBackupSection();
 
     if (!isSilent) {
-      showSheetsStatus(`✅ Respaldo completado: ${nowStr}`, "success");
+      showSheetsStatus(`✅ Sincronización exitosa con HogarFlex_DB: ${nowStr}`, "success");
       showCloudSyncToast(`✅ Guardado con éxito en Google Sheets (${nowStr})`, "success");
     }
   } catch (err) {
-    console.error("Error al exportar a Google Sheets:", err);
+    console.error("Error al exportar a Google Sheets vía Apps Script:", err);
     if (!isSilent) {
       showSheetsStatus(`Error: ${err.message || err}`, "error");
       showCloudSyncToast(`Error al guardar en la nube: ${err.message || err}`, "error");
@@ -8226,9 +8085,7 @@ async function exportToGoogleSheets(isSilent = false) {
   }
 }
 
-// ============================================================
-// IMPORTAR DESDE GOOGLE SHEETS (MÓDULO 1: PERSISTENCIA)
-// ============================================================
+// IMPORTAR DESDE GOOGLE SHEETS VÍA APPS SCRIPT
 async function importFromGoogleSheets(isSilent = false) {
   if (isImportingSheets || isExportingSheets) return;
 
@@ -8240,10 +8097,10 @@ async function importFromGoogleSheets(isSilent = false) {
     return;
   }
 
-  if (!gdriveAccessToken) {
+  const scriptUrl = getAppsScriptUrl();
+  if (!scriptUrl) {
     if (!isSilent) {
-      const wantConnect = confirm("Debes conectar tu cuenta de Google antes de recargar. ¿Deseas conectarla ahora?");
-      if (wantConnect) connectWithGoogle();
+      showSheetsStatus("Por favor configura la URL de Google Apps Script en la sección de Respaldo.", "error");
     }
     return;
   }
@@ -8252,83 +8109,29 @@ async function importFromGoogleSheets(isSilent = false) {
   setCloudButtonsLoading(true, "import");
 
   if (!isSilent) {
-    showCloudSyncToast("⏳ Descargando base de datos desde Google Sheets...", "info");
-    showSheetsStatus("⏳ Descargando base de datos desde Google Sheets...", "info");
+    showCloudSyncToast("⏳ Descargando base de datos desde HogarFlex_DB...", "info");
+    showSheetsStatus("⏳ Descargando base de datos desde Google Sheets vía Apps Script...", "info");
   }
 
   try {
-    // Si es modo demo (token simulado)
-    if (gdriveAccessToken.startsWith("demo_token_")) {
-      await new Promise((r) => setTimeout(r, 800));
-      if (!isSilent) {
-        showSheetsStatus("✅ Datos recargados desde Google Sheets (Modo Demostración)", "success");
-        showCloudSyncToast("✅ Datos recargados desde la nube (Modo Demostración)", "success");
-      }
-      return;
+    const fetchUrl = scriptUrl + (scriptUrl.includes("?") ? "&" : "?") + "action=read";
+    const res = await fetch(fetchUrl, { method: "GET" });
+
+    if (!res.ok) {
+      throw new Error(`Error al leer del Apps Script (${res.status})`);
     }
 
-    // 1. Buscar el archivo "HogarFlex_DB" en Google Drive por nombre
-    const searchRes = await fetch(
-      "https://www.googleapis.com/drive/v3/files?q=name='HogarFlex_DB' and mimeType='application/vnd.google-apps.spreadsheet' and trashed=false&fields=files(id,name)",
-      { headers: { Authorization: `Bearer ${gdriveAccessToken}` } }
-    );
-
-    if (searchRes.status === 401) {
-      disconnectGoogle();
-      throw new Error("La sesión de Google expiró. Por favor vuelve a conectar tu cuenta.");
+    const json = await res.json();
+    if (!json.success) {
+      throw new Error(json.error || "Error al obtener datos del spreadsheet.");
     }
 
-    if (!searchRes.ok) {
-      const errJson = await searchRes.json().catch(() => ({}));
-      throw new Error(errJson.error?.message || `Error al buscar en Google Drive (${searchRes.status})`);
-    }
-
-    const searchData = await searchRes.json();
-    const spreadsheetId = searchData.files && searchData.files.length > 0 ? searchData.files[0].id : null;
-
-    if (!spreadsheetId) {
-      throw new Error("No se encontró el archivo 'HogarFlex_DB' en tu Google Drive. Guarda primero en la nube para crearlo.");
-    }
-
-    localStorage.setItem("hogarflex_spreadsheet_id", spreadsheetId);
-
-    // 2. Leer las 5 pestañas en batchGet: Clientes, Créditos, Pagos, Ventas_Directas, Config
-    const ranges = encodeURIComponent("Clientes!A:Z") + "&ranges=" +
-      encodeURIComponent("Créditos!A:Z") + "&ranges=" +
-      encodeURIComponent("Pagos!A:Z") + "&ranges=" +
-      encodeURIComponent("Ventas_Directas!A:Z") + "&ranges=" +
-      encodeURIComponent("Config!A:Z");
-
-    const batchRes = await fetch(
-      `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values:batchGet?ranges=${ranges}`,
-      { headers: { Authorization: `Bearer ${gdriveAccessToken}` } }
-    );
-
-    if (batchRes.status === 401) {
-      disconnectGoogle();
-      throw new Error("La sesión de Google expiró. Por favor vuelve a conectar tu cuenta.");
-    }
-
-    if (!batchRes.ok) {
-      const errJson = await batchRes.json().catch(() => ({}));
-      throw new Error(errJson.error?.message || `Error al leer de Google Sheets (${batchRes.status})`);
-    }
-
-    const batchData = await batchRes.json();
-    const valueRanges = batchData.valueRanges || [];
-
-    // Mapear cada pestaña por nombre normalizado
-    const sheetsMap = {};
-    valueRanges.forEach((vr) => {
-      const sheetTitle = (vr.range || "").split("!")[0].replace(/'/g, "").trim();
-      sheetsMap[sheetTitle] = vr.values || [];
-    });
-
-    const clientsRows = sheetsMap["Clientes"] || [];
-    const creditsRows = sheetsMap["Créditos"] || [];
-    const paymentsRows = sheetsMap["Pagos"] || [];
-    const salesRows = sheetsMap["Ventas_Directas"] || [];
-    const configRows = sheetsMap["Config"] || [];
+    const sheetsData = json.data || {};
+    const clientsRows = sheetsData["Clientes"] || [];
+    const creditsRows = sheetsData["Créditos"] || [];
+    const paymentsRows = sheetsData["Pagos"] || [];
+    const salesRows = sheetsData["Ventas_Directas"] || [];
+    const configRows = sheetsData["Config"] || [];
 
     // Validar si las pestañas tienen filas con datos más allá del encabezado
     const hasClientData = clientsRows.length > 1;
@@ -8336,7 +8139,11 @@ async function importFromGoogleSheets(isSilent = false) {
     const hasSalesData = salesRows.length > 1;
 
     if (!hasClientData && !hasCreditData && !hasSalesData) {
-      throw new Error("La base de datos 'HogarFlex_DB' en Google Sheets está vacía o sin registros válidos.");
+      console.log("[HogarFlex Cloud Import] La base de datos en Google Sheets aún no contiene registros.");
+      if (!isSilent) {
+        showSheetsStatus("ℹ️ La hoja HogarFlex_DB está lista y esperando su primer respaldo.", "info");
+      }
+      return;
     }
 
     // 3. Procesar CLIENTES (hoja 1) -> hogarflex_clients
@@ -8677,7 +8484,7 @@ async function importFromGoogleSheets(isSilent = false) {
       showCloudSyncToast(successSummary, "success");
     }
   } catch (err) {
-    console.error("Error al importar desde Google Sheets:", err);
+    console.error("Error al importar desde Google Sheets vía Apps Script:", err);
     if (!isSilent) {
       showSheetsStatus(`Error al recargar desde la nube: ${err.message || err}`, "error");
       showCloudSyncToast(`Error al recargar: ${err.message || err}`, "error");
@@ -8728,7 +8535,7 @@ function setCloudButtonsLoading(isLoading, action = "export") {
         btnExport.setAttribute("disabled", "true");
         btnExport.innerHTML = `<span class="spinner-icon">🔄</span> <span>Guardando en la nube...</span>`;
       } else {
-        if (gdriveAccessToken) btnExport.removeAttribute("disabled");
+        btnExport.removeAttribute("disabled");
         btnExport.innerHTML = `<span class="btn-icon">☁️⬆️</span> <span class="btn-text">Guardar en la nube</span>`;
       }
     }
@@ -8747,7 +8554,7 @@ function setCloudButtonsLoading(isLoading, action = "export") {
         btnImport.setAttribute("disabled", "true");
         btnImport.innerHTML = `<span class="spinner-icon">🔄</span> <span>Recargando de la nube...</span>`;
       } else {
-        if (gdriveAccessToken) btnImport.removeAttribute("disabled");
+        btnImport.removeAttribute("disabled");
         btnImport.innerHTML = `<span class="btn-icon">☁️⬇️</span> <span class="btn-text">Recargar desde la nube</span>`;
       }
     }
@@ -8803,7 +8610,7 @@ function showCloudSyncToast(message, type = "info") {
   }
 }
 
-// EXPORTAR COMPROBANTES A GOOGLE DRIVE (PASO 5)
+// EXPORTAR COMPROBANTES A GOOGLE DRIVE VÍA APPS SCRIPT
 async function exportReceiptsToGoogleDrive() {
   if (isExportingReceipts) return;
 
@@ -8812,15 +8619,16 @@ async function exportReceiptsToGoogleDrive() {
     return;
   }
 
-  if (!gdriveAccessToken) {
-    alert("Debes conectar tu cuenta de Google antes de exportar.");
+  const scriptUrl = getAppsScriptUrl();
+  if (!scriptUrl) {
+    alert("Por favor configura la URL de Google Apps Script antes de exportar.");
     return;
   }
 
   isExportingReceipts = true;
   const exportBtn = document.getElementById("btn-export-receipts");
 
-  showReceiptsStatus("⏳ Buscando y exportando comprobantes a Google Drive...", "info");
+  showReceiptsStatus("⏳ Buscando y exportando comprobantes a Google Drive vía Apps Script...", "info");
   if (exportBtn) exportBtn.setAttribute("disabled", "true");
 
   try {
@@ -8858,135 +8666,41 @@ async function exportReceiptsToGoogleDrive() {
       return;
     }
 
-    // Modo demo
-    if (gdriveAccessToken.startsWith("demo_token_")) {
-      await new Promise((r) => setTimeout(r, 1200));
-      showReceiptsStatus(`✅ ${receiptsToUpload.length} comprobantes exportados (Modo Demostración)`, "success");
-      return;
-    }
-
-    // 1. Buscar o crear carpeta "HogarFlex_Comprobantes"
-    let parentFolderId = await getOrCreateDriveFolder("HogarFlex_Comprobantes");
-
-    // 2. Cachear subcarpetas de meses
-    const monthFolderIds = {};
     let uploadedCount = 0;
-
     for (const item of receiptsToUpload) {
-      if (!monthFolderIds[item.monthFolder]) {
-        monthFolderIds[item.monthFolder] = await getOrCreateDriveFolder(item.monthFolder, parentFolderId);
-      }
-      const targetFolderId = monthFolderIds[item.monthFolder];
-
-      // 3. Verificar si el archivo ya existe en esa carpeta
-      const exists = await checkFileExistsInDrive(item.fileName, targetFolderId);
-      if (!exists) {
-        await uploadImageToDrive(item.fileName, item.base64, targetFolderId);
-        uploadedCount++;
+      try {
+        const res = await fetch(scriptUrl, {
+          method: "POST",
+          body: JSON.stringify({
+            action: "upload_receipt",
+            fileName: item.fileName,
+            monthFolder: item.monthFolder,
+            base64: item.base64
+          })
+        });
+        if (res.ok) {
+          const json = await res.json();
+          if (json.success && !json.alreadyExists) {
+            uploadedCount++;
+          }
+        }
+      } catch (uploadErr) {
+        console.warn("Error subiendo comprobante individual:", item.fileName, uploadErr);
       }
     }
 
     if (uploadedCount > 0) {
-      showReceiptsStatus(`✅ ${uploadedCount} comprobantes exportados`, "success");
+      showReceiptsStatus(`✅ ${uploadedCount} comprobantes subidos a Drive`, "success");
     } else {
       showReceiptsStatus(`✅ Todos los comprobantes (${receiptsToUpload.length}) ya estaban sincronizados en Drive.`, "success");
     }
   } catch (err) {
-    console.error("Error al exportar comprobantes:", err);
+    console.error("Error al exportar comprobantes vía Apps Script:", err);
     showReceiptsStatus(`Error: ${err.message || err}`, "error");
   } finally {
     isExportingReceipts = false;
     if (exportBtn) exportBtn.removeAttribute("disabled");
   }
-}
-
-// Auxiliar: Buscar o crear carpeta en Drive
-async function getOrCreateDriveFolder(folderName, parentId = null) {
-  let query = `name='${folderName}' and mimeType='application/vnd.google-apps.folder' and trashed=false`;
-  if (parentId) {
-    query += ` and '${parentId}' in parents`;
-  }
-
-  const res = await fetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name)`, {
-    headers: { Authorization: `Bearer ${gdriveAccessToken}` }
-  });
-  if (res.status === 401) {
-    disconnectGoogle();
-    throw new Error("Sesión de Google expirada.");
-  }
-  const data = await res.json();
-  if (data.files && data.files.length > 0) {
-    return data.files[0].id;
-  }
-
-  // Crear carpeta
-  const body = {
-    name: folderName,
-    mimeType: "application/vnd.google-apps.folder"
-  };
-  if (parentId) {
-    body.parents = [parentId];
-  }
-
-  const createRes = await fetch("https://www.googleapis.com/drive/v3/files", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${gdriveAccessToken}`,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify(body)
-  });
-  const newFolder = await createRes.json();
-  return newFolder.id;
-}
-
-// Auxiliar: Verificar si archivo ya existe en carpeta
-async function checkFileExistsInDrive(fileName, parentFolderId) {
-  const query = `name='${fileName}' and '${parentFolderId}' in parents and trashed=false`;
-  const res = await fetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id)`, {
-    headers: { Authorization: `Bearer ${gdriveAccessToken}` }
-  });
-  const data = await res.json();
-  return data.files && data.files.length > 0;
-}
-
-// Auxiliar: Subir imagen base64 a Google Drive (multipart)
-async function uploadImageToDrive(fileName, base64Data, parentFolderId) {
-  const parts = base64Data.split(";base64,");
-  const contentType = (parts[0] || "").replace("data:", "") || "image/jpeg";
-  const byteChars = atob(parts[1]);
-  const byteArrays = [];
-  for (let offset = 0; offset < byteChars.length; offset += 512) {
-    const slice = byteChars.slice(offset, offset + 512);
-    const byteNumbers = new Array(slice.length);
-    for (let i = 0; i < slice.length; i++) {
-      byteNumbers[i] = slice.charCodeAt(i);
-    }
-    byteArrays.push(new Uint8Array(byteNumbers));
-  }
-  const fileBlob = new Blob(byteArrays, { type: contentType });
-
-  const metadata = {
-    name: fileName,
-    parents: [parentFolderId],
-    mimeType: contentType
-  };
-
-  const form = new FormData();
-  form.append("metadata", new Blob([JSON.stringify(metadata)], { type: "application/json" }));
-  form.append("file", fileBlob);
-
-  const res = await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${gdriveAccessToken}` },
-    body: form
-  });
-
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.error?.message || "Error al subir archivo a Drive");
-  }
-  return await res.json();
 }
 
 // Auxiliares de interfaz para mostrar mensajes de estado
@@ -9032,8 +8746,7 @@ function showReceiptsStatus(message, type) {
   el.classList.remove("hidden");
 }
 
-
-// Exportar funciones del modulo de respaldo a window
+// Exportar funciones del módulo de respaldo a window
 window.initBackupModule = initBackupModule;
 window.renderBackupSection = renderBackupSection;
 window.exportToGoogleSheets = exportToGoogleSheets;
@@ -9042,5 +8755,6 @@ window.triggerAutoCloudBackup = triggerAutoCloudBackup;
 window.setCloudButtonsLoading = setCloudButtonsLoading;
 window.showCloudSyncToast = showCloudSyncToast;
 window.exportReceiptsToGoogleDrive = exportReceiptsToGoogleDrive;
-window.connectWithGoogle = connectWithGoogle;
-window.disconnectGoogle = disconnectGoogle;
+window.getAppsScriptUrl = getAppsScriptUrl;
+window.setAppsScriptUrl = setAppsScriptUrl;
+window.updateBackendStatusUI = updateBackendStatusUI;
