@@ -6,14 +6,10 @@
  * Este script es una extensión ligada (container-bound) a la hoja de cálculo HogarFlex_DB.
  * Se crea dentro del propio Google Sheets: Extensiones -> Apps Script.
  * 
- * CONFIGURACIÓN DE DESPLIEGUE:
- * 1. Clic en botón azul "Implementar" (arriba a la derecha) -> "Nueva implementación".
- * 2. Selecciona tipo: "Aplicación web".
- * 3. Descripción: HogarFlex Backend v1
- * 4. Ejecutar como: "Yo (messiyorman123@gmail.com)"
- * 5. Quién tiene acceso: "Cualquier persona" (Anyone)
- * 6. Clic en "Implementar", autoriza los permisos de tu cuenta y copia la URL generada.
- *    (Ejemplo de URL: https://script.google.com/macros/s/AKfycb.../exec)
+ * DESPLIEGUE ACTIVO:
+ * ID de implementación: AKfycbwvU1ooJOW4H_aDZaknRYM_RlS_Q_KN2_cEgLYPyvXjojQ1aXfbXTJDFpJrMqrh19DwLw
+ * URL Web App: https://script.google.com/macros/s/AKfycbwvU1ooJOW4H_aDZaknRYM_RlS_Q_KN2_cEgLYPyvXjojQ1aXfbXTJDFpJrMqrh19DwLw/exec
+ * Propietario: messiyorman123@gmail.com
  */
 
 // Nombres estándar de las pestañas
@@ -211,6 +207,9 @@ function doPost(e) {
  * Auxiliar: Respuesta JSON compatible con CORS
  */
 function jsonResponse_(obj) {
+  obj = obj || {};
+  obj.success = true;
+  if (!obj.status) obj.status = "success";
   return ContentService.createTextOutput(JSON.stringify(obj))
     .setMimeType(ContentService.MimeType.JSON);
 }
@@ -220,7 +219,9 @@ function jsonResponse_(obj) {
  */
 function errorResponse_(msg) {
   return ContentService.createTextOutput(JSON.stringify({
+    success: false,
     status: "error",
+    error: msg,
     message: msg
   })).setMimeType(ContentService.MimeType.JSON);
 }

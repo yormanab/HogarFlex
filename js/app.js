@@ -17,7 +17,7 @@ const APPS_SCRIPT_URL_KEY = "hogarflex_apps_script_url";
 
 // URL base de la Web App desplegada en Google Apps Script
 // Se puede configurar o actualizar desde la sección de Respaldo de la app
-const DEFAULT_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwO4U-hogarflex_backend/exec";
+const DEFAULT_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwvU1ooJOW4H_aDZaknRYM_RlS_Q_KN2_cEgLYPyvXjojQ1aXfbXTJDFpJrMqrh19DwLw/exec";
 
 function getAppsScriptUrl() {
   return localStorage.getItem(APPS_SCRIPT_URL_KEY) || DEFAULT_APPS_SCRIPT_URL;
@@ -7753,7 +7753,8 @@ function initBackupModule() {
         const testUrl = val + (val.includes("?") ? "&" : "?") + "action=read";
         const res = await fetch(testUrl, { method: "GET" });
         const json = await res.json();
-        if (json && json.success) {
+        const isSuccess = json && (json.status === "success" || json.success === true);
+        if (isSuccess) {
           if (feedback) {
             feedback.style.color = "#15803d";
             feedback.textContent = "✅ Conexión exitosa con HogarFlex_DB en Google Apps Script!";
@@ -7761,7 +7762,7 @@ function initBackupModule() {
           setAppsScriptUrl(val);
           updateBackendStatusUI(true);
         } else {
-          throw new Error(json.error || "Respuesta no válida del Apps Script");
+          throw new Error(json.message || json.error || "Respuesta no válida del Apps Script");
         }
       } catch (err) {
         if (feedback) {
@@ -8058,8 +8059,9 @@ async function exportToGoogleSheets(isSilent = false) {
     }
 
     const json = await res.json();
-    if (!json.success) {
-      throw new Error(json.error || "No se pudo escribir en el spreadsheet.");
+    const isSuccess = json && (json.status === "success" || json.success === true);
+    if (!isSuccess) {
+      throw new Error(json.message || json.error || "No se pudo escribir en el spreadsheet.");
     }
 
     localStorage.setItem(BACKUP_LAST_SHEETS_KEY, nowStr);
@@ -8122,8 +8124,9 @@ async function importFromGoogleSheets(isSilent = false) {
     }
 
     const json = await res.json();
-    if (!json.success) {
-      throw new Error(json.error || "Error al obtener datos del spreadsheet.");
+    const isSuccess = json && (json.status === "success" || json.success === true);
+    if (!isSuccess) {
+      throw new Error(json.message || json.error || "Error al obtener datos del spreadsheet.");
     }
 
     const sheetsData = json.data || {};
@@ -8680,7 +8683,8 @@ async function exportReceiptsToGoogleDrive() {
         });
         if (res.ok) {
           const json = await res.json();
-          if (json.success && !json.alreadyExists) {
+          const isSuccess = json && (json.status === "success" || json.success === true);
+          if (isSuccess && !json.alreadyExists) {
             uploadedCount++;
           }
         }
