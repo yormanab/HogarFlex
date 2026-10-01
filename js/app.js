@@ -30,6 +30,57 @@ let gdriveTokenClient = null;
 let isExportingSheets = false;
 let isImportingSheets = false;
 let isExportingReceipts = false;
+let autoBackupDebounceTimer = null;
+let pendingBackupReasons = new Set();
+
+// ============================================================
+// AUTO-SINCRONIZACIÓN EN SEGUNDO PLANO A GOOGLE SHEETS
+// ============================================================
+function triggerAutoCloudBackup(source = "datos") {
+  // Evitar auto-exportación si estamos en medio de una importación activa desde Sheets
+  if (typeof isImportingSheets !== "undefined" && isImportingSheets) {
+    return;
+  }
+
+  pendingBackupReasons.add(source);
+  console.log(`[HogarFlex Cloud Auto-Backup] 🔔 Cambio detectado en "${source}". Encolando sincronización automática a Google Sheets...`);
+
+  if (autoBackupDebounceTimer) {
+    clearTimeout(autoBackupDebounceTimer);
+  }
+
+  // Debounce de 400ms para agrupar operaciones rápidas o secuenciales
+  autoBackupDebounceTimer = setTimeout(async () => {
+    const reasons = Array.from(pendingBackupReasons).join(", ");
+    pendingBackupReasons.clear();
+
+    if (!navigator.onLine) {
+      console.warn(`[HogarFlex Cloud Auto-Backup] ⚠️ Sin conexión a internet. Los cambios en (${reasons}) quedan seguros en localStorage y se sincronizarán al recuperar conectividad.`);
+      return;
+    }
+
+    if (!gdriveAccessToken) {
+      console.warn(`[HogarFlex Cloud Auto-Backup] ℹ️ Google Drive no conectado aún. Los cambios en (${reasons}) se guardaron en localStorage.`);
+      return;
+    }
+
+    try {
+      if (typeof isExportingSheets !== "undefined" && isExportingSheets) {
+        console.log(`[HogarFlex Cloud Auto-Backup] ⏳ Exportación previa en curso. Reintentando sincronización de (${reasons}) en 800ms...`);
+        setTimeout(() => triggerAutoCloudBackup(source), 800);
+        return;
+      }
+
+      console.log(`[HogarFlex Cloud Auto-Backup] 🚀 Disparando exportToGoogleSheets(true) en segundo plano por cambio en: ${reasons}...`);
+      if (typeof exportToGoogleSheets === "function") {
+        await exportToGoogleSheets(true);
+        console.log(`[HogarFlex Cloud Auto-Backup] ✅ Cambios sincronizados con Google Sheets exitosamente (${reasons}).`);
+      }
+    } catch (err) {
+      console.error(`[HogarFlex Cloud Auto-Backup] ❌ Error en auto-sincronización (${reasons}):`, err);
+    }
+  }, 400);
+}
 
 // Variables de respaldo inicializadas arriba
 
@@ -220,6 +271,7 @@ function getStoredProducts() {
 function saveProductsToStorage(products) {
   try {
     localStorage.setItem(PRODUCTS_STORAGE_KEY, JSON.stringify(products));
+    triggerAutoCloudBackup("productos");
   } catch (err) {
     console.error("Error al guardar productos en localStorage:", err);
     alert("No se pudo guardar el producto. Espacio de almacenamiento lleno.");
@@ -618,6 +670,7 @@ function getStoredClients() {
 function saveClientsToStorage(clients) {
   try {
     localStorage.setItem(CLIENTS_STORAGE_KEY, JSON.stringify(clients));
+    triggerAutoCloudBackup("clientes");
   } catch (err) {
     console.error("Error al guardar clientes en localStorage:", err);
     alert("No se pudo guardar la información del cliente. Almacenamiento lleno.");
@@ -1097,6 +1150,7 @@ function getStoredCredits() {
 function saveCreditsToStorage(credits) {
   try {
     localStorage.setItem(CREDITS_STORAGE_KEY, JSON.stringify(credits));
+    triggerAutoCloudBackup("créditos/pagos");
   } catch (err) {
     console.error("Error al guardar créditos en localStorage:", err);
     alert("No se pudo guardar el crédito. Almacenamiento lleno.");
@@ -3801,6 +3855,7 @@ function getStoredSales() {
 function saveSalesToStorage(sales) {
   try {
     localStorage.setItem(SALES_STORAGE_KEY, JSON.stringify(sales));
+    triggerAutoCloudBackup("ventas_directas");
   } catch (err) {
     console.error("Error al guardar ventas directas en localStorage:", err);
     alert("No se pudo guardar la venta directa. Espacio de almacenamiento lleno.");
@@ -4713,6 +4768,7 @@ function getStoredSuppliers() {
 function saveSuppliersToStorage(suppliers) {
   try {
     localStorage.setItem(SUPPLIERS_STORAGE_KEY, JSON.stringify(suppliers));
+    triggerAutoCloudBackup("proveedores");
   } catch (err) {
     console.error("Error al guardar proveedores en localStorage:", err);
     alert("No se pudo guardar la información del proveedor. Almacenamiento lleno.");
@@ -4732,6 +4788,7 @@ function getStoredExpenses() {
 function saveExpensesToStorage(expenses) {
   try {
     localStorage.setItem(EXPENSES_STORAGE_KEY, JSON.stringify(expenses));
+    triggerAutoCloudBackup("gastos");
   } catch (err) {
     console.error("Error al guardar gastos en localStorage:", err);
     alert("No se pudo guardar el gasto. Almacenamiento lleno.");
@@ -6612,6 +6669,7 @@ function getStoredInvoices() {
 function saveInvoicesToStorage(invoices) {
   try {
     localStorage.setItem(INVOICES_STORAGE_KEY, JSON.stringify(invoices));
+    triggerAutoCloudBackup("facturación");
   } catch (e) {
     console.error("Error al guardar facturas en localStorage:", e);
   }
@@ -7911,6 +7969,7 @@ function disconnectGoogle() {
 
 // EXPORTAR A GOOGLE SHEETS (PASO 4)
 async function exportToGoogleSheets(isSilent = false) {
+  console.log(`[HogarFlex Cloud Export] 🚀 Iniciando exportToGoogleSheets(isSilent = ${isSilent})...`);
   if (isExportingSheets) return;
 
   if (!navigator.onLine) {
@@ -8315,6 +8374,20 @@ async function importFromGoogleSheets(isSilent = false) {
       });
     }
 
+    // Preservar clientes locales que aún no se hayan subido a Google Sheets
+    let hasUnsyncedLocal = false;
+    existingClients.forEach((locC) => {
+      const alreadyInImported = importedClients.some((impC) =>
+        (locC.dni && impC.dni && locC.dni.trim().toLowerCase() === impC.dni.trim().toLowerCase()) ||
+        (locC.id && impC.id === locC.id)
+      );
+      if (!alreadyInImported && (locC.dni || locC.name)) {
+        console.log(`[HogarFlex Cloud Import] 🛡️ Preservando cliente local no sincronizado en Sheets: "${locC.name}" (${locC.dni})`);
+        importedClients.push(locC);
+        hasUnsyncedLocal = true;
+      }
+    });
+
     // 4. Procesar PAGOS (hoja 3) -> indexados por ID Crédito y Nombre Cliente
     const paymentsByCreditId = {};
     const paymentsByClientName = {};
@@ -8483,6 +8556,16 @@ async function importFromGoogleSheets(isSilent = false) {
       importedCredits.push(creditObj);
     }
 
+    // Preservar créditos locales que aún no se hayan subido a Google Sheets
+    existingCredits.forEach((locCr) => {
+      const alreadyInImported = importedCredits.some((impCr) => impCr.id === locCr.id);
+      if (!alreadyInImported && locCr.id) {
+        console.log(`[HogarFlex Cloud Import] 🛡️ Preservando crédito local no sincronizado en Sheets: "${locCr.id}"`);
+        importedCredits.push(locCr);
+        hasUnsyncedLocal = true;
+      }
+    });
+
     // 6. Procesar VENTAS DIRECTAS (hoja 4) -> hogarflex_ventas_directas
     const existingSales = getStoredSales();
     const existingSaleMap = {};
@@ -8538,6 +8621,16 @@ async function importFromGoogleSheets(isSilent = false) {
       });
     }
 
+    // Preservar ventas directas locales no sincronizadas en Sheets
+    existingSales.forEach((locS) => {
+      const alreadyInImported = importedSales.some((impS) => impS.id === locS.id);
+      if (!alreadyInImported && locS.id) {
+        console.log(`[HogarFlex Cloud Import] 🛡️ Preservando venta directa local no sincronizada: "${locS.id}"`);
+        importedSales.push(locS);
+        hasUnsyncedLocal = true;
+      }
+    });
+
     // 7. Procesar CONFIGURACIÓN (hoja 5) -> hogarflex_config
     const importedConfig = {};
     for (let cfgIdx = 1; cfgIdx < configRows.length; cfgIdx++) {
@@ -8562,6 +8655,12 @@ async function importFromGoogleSheets(isSilent = false) {
       if (importedConfig["Fecha Último Respaldo"]) {
         localStorage.setItem(BACKUP_LAST_SHEETS_KEY, importedConfig["Fecha Último Respaldo"]);
       }
+    }
+
+    // Si se detectaron registros locales no sincronizados, disparar subida automática para persistirlos en Sheets
+    if (hasUnsyncedLocal) {
+      console.log("[HogarFlex Cloud Import] ⚡ Detectados registros locales pendientes de subir a Sheets. Ejecutando auto-backup inmediato...");
+      triggerAutoCloudBackup("registros-locales-recientes");
     }
 
     // 9. Actualizar todas las vistas activas
@@ -8939,6 +9038,7 @@ window.initBackupModule = initBackupModule;
 window.renderBackupSection = renderBackupSection;
 window.exportToGoogleSheets = exportToGoogleSheets;
 window.importFromGoogleSheets = importFromGoogleSheets;
+window.triggerAutoCloudBackup = triggerAutoCloudBackup;
 window.setCloudButtonsLoading = setCloudButtonsLoading;
 window.showCloudSyncToast = showCloudSyncToast;
 window.exportReceiptsToGoogleDrive = exportReceiptsToGoogleDrive;
