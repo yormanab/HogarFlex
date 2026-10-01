@@ -10,7 +10,7 @@ const logoBase64 = LOGO_BASE64;
 // ============================================================
 // FASE 11: CONFIGURACIÃ“N GOOGLE API & RESPALDO
 // ============================================================
-const GDRIVE_CLIENT_ID = 'TU_CLIENT_ID_AQUI';
+const GDRIVE_CLIENT_ID = '225597172709-ql0hh87u6d6kuqo6tupa0v7e9sd9rqko.apps.googleusercontent.com';
 const GDRIVE_API_KEY = 'TU_API_KEY_AQUI';
 const GDRIVE_SCOPES = 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/spreadsheets';
 
@@ -19,6 +19,11 @@ const BACKUP_AUTO_CLOSE_KEY = "hogarflex_auto_backup_on_close";
 const GDRIVE_TOKEN_KEY = "hogarflex_gdrive_token";
 const GDRIVE_EMAIL_KEY = "hogarflex_gdrive_email";
 
+const savedGdriveToken = sessionStorage.getItem(GDRIVE_TOKEN_KEY);
+if (savedGdriveToken && savedGdriveToken.startsWith("demo_token_")) {
+  sessionStorage.removeItem(GDRIVE_TOKEN_KEY);
+  sessionStorage.removeItem(GDRIVE_EMAIL_KEY);
+}
 let gdriveAccessToken = sessionStorage.getItem(GDRIVE_TOKEN_KEY) || null;
 let gdriveUserEmail = sessionStorage.getItem(GDRIVE_EMAIL_KEY) || null;
 let gdriveTokenClient = null;
@@ -7789,14 +7794,8 @@ function connectWithGoogle() {
     alert("Sin conexión. El respaldo se hará cuando vuelva el internet.");
     return;
   }
-
-    // Si tiene credenciales placeholder
   if (GDRIVE_CLIENT_ID === "TU_CLIENT_ID_AQUI" || !GDRIVE_CLIENT_ID) {
-    gdriveAccessToken = "demo_token_" + Date.now();
-    gdriveUserEmail = "yorgelis.hogarflex@gmail.com (Demo)";
-    sessionStorage.setItem(GDRIVE_TOKEN_KEY, gdriveAccessToken);
-    sessionStorage.setItem(GDRIVE_EMAIL_KEY, gdriveUserEmail);
-    updateGoogleConnectUI(true);
+    alert("Respaldo no configurado");
     return;
   }
 
