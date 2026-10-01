@@ -2508,7 +2508,7 @@
                 <h3 style="margin: 0; font-size: 1.1rem; color: var(--color-primary); font-weight: 700;">Base de Datos (Google Sheets)</h3>
               </div>
               <p style="color: var(--color-text-muted); font-size: 0.88rem; line-height: 1.5; margin-bottom: 14px;">
-                Sincroniza directamente con la hoja de cálculo <code>HogarFlex_DB</code> en las pestañas <strong>Clientes</strong>, <strong>Créditos</strong>, <strong>Pagos</strong>, <strong>Ventas Directas</strong> y <strong>Configuración</strong>.
+                Sincroniza directamente con la hoja de cálculo <code>HogarFlex_DB</code> en las pestañas <strong>Clientes</strong>, <strong>Créditos</strong>, <strong>Pagos</strong>, <strong>Ventas Directas</strong>, <strong>Proveedores</strong>, <strong>Facturas</strong>, <strong>Productos</strong> y <strong>Configuración</strong>.
               </p>
               <div style="background: #f8fafc; border-radius: 8px; padding: 10px 12px; font-size: 0.84rem; color: #475569; margin-bottom: 16px;">
                 🕒 <span id="sheets-last-backup-text">Último respaldo: Nunca</span>
@@ -2533,25 +2533,25 @@
             </div>
           </div>
 
-          <!-- 2. Exportar Comprobantes a Drive -->
+          <!-- 2. Exportar Comprobantes y Fotos a Drive -->
           <div class="card" style="background: #ffffff; border: 1px solid var(--color-border); border-radius: 12px; padding: 22px; box-shadow: var(--shadow-sm); display: flex; flex-direction: column; justify-content: space-between;">
             <div>
               <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
                 <span style="font-size: 1.6rem;">📁</span>
-                <h3 style="margin: 0; font-size: 1.1rem; color: var(--color-primary); font-weight: 700;">Comprobantes (Google Drive)</h3>
+                <h3 style="margin: 0; font-size: 1.1rem; color: var(--color-primary); font-weight: 700;">Archivos y Fotos (Google Drive)</h3>
               </div>
               <p style="color: var(--color-text-muted); font-size: 0.88rem; line-height: 1.5; margin-bottom: 14px;">
-                Guarda los comprobantes de pagos en la carpeta <code>HogarFlex_Comprobantes</code> de Google Drive organizada por meses sin duplicados a través del Apps Script.
+                Guarda los comprobantes de pagos en <code>HogarFlex_Comprobantes</code> y las fotos de productos en <code>HogarFlex_Productos</code> de Google Drive sin duplicados a través del Apps Script.
               </p>
               <div style="background: #f8fafc; border-radius: 8px; padding: 10px 12px; font-size: 0.84rem; color: #475569; margin-bottom: 16px;">
-                🖼️ <span id="receipts-available-count-text">Comprobantes listos para subir: Calculando...</span>
+                🖼️ <span id="receipts-available-count-text">Archivos listos para Drive: Calculando...</span>
               </div>
             </div>
 
             <div>
               <div id="receipts-status-msg" class="hidden" style="margin-bottom: 12px; padding: 10px; border-radius: 8px; font-size: 0.88rem;"></div>
               <button type="button" id="btn-export-receipts" class="btn-primary-action" style="background: var(--color-primary); color: #fff; width: 100%; justify-content: center; padding: 11px 16px; border-radius: 8px; font-weight: 600; display: inline-flex; align-items: center; gap: 8px; cursor: pointer; border: none;">
-                <span>📁</span> Exportar comprobantes a Drive
+                <span>📁</span> Exportar archivos a Drive
               </button>
             </div>
           </div>

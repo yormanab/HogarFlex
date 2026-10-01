@@ -7873,7 +7873,7 @@ function renderBackupSection() {
       : "Último respaldo: Nunca";
   }
 
-  // Contar comprobantes listos para subir
+  // Contar comprobantes y fotos de productos listos para subir a Drive
   const receiptsCountEl = document.getElementById("receipts-available-count-text");
   if (receiptsCountEl) {
     const credits = getStoredCredits();
@@ -7885,11 +7885,17 @@ function renderBackupSection() {
         }
       });
     });
-    receiptsCountEl.textContent = `Comprobantes con imagen listos: ${totalReceipts}`;
+    const products = getStoredProducts();
+    let totalProdPhotos = 0;
+    products.forEach((p) => {
+      if (p.photo && p.photo.startsWith("data:image")) {
+        totalProdPhotos++;
+      }
+    });
+    receiptsCountEl.textContent = `Archivos listos para Drive: ${totalReceipts} comprobante(s) + ${totalProdPhotos} foto(s) de productos`;
   }
 }
 
-// Actualizar interfaz según estado del Backend Google Apps Script
 function updateBackendStatusUI(isConnected, message = "") {
   const badge = document.getElementById("backend-status-badge");
   const feedback = document.getElementById("backend-url-feedback");
@@ -7949,10 +7955,13 @@ async function exportToGoogleSheets(isSilent = false) {
   }
 
   try {
-    // 1. Recopilar datos desde localStorage
+    // 1. Recopilar todos los datos desde localStorage
     const clients = getStoredClients();
     const credits = getStoredCredits();
     const sales = getStoredSales();
+    const suppliers = getStoredSuppliers();
+    const invoices = getStoredInvoices();
+    const products = getStoredProducts();
 
     // Hoja 1: Clientes (cédula, nombre, teléfono, dirección)
     const clientsData = [
@@ -8023,9 +8032,90 @@ async function exportToGoogleSheets(isSilent = false) {
       })
     ];
 
+    // Hoja 5: Proveedores (ID, Nombre, Teléfono, Dirección, Categoría, Notas)
+    const suppliersData = [
+      ["ID", "Nombre", "Teléfono", "Dirección", "Categoría", "Notas"],
+      ...suppliers.map((s) => [
+        s.id || "",
+        s.name || "",
+        s.phone || "",
+        s.location || s.address || "",
+        s.category || (Array.isArray(s.paymentMethods) ? s.paymentMethods.join(", ") : (s.paymentMethods || "General")),
+        s.notes || ""
+      ])
+    ];
+
+    // Hoja 6: Facturas (ID Factura, Cliente, Productos, Total USD, Fecha, Estado)
+    const invoicesData = [
+      ["ID Factura", "Cliente", "Productos", "Total USD", "Fecha", "Estado"],
+      ...invoices.map((inv) => {
+        const clientName = inv.client?.name || "Cliente";
+        const prods = (inv.data?.items || []).map((it) => `${it.name || "Producto"} (x${it.quantity || 1})`).join(", ");
+        const dateStr = inv.date ? formatDateDisplay(new Date(inv.date)) : "";
+        const status = inv.status || (inv.data?.remainingBalance <= 0 ? "Pagada" : "Emitida");
+        return [
+          inv.docNumber || inv.id || "",
+          clientName,
+          prods,
+          parseFloat(inv.totalAmountUSD) || 0,
+          dateStr,
+          status
+        ];
+      })
+    ];
+
+    // Hoja 7: Productos (ID, Nombre, Descripción, Precio USD, Categoría, Stock)
+    // Las imágenes NO van a Sheets; se suben a Google Drive en HogarFlex_Productos
+    const productsData = [
+      ["ID", "Nombre", "Descripción", "Precio USD", "Categoría", "Stock"],
+      ...products.map((p) => [
+        p.id || "",
+        p.name || "",
+        p.description || "",
+        parseFloat(p.price) || 0,
+        p.category || "General",
+        (p.quantity !== null && p.quantity !== undefined) ? p.quantity : (p.stock || "")
+      ])
+    ];
+
+    // Calcular Métricas para Resumen/Dashboard (Config)
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth();
+    let totalCobradoMesUSD = 0;
+    let totalPendienteUSD = 0;
+
+    credits.forEach((cr) => {
+      (cr.payments || []).forEach((p) => {
+        const amt = parseFloat(p.amountUSD) || 0;
+        if (amt > 0 && p.date) {
+          const d = new Date(p.date);
+          if (!isNaN(d.getTime()) && d.getFullYear() === currentYear && d.getMonth() === currentMonth) {
+            totalCobradoMesUSD += amt;
+          }
+        }
+      });
+      if (cr.status !== "pagado" && cr.status !== "Pagado") {
+        const bal = parseFloat(cr.remainingBalance);
+        if (!isNaN(bal) && bal > 0.01) {
+          totalPendienteUSD += bal;
+        }
+      }
+    });
+
+    sales.forEach((s) => {
+      const amt = parseFloat(s.salePriceUSD) || 0;
+      if (amt > 0 && (s.date || s.createdAt)) {
+        const d = new Date(s.date || s.createdAt);
+        if (!isNaN(d.getTime()) && d.getFullYear() === currentYear && d.getMonth() === currentMonth) {
+          totalCobradoMesUSD += amt;
+        }
+      }
+    });
+
     const nowStr = new Date().toLocaleString("es-VE");
 
-    // Hoja 5: Config (fecha último respaldo, versión app)
+    // Hoja 8: Config (fecha último respaldo, versión app, resumen y KPIs)
     const configData = [
       ["Parámetro", "Valor"],
       ["Fecha Último Respaldo", nowStr],
@@ -8033,11 +8123,15 @@ async function exportToGoogleSheets(isSilent = false) {
       ["Total Clientes", String(clients.length)],
       ["Total Créditos", String(credits.length)],
       ["Total Pagos", String(paymentsData.length - 1)],
-      ["Total Ventas Directas", String(sales.length)]
+      ["Total Ventas Directas", String(sales.length)],
+      ["Total Proveedores", String(suppliers.length)],
+      ["Total Productos", String(products.length)],
+      ["Total Facturas", String(invoices.length)],
+      ["Total cobrado este mes", `$${totalCobradoMesUSD.toFixed(2)} USD`],
+      ["Total pendiente por cobrar", `$${totalPendienteUSD.toFixed(2)} USD`]
     ];
 
-    // 2. Enviar datos al Google Apps Script (POST)
-    // Se envía como string simple para evitar el preflight CORS OPTIONS
+    // 2. Enviar datos completos al Google Apps Script (POST)
     const payload = {
       action: "write",
       data: {
@@ -8045,6 +8139,9 @@ async function exportToGoogleSheets(isSilent = false) {
         "Créditos": creditsData,
         Pagos: paymentsData,
         "Ventas_Directas": salesData,
+        Proveedores: suppliersData,
+        Facturas: invoicesData,
+        Productos: productsData,
         Config: configData
       }
     };
@@ -8066,6 +8163,11 @@ async function exportToGoogleSheets(isSilent = false) {
 
     localStorage.setItem(BACKUP_LAST_SHEETS_KEY, nowStr);
     renderBackupSection();
+
+    // Sincronizar en segundo plano fotos de productos a Google Drive (HogarFlex_Productos)
+    setTimeout(() => {
+      exportProductImagesToGoogleDrive(true).catch(() => {});
+    }, 100);
 
     if (!isSilent) {
       showSheetsStatus(`✅ Sincronización exitosa con HogarFlex_DB: ${nowStr}`, "success");
@@ -8134,14 +8236,16 @@ async function importFromGoogleSheets(isSilent = false) {
     const creditsRows = sheetsData["Créditos"] || [];
     const paymentsRows = sheetsData["Pagos"] || [];
     const salesRows = sheetsData["Ventas_Directas"] || [];
+    const suppliersRows = sheetsData["Proveedores"] || [];
+    const invoicesRows = sheetsData["Facturas"] || [];
+    const productsRows = sheetsData["Productos"] || [];
     const configRows = sheetsData["Config"] || [];
 
     // Validar si las pestañas tienen filas con datos más allá del encabezado
-    const hasClientData = clientsRows.length > 1;
-    const hasCreditData = creditsRows.length > 1;
-    const hasSalesData = salesRows.length > 1;
+    const hasData = clientsRows.length > 1 || creditsRows.length > 1 || salesRows.length > 1 ||
+                    suppliersRows.length > 1 || invoicesRows.length > 1 || productsRows.length > 1;
 
-    if (!hasClientData && !hasCreditData && !hasSalesData) {
+    if (!hasData) {
       console.log("[HogarFlex Cloud Import] La base de datos en Google Sheets aún no contiene registros.");
       if (!isSilent) {
         showSheetsStatus("ℹ️ La hoja HogarFlex_DB está lista y esperando su primer respaldo.", "info");
@@ -8149,7 +8253,9 @@ async function importFromGoogleSheets(isSilent = false) {
       return;
     }
 
-    // 3. Procesar CLIENTES (hoja 1) -> hogarflex_clients
+    let hasUnsyncedLocal = false;
+
+    // 1. Procesar CLIENTES (hoja Clientes) -> hogarflex_clients
     const existingClients = getStoredClients();
     const existingClientByDni = {};
     const existingClientByName = {};
@@ -8184,8 +8290,7 @@ async function importFromGoogleSheets(isSilent = false) {
       });
     }
 
-    // Preservar clientes locales que aún no se hayan subido a Google Sheets
-    let hasUnsyncedLocal = false;
+    // Preservar clientes locales no sincronizados en Sheets
     existingClients.forEach((locC) => {
       const alreadyInImported = importedClients.some((impC) =>
         (locC.dni && impC.dni && locC.dni.trim().toLowerCase() === impC.dni.trim().toLowerCase()) ||
@@ -8198,7 +8303,7 @@ async function importFromGoogleSheets(isSilent = false) {
       }
     });
 
-    // 4. Procesar PAGOS (hoja 3) -> indexados por ID Crédito y Nombre Cliente
+    // 2. Procesar PAGOS (hoja Pagos) -> indexados por ID Crédito y Nombre Cliente
     const paymentsByCreditId = {};
     const paymentsByClientName = {};
 
@@ -8246,7 +8351,7 @@ async function importFromGoogleSheets(isSilent = false) {
       }
     }
 
-    // 5. Procesar CRÉDITOS (hoja 2) con PAGOS anidados -> hogarflex_credits
+    // 3. Procesar CRÉDITOS (hoja Créditos) con PAGOS anidados -> hogarflex_credits
     const existingCredits = getStoredCredits();
     const existingCreditMap = {};
     existingCredits.forEach((c) => {
@@ -8270,7 +8375,6 @@ async function importFromGoogleSheets(isSilent = false) {
 
       const existingCr = existingCreditMap[crId];
 
-      // Vincular con cliente existente o importado
       const matchingClient = importedClients.find((c) =>
         c.name.toLowerCase() === clientName.toLowerCase()
       ) || (existingCr ? existingCr.client : null) || {
@@ -8281,15 +8385,12 @@ async function importFromGoogleSheets(isSilent = false) {
         address: ""
       };
 
-      // Items / Productos
       let items = existingCr && existingCr.items && existingCr.items.length > 0
         ? existingCr.items
         : parseProductsSummaryString(productsSummary, totalSaleUSD);
 
-      // Pagos anidados correspondientes a este crédito
       let creditPayments = paymentsByCreditId[crId] || paymentsByClientName[clientName.toLowerCase()] || [];
 
-      // Preservar comprobantes locales si existían
       if (existingCr && Array.isArray(existingCr.payments)) {
         creditPayments.forEach((p) => {
           const matchP = existingCr.payments.find((lp) =>
@@ -8302,7 +8403,6 @@ async function importFromGoogleSheets(isSilent = false) {
         });
       }
 
-      // Fecha de creación
       let createdAtTime = Date.now();
       if (existingCr && existingCr.createdAt) {
         createdAtTime = existingCr.createdAt;
@@ -8344,7 +8444,6 @@ async function importFromGoogleSheets(isSilent = false) {
         payments: creditPayments
       };
 
-      // Reconstruir cuotas si es necesario
       if (!creditObj.installments || creditObj.installments.length === 0) {
         const debt = Math.max(0, totalSaleUSD - downpaymentAmount);
         const count = creditObj.installmentsCount || 1;
@@ -8366,7 +8465,7 @@ async function importFromGoogleSheets(isSilent = false) {
       importedCredits.push(creditObj);
     }
 
-    // Preservar créditos locales que aún no se hayan subido a Google Sheets
+    // Preservar créditos locales no sincronizados en Sheets
     existingCredits.forEach((locCr) => {
       const alreadyInImported = importedCredits.some((impCr) => impCr.id === locCr.id);
       if (!alreadyInImported && locCr.id) {
@@ -8376,7 +8475,7 @@ async function importFromGoogleSheets(isSilent = false) {
       }
     });
 
-    // 6. Procesar VENTAS DIRECTAS (hoja 4) -> hogarflex_ventas_directas
+    // 4. Procesar VENTAS DIRECTAS (hoja Ventas_Directas) -> hogarflex_ventas_directas
     const existingSales = getStoredSales();
     const existingSaleMap = {};
     existingSales.forEach((s) => {
@@ -8441,7 +8540,161 @@ async function importFromGoogleSheets(isSilent = false) {
       }
     });
 
-    // 7. Procesar CONFIGURACIÓN (hoja 5) -> hogarflex_config
+    // 5. Procesar PROVEEDORES (hoja Proveedores) -> hogarflex_suppliers
+    const existingSuppliers = getStoredSuppliers();
+    const existingSupplierMap = {};
+    existingSuppliers.forEach((s) => {
+      if (s.id) existingSupplierMap[String(s.id).trim()] = s;
+      if (s.name) existingSupplierMap[String(s.name).trim().toLowerCase()] = s;
+    });
+
+    const importedSuppliers = [];
+    for (let supIdx = 1; supIdx < suppliersRows.length; supIdx++) {
+      const row = suppliersRows[supIdx];
+      if (!row || row.length === 0) continue;
+      const sId = String(row[0] || "").trim();
+      const sName = String(row[1] || "").trim();
+      const sPhone = String(row[2] || "").trim();
+      const sLocation = String(row[3] || "").trim();
+      const sCategory = String(row[4] || "").trim();
+      const sNotes = String(row[5] || "").trim();
+
+      if (!sId && !sName) continue;
+
+      const existingSup = existingSupplierMap[sId] || existingSupplierMap[sName.toLowerCase()];
+      importedSuppliers.push({
+        id: sId || ("sup_" + (Date.now() + supIdx)),
+        name: sName,
+        phone: sPhone,
+        location: sLocation,
+        category: sCategory || "General",
+        notes: sNotes,
+        paymentMethods: existingSup && existingSup.paymentMethods ? existingSup.paymentMethods : (sCategory ? [sCategory] : []),
+        productsCost: existingSup && existingSup.productsCost ? existingSup.productsCost : [],
+        createdAt: existingSup && existingSup.createdAt ? existingSup.createdAt : new Date().toISOString()
+      });
+    }
+
+    // Preservar proveedores locales no sincronizados en Sheets
+    existingSuppliers.forEach((locSup) => {
+      const alreadyInImported = importedSuppliers.some((impSup) =>
+        (locSup.id && impSup.id === locSup.id) ||
+        (locSup.name && impSup.name && locSup.name.trim().toLowerCase() === impSup.name.trim().toLowerCase())
+      );
+      if (!alreadyInImported && (locSup.id || locSup.name)) {
+        console.log(`[HogarFlex Cloud Import] 🛡️ Preservando proveedor local no sincronizado en Sheets: "${locSup.name}"`);
+        importedSuppliers.push(locSup);
+        hasUnsyncedLocal = true;
+      }
+    });
+
+    // 6. Procesar FACTURAS (hoja Facturas) -> hogarflex_invoices
+    const existingInvoices = getStoredInvoices();
+    const existingInvoiceMap = {};
+    existingInvoices.forEach((inv) => {
+      if (inv.id) existingInvoiceMap[String(inv.id).trim()] = inv;
+      if (inv.docNumber) existingInvoiceMap[String(inv.docNumber).trim()] = inv;
+    });
+
+    const importedInvoices = [];
+    for (let invIdx = 1; invIdx < invoicesRows.length; invIdx++) {
+      const row = invoicesRows[invIdx];
+      if (!row || row.length === 0) continue;
+      const docNum = String(row[0] || "").trim();
+      const clientName = String(row[1] || "").trim();
+      const prodsSummary = String(row[2] || "").trim();
+      const totalUSD = parseFloat(row[3]) || 0;
+      const dateStr = String(row[4] || "").trim();
+      const status = String(row[5] || "Emitida").trim();
+
+      if (!docNum && !clientName) continue;
+
+      const existingInv = existingInvoiceMap[docNum];
+      const matchingClient = importedClients.find((c) => c.name.toLowerCase() === clientName.toLowerCase()) ||
+        (existingInv ? existingInv.client : null) || { name: clientName, dni: "-", phone: "", address: "" };
+
+      importedInvoices.push({
+        id: existingInv ? existingInv.id : `inv_fac_${Date.now()}_${invIdx}`,
+        type: existingInv ? existingInv.type : "factura_credito",
+        docNumber: docNum || `FAC-${String(invIdx).padStart(4, "0")}`,
+        date: dateStr || (existingInv ? existingInv.date : new Date().toISOString()),
+        creditId: existingInv ? existingInv.creditId : null,
+        paymentId: existingInv ? existingInv.paymentId : null,
+        client: matchingClient,
+        totalAmountUSD: totalUSD,
+        totalAmountBs: existingInv ? existingInv.totalAmountBs : null,
+        rateBCV: existingInv ? existingInv.rateBCV : null,
+        status: status,
+        data: existingInv && existingInv.data ? existingInv.data : {
+          items: parseProductsSummaryString(prodsSummary, totalUSD),
+          totalSaleUSD: totalUSD,
+          remainingBalance: status.toLowerCase() === "pagada" ? 0 : totalUSD
+        },
+        createdAt: existingInv ? existingInv.createdAt : Date.now()
+      });
+    }
+
+    // Preservar facturas locales no sincronizadas en Sheets
+    existingInvoices.forEach((locInv) => {
+      const alreadyInImported = importedInvoices.some((impInv) =>
+        (locInv.docNumber && impInv.docNumber === locInv.docNumber) ||
+        (locInv.id && impInv.id === locInv.id)
+      );
+      if (!alreadyInImported && (locInv.id || locInv.docNumber)) {
+        console.log(`[HogarFlex Cloud Import] 🛡️ Preservando factura local no sincronizada: "${locInv.docNumber || locInv.id}"`);
+        importedInvoices.push(locInv);
+        hasUnsyncedLocal = true;
+      }
+    });
+
+    // 7. Procesar PRODUCTOS (hoja Productos) -> hogarflex_products
+    const existingProducts = getStoredProducts();
+    const existingProductMap = {};
+    existingProducts.forEach((p) => {
+      if (p.id) existingProductMap[String(p.id).trim()] = p;
+      if (p.name) existingProductMap[String(p.name).trim().toLowerCase()] = p;
+    });
+
+    const importedProducts = [];
+    for (let prodIdx = 1; prodIdx < productsRows.length; prodIdx++) {
+      const row = productsRows[prodIdx];
+      if (!row || row.length === 0) continue;
+      const pId = String(row[0] || "").trim();
+      const pName = String(row[1] || "").trim();
+      const pDesc = String(row[2] || "").trim();
+      const pPrice = parseFloat(row[3]) || 0;
+      const pCategory = String(row[4] || "General").trim();
+      const pStock = row[5] !== "" && row[5] !== undefined && row[5] !== null ? parseInt(row[5], 10) : null;
+
+      if (!pId && !pName) continue;
+
+      const existingProd = existingProductMap[pId] || existingProductMap[pName.toLowerCase()];
+      importedProducts.push({
+        id: pId || ("prod_" + (Date.now() + prodIdx)),
+        name: pName,
+        description: pDesc,
+        price: pPrice.toFixed(2),
+        category: pCategory,
+        quantity: !isNaN(pStock) ? pStock : null,
+        photo: existingProd && existingProd.photo ? existingProd.photo : "",
+        createdAt: existingProd && existingProd.createdAt ? existingProd.createdAt : Date.now()
+      });
+    }
+
+    // Preservar productos locales no sincronizados en Sheets
+    existingProducts.forEach((locProd) => {
+      const alreadyInImported = importedProducts.some((impProd) =>
+        (locProd.id && impProd.id === locProd.id) ||
+        (locProd.name && impProd.name && locProd.name.trim().toLowerCase() === impProd.name.trim().toLowerCase())
+      );
+      if (!alreadyInImported && (locProd.id || locProd.name)) {
+        console.log(`[HogarFlex Cloud Import] 🛡️ Preservando producto local no sincronizado: "${locProd.name}"`);
+        importedProducts.push(locProd);
+        hasUnsyncedLocal = true;
+      }
+    });
+
+    // 8. Procesar CONFIGURACIÓN (hoja Config) -> hogarflex_config
     const importedConfig = {};
     for (let cfgIdx = 1; cfgIdx < configRows.length; cfgIdx++) {
       const row = configRows[cfgIdx];
@@ -8450,7 +8703,7 @@ async function importFromGoogleSheets(isSilent = false) {
       }
     }
 
-    // 8. Sobrescribir localStorage únicamente tras validar y parsear con éxito
+    // 9. Sobrescribir localStorage únicamente tras validar y parsear con éxito
     if (importedClients.length > 0) {
       localStorage.setItem(CLIENTS_STORAGE_KEY, JSON.stringify(importedClients));
     }
@@ -8459,6 +8712,15 @@ async function importFromGoogleSheets(isSilent = false) {
     }
     if (importedSales.length > 0) {
       localStorage.setItem(SALES_STORAGE_KEY, JSON.stringify(importedSales));
+    }
+    if (importedSuppliers.length > 0) {
+      localStorage.setItem(SUPPLIERS_STORAGE_KEY, JSON.stringify(importedSuppliers));
+    }
+    if (importedInvoices.length > 0) {
+      localStorage.setItem(INVOICES_STORAGE_KEY, JSON.stringify(importedInvoices));
+    }
+    if (importedProducts.length > 0) {
+      localStorage.setItem(PRODUCTS_STORAGE_KEY, JSON.stringify(importedProducts));
     }
     if (Object.keys(importedConfig).length > 0) {
       localStorage.setItem("hogarflex_config", JSON.stringify(importedConfig));
@@ -8473,15 +8735,18 @@ async function importFromGoogleSheets(isSilent = false) {
       triggerAutoCloudBackup("registros-locales-recientes");
     }
 
-    // 9. Actualizar todas las vistas activas
+    // 10. Actualizar todas las vistas activas
     if (typeof renderClients === "function") renderClients();
     if (typeof renderCredits === "function") renderCredits();
     if (typeof renderPagosSection === "function") renderPagosSection();
     if (typeof renderVentasSection === "function") renderVentasSection();
+    if (typeof renderProducts === "function") renderProducts();
+    if (typeof renderSuppliersTable === "function") renderSuppliersTable();
+    if (typeof renderFacturacionSection === "function") renderFacturacionSection();
     if (typeof renderDashboardSection === "function") renderDashboardSection();
     if (typeof renderBackupSection === "function") renderBackupSection();
 
-    const successSummary = `✅ Sincronizado: ${importedClients.length} clientes, ${importedCredits.length} créditos, ${importedSales.length} ventas.`;
+    const successSummary = `✅ Sincronizado: ${importedClients.length} clientes, ${importedCredits.length} créditos, ${importedSales.length} ventas, ${importedProducts.length} productos, ${importedSuppliers.length} proveedores, ${importedInvoices.length} facturas.`;
     showSheetsStatus(successSummary, "success");
     if (!isSilent) {
       showCloudSyncToast(successSummary, "success");
@@ -8613,7 +8878,50 @@ function showCloudSyncToast(message, type = "info") {
   }
 }
 
-// EXPORTAR COMPROBANTES A GOOGLE DRIVE VÍA APPS SCRIPT
+// EXPORTAR FOTOS DE PRODUCTOS A GOOGLE DRIVE VÍA APPS SCRIPT (HogarFlex_Productos)
+async function exportProductImagesToGoogleDrive(isSilent = true) {
+  const scriptUrl = getAppsScriptUrl();
+  if (!scriptUrl || !navigator.onLine) return 0;
+
+  try {
+    const products = getStoredProducts();
+    const productsWithPhoto = products.filter((p) => p.photo && p.photo.startsWith("data:image"));
+    if (productsWithPhoto.length === 0) return 0;
+
+    let uploadedCount = 0;
+    for (const prod of productsWithPhoto) {
+      try {
+        const res = await fetch(scriptUrl, {
+          method: "POST",
+          body: JSON.stringify({
+            action: "upload_product_image",
+            productId: prod.id,
+            fileName: `producto_${prod.id}.jpg`,
+            base64: prod.photo
+          })
+        });
+        if (res.ok) {
+          const json = await res.json();
+          const isSuccess = json && (json.status === "success" || json.success === true);
+          if (isSuccess && !json.alreadyExists) {
+            uploadedCount++;
+          }
+        }
+      } catch (err) {
+        console.warn("Error al subir foto de producto a Drive:", prod.id, err);
+      }
+    }
+    if (uploadedCount > 0) {
+      console.log(`[HogarFlex Drive] ✅ ${uploadedCount} fotos de productos sincronizadas en HogarFlex_Productos.`);
+    }
+    return uploadedCount;
+  } catch (err) {
+    console.error("Error al exportar fotos de productos a Drive:", err);
+    return 0;
+  }
+}
+
+// EXPORTAR ARCHIVOS A GOOGLE DRIVE VÍA APPS SCRIPT (Comprobantes y Fotos)
 async function exportReceiptsToGoogleDrive() {
   if (isExportingReceipts) return;
 
@@ -8631,7 +8939,7 @@ async function exportReceiptsToGoogleDrive() {
   isExportingReceipts = true;
   const exportBtn = document.getElementById("btn-export-receipts");
 
-  showReceiptsStatus("⏳ Buscando y exportando comprobantes a Google Drive vía Apps Script...", "info");
+  showReceiptsStatus("⏳ Sincronizando comprobantes y fotos de productos en Google Drive...", "info");
   if (exportBtn) exportBtn.setAttribute("disabled", "true");
 
   try {
@@ -8664,12 +8972,7 @@ async function exportReceiptsToGoogleDrive() {
       });
     });
 
-    if (receiptsToUpload.length === 0) {
-      showReceiptsStatus("ℹ️ No hay comprobantes con imagen registrados en los pagos.", "info");
-      return;
-    }
-
-    let uploadedCount = 0;
+    let uploadedReceiptsCount = 0;
     for (const item of receiptsToUpload) {
       try {
         const res = await fetch(scriptUrl, {
@@ -8685,7 +8988,7 @@ async function exportReceiptsToGoogleDrive() {
           const json = await res.json();
           const isSuccess = json && (json.status === "success" || json.success === true);
           if (isSuccess && !json.alreadyExists) {
-            uploadedCount++;
+            uploadedReceiptsCount++;
           }
         }
       } catch (uploadErr) {
@@ -8693,13 +8996,16 @@ async function exportReceiptsToGoogleDrive() {
       }
     }
 
-    if (uploadedCount > 0) {
-      showReceiptsStatus(`✅ ${uploadedCount} comprobantes subidos a Drive`, "success");
+    // Sincronizar también fotos de productos a HogarFlex_Productos
+    const uploadedPhotosCount = await exportProductImagesToGoogleDrive(false);
+
+    if (uploadedReceiptsCount > 0 || uploadedPhotosCount > 0) {
+      showReceiptsStatus(`✅ Sincronizados en Drive: ${uploadedReceiptsCount} comprobante(s) y ${uploadedPhotosCount} foto(s) de productos.`, "success");
     } else {
-      showReceiptsStatus(`✅ Todos los comprobantes (${receiptsToUpload.length}) ya estaban sincronizados en Drive.`, "success");
+      showReceiptsStatus(`✅ Todos los comprobantes y fotos ya estaban sincronizados en Google Drive.`, "success");
     }
   } catch (err) {
-    console.error("Error al exportar comprobantes vía Apps Script:", err);
+    console.error("Error al exportar archivos a Drive vía Apps Script:", err);
     showReceiptsStatus(`Error: ${err.message || err}`, "error");
   } finally {
     isExportingReceipts = false;
@@ -8759,6 +9065,7 @@ window.triggerAutoCloudBackup = triggerAutoCloudBackup;
 window.setCloudButtonsLoading = setCloudButtonsLoading;
 window.showCloudSyncToast = showCloudSyncToast;
 window.exportReceiptsToGoogleDrive = exportReceiptsToGoogleDrive;
+window.exportProductImagesToGoogleDrive = exportProductImagesToGoogleDrive;
 window.getAppsScriptUrl = getAppsScriptUrl;
 window.setAppsScriptUrl = setAppsScriptUrl;
 window.updateBackendStatusUI = updateBackendStatusUI;

@@ -18,6 +18,9 @@ var SHEET_NAMES = {
   CREDITOS: "Créditos",
   PAGOS: "Pagos",
   VENTAS: "Ventas_Directas",
+  PROVEEDORES: "Proveedores",
+  FACTURAS: "Facturas",
+  PRODUCTOS: "Productos",
   CONFIG: "Config"
 };
 
@@ -27,6 +30,9 @@ var DEFAULT_HEADERS = {
   Créditos: ["ID", "Cliente", "Producto(s)", "Total USD", "Cuota Inicial", "Saldo", "Estado", "Fecha Creación"],
   Pagos: ["ID Pago", "ID Crédito", "Cliente", "Tipo", "Monto USD", "Moneda", "Tasa BCV", "Monto Bs", "Fecha", "Referencia"],
   Ventas_Directas: ["ID", "Cliente", "Producto(s)", "Precio USD", "Método Pago", "Fecha"],
+  Proveedores: ["ID", "Nombre", "Teléfono", "Dirección", "Categoría", "Notas"],
+  Facturas: ["ID Factura", "Cliente", "Productos", "Total USD", "Fecha", "Estado"],
+  Productos: ["ID", "Nombre", "Descripción", "Precio USD", "Categoría", "Stock"],
   Config: ["Parámetro", "Valor"]
 };
 
@@ -73,6 +79,9 @@ function doGet(e) {
       SHEET_NAMES.CREDITOS,
       SHEET_NAMES.PAGOS,
       SHEET_NAMES.VENTAS,
+      SHEET_NAMES.PROVEEDORES,
+      SHEET_NAMES.FACTURAS,
+      SHEET_NAMES.PRODUCTOS,
       SHEET_NAMES.CONFIG
     ];
 
@@ -193,6 +202,48 @@ function doPost(e) {
         });
       }
       return errorResponse_("Datos base64 no proporcionados para el comprobante.");
+    }
+
+    // Acción para subir imágenes de productos a Google Drive (HogarFlex_Productos)
+    if (action === "upload_product_image") {
+      var folderName = "HogarFlex_Productos";
+      var folders = DriveApp.getFoldersByName(folderName);
+      var productFolder = folders.hasNext() ? folders.next() : DriveApp.createFolder(folderName);
+
+      var prodId = String(payload.productId || "").replace(/[^a-zA-Z0-9_-]/g, "");
+      var fileName = payload.fileName || ("producto_" + prodId + ".jpg");
+      var base64Data = payload.base64 || "";
+
+      if (base64Data) {
+        var existingFiles = productFolder.getFilesByName(fileName);
+        if (existingFiles.hasNext()) {
+          var existingFile = existingFiles.next();
+          return jsonResponse_({
+            status: "success",
+            action: "upload_product_image",
+            fileId: existingFile.getId(),
+            fileUrl: existingFile.getUrl(),
+            fileName: fileName,
+            alreadyExists: true
+          });
+        }
+
+        var parts = base64Data.split(";base64,");
+        var contentType = (parts[0] || "").replace("data:", "") || "image/jpeg";
+        var decoded = Utilities.base64Decode(parts[1] || parts[0]);
+        var blob = Utilities.newBlob(decoded, contentType, fileName);
+        var file = productFolder.createFile(blob);
+
+        return jsonResponse_({
+          status: "success",
+          action: "upload_product_image",
+          fileId: file.getId(),
+          fileUrl: file.getUrl(),
+          fileName: fileName,
+          alreadyExists: false
+        });
+      }
+      return errorResponse_("Datos base64 no proporcionados para la foto del producto.");
     }
 
     return errorResponse_("Acción no reconocida: " + action);
