@@ -1,0 +1,14 @@
+{
+  "name": "HOGARFLEX NOELUIS",
+  "short_name": "HogarFlex",
+  "description": "Sistema de créditos y ventas HOGARFLEX",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#1a3a6b",
+  "theme_color": "#1a3a6b",
+  "orientation": "portrait",
+  "icons": [
+    { "src": "assets/logo.jpg", "sizes": "192x192", "type": "image/jpeg" },
+    { "src": "assets/logo.jpg", "sizes": "512x512", "type": "image/jpeg" }
+  ]
+}

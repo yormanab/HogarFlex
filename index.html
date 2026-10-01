@@ -1,0 +1,2638 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#1a3a6b">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="HogarFlex">
+  <title>HOGARFLEX NOELUIS — Sistema de Créditos</title>
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="apple-touch-icon" href="assets/photo_2026-09-29_22-08-25.jpg">
+  <link rel="icon" type="image/jpeg" href="assets/photo_2026-09-29_22-08-25.jpg">
+  <script src="js/jspdf.umd.min.js"></script>
+  <script src="https://apis.google.com/js/api.js"></script>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+</head>
+<body>
+
+  <!-- ==========================================
+       VISTA 1: PANTALLA DE LOGIN
+       ========================================== -->
+  <main id="login-view" class="view-login">
+    <div class="login-card">
+      <div class="login-brand-header">
+        <img src="assets/photo_2026-09-29_22-08-25.jpg" alt="Logo HOGARFLEX NOELUIS" class="login-logo" id="login-logo-img">
+        <h1 class="business-title">HOGARFLEX NOELUIS</h1>
+        <p class="business-slogan">"Todo para tu hogar, al instante y a tu medida."</p>
+        <span class="business-contact">📞 0424.215.58.05</span>
+      </div>
+
+      <div id="login-error" class="error-message" role="alert">
+        Usuario o contraseña incorrectos. Por favor verifica tus credenciales.
+      </div>
+
+      <form id="login-form" class="login-form" autocomplete="on">
+        <div class="form-group">
+          <label for="username" class="form-label">Usuario</label>
+          <div class="input-container">
+            <input 
+              type="text" 
+              id="username" 
+              name="username" 
+              class="form-input" 
+              placeholder="Ingresa tu usuario" 
+              required 
+              autocapitalize="none"
+              autocomplete="username">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="password" class="form-label">Contraseña</label>
+          <div class="input-container">
+            <input 
+              type="password" 
+              id="password" 
+              name="password" 
+              class="form-input" 
+              placeholder="••••••••" 
+              required
+              autocomplete="current-password">
+          </div>
+        </div>
+
+        <button type="submit" id="btn-login" class="btn-primary">
+          Iniciar Sesión
+        </button>
+      </form>
+    </div>
+  </main>
+
+  <!-- ==========================================
+       VISTA 2: APLICACIÓN PRINCIPAL (POST-LOGIN)
+       ========================================== -->
+  <div id="app-view" class="view-app hidden">
+    <!-- Header Superior -->
+    <header class="app-header">
+      <div class="app-brand">
+        <img src="assets/photo_2026-09-29_22-08-25.jpg" alt="Hogarflex" class="header-logo">
+        <div class="header-title-box">
+          <h1>HOGARFLEX NOELUIS</h1>
+          <p>Sistema de Créditos</p>
+        </div>
+      </div>
+      <div class="header-actions">
+        <span class="user-badge" id="current-user-display">👤 Yorgeh2023</span>
+        <button id="btn-logout" class="btn-logout" type="button" title="Cerrar sesión">
+          Cerrar Sesión
+        </button>
+      </div>
+    </header>
+
+    <!-- Menú de Navegación con las 6 secciones -->
+    <nav class="app-nav" aria-label="Navegación principal">
+      <div class="nav-container">
+        <button class="nav-tab active" data-section="dashboard" type="button">
+          <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" />
+          </svg>
+          <span>Dashboard</span>
+        </button>
+
+        <button class="nav-tab" data-section="clientes" type="button">
+          <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
+          </svg>
+          <span>Clientes</span>
+        </button>
+
+        <button class="nav-tab" data-section="productos" type="button">
+          <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
+          </svg>
+          <span>Productos</span>
+        </button>
+
+        <button class="nav-tab" data-section="creditos" type="button">
+          <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15A2.25 2.25 0 002.25 6.75v10.5A2.25 2.25 0 004.5 19.5z" />
+          </svg>
+          <span>Créditos</span>
+        </button>
+
+        <button class="nav-tab" data-section="pagos" type="button">
+          <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <span>Pagos</span>
+        </button>
+
+        <button class="nav-tab" data-section="ventas" type="button">
+          <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 00-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.7 2.84-7.076a.75.75 0 00-.726-.924H5.105m2.395 8l-1.472-5.517M7.5 14.25L5.106 5.272M6 20.25a.75.75 0 11-1.5 0 .75.75 0 011.5 0zm12.75 0a.75.75 0 11-1.5 0 .75.75 0 011.5 0z" />
+          </svg>
+          <span>Ventas</span>
+        </button>
+
+        <button class="nav-tab" data-section="proveedores" type="button">
+          <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 18.75a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 01-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h1.125c.621 0 1.129-.504 1.09-1.124a17.902 17.902 0 00-3.213-9.193 2.056 2.056 0 00-1.58-.86H14.25M16.5 18.75h-2.25m0-11.25V3.75a1.125 1.125 0 00-1.125-1.125h-9a1.125 1.125 0 00-1.125 1.125v13.5c0 .621.504 1.125 1.125 1.125h1.125" />
+          </svg>
+          <span>Proveedores</span>
+        </button>
+
+        <button class="nav-tab" data-section="facturacion" type="button">
+          <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+          </svg>
+          <span>Facturación</span>
+        </button>
+
+        <button class="nav-tab" data-section="backup" type="button">
+          <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 16.5V9.75m0 0l3 3m-3-3l-3 3M6.75 19.5a4.5 4.5 0 01-1.41-8.775 5.25 5.25 0 0110.233-2.33 3 3 0 013.758 3.848A3.752 3.752 0 0118 19.5H6.75z" />
+          </svg>
+          <span>Respaldo</span>
+        </button>
+      </div>
+    </nav>
+
+    <!-- Contenido de las 6 secciones con "Módulo en construcción" -->
+    <main class="app-main">
+      <!-- 1. Dashboard Financiero (Fase 8) -->
+      <section id="panel-dashboard" class="section-panel active" aria-labelledby="heading-dashboard">
+        <!-- Encabezado del Dashboard -->
+        <div class="module-header" style="margin-bottom: 20px;">
+          <div>
+            <h2 id="heading-dashboard" class="module-title">Dashboard Financiero</h2>
+            <p class="module-subtitle">Métricas clave, flujo de ingresos y control de créditos en tiempo real</p>
+          </div>
+          <div style="display: flex; gap: 8px; align-items: center;">
+            <button type="button" id="btn-refresh-dashboard" class="btn-primary-action" style="padding: 8px 16px; font-size: 0.88rem; display: flex; align-items: center; gap: 6px;">
+              <span>🔄</span> Actualizar
+            </button>
+          </div>
+        </div>
+
+        <!-- 1. Tarjetas de Métricas Principales (Grid 4 col) -->
+        <div class="dashboard-kpi-grid">
+          <!-- KPI 1: Total cobrado este mes -->
+          <div class="kpi-card kpi-card-collected">
+            <div class="kpi-icon-wrap" style="background: rgba(245, 196, 0, 0.18); color: #b45309;">
+              💵
+            </div>
+            <div class="kpi-content">
+              <span class="kpi-label">Total cobrado este mes</span>
+              <h3 class="kpi-value" id="kpi-total-cobrado-mes">$0.00 USD</h3>
+              <small class="kpi-subtext" id="kpi-sub-cobrado">0 transacciones registradas</small>
+            </div>
+          </div>
+
+          <!-- KPI 2: Total pendiente por cobrar -->
+          <div class="kpi-card kpi-card-pending">
+            <div class="kpi-icon-wrap" style="background: rgba(26, 58, 107, 0.12); color: #1a3a6b;">
+              ⏳
+            </div>
+            <div class="kpi-content">
+              <span class="kpi-label">Total pendiente por cobrar</span>
+              <h3 class="kpi-value" id="kpi-total-pendiente">$0.00 USD</h3>
+              <small class="kpi-subtext" id="kpi-sub-pendiente">En créditos activos</small>
+            </div>
+          </div>
+
+          <!-- KPI 3: Clientes activos con crédito -->
+          <div class="kpi-card kpi-card-clients">
+            <div class="kpi-icon-wrap" style="background: rgba(16, 185, 129, 0.15); color: #047857;">
+              👥
+            </div>
+            <div class="kpi-content">
+              <span class="kpi-label">Clientes activos con crédito</span>
+              <h3 class="kpi-value" id="kpi-clientes-activos">0</h3>
+              <small class="kpi-subtext" id="kpi-sub-clientes">Con saldo pendiente</small>
+            </div>
+          </div>
+
+          <!-- KPI 4: Créditos vencidos -->
+          <div class="kpi-card kpi-card-overdue">
+            <div class="kpi-icon-wrap" style="background: rgba(239, 68, 68, 0.15); color: #dc2626;">
+              ⚠️
+            </div>
+            <div class="kpi-content">
+              <span class="kpi-label">Créditos vencidos</span>
+              <h3 class="kpi-value" id="kpi-creditos-vencidos" style="color: #dc2626;">0</h3>
+              <small class="kpi-subtext" id="kpi-sub-vencidos" style="color: #b91c1c;">Con cuotas en mora</small>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2. Resumen de Ingresos: Gráficos de barras -->
+        <div class="dashboard-charts-grid" style="margin-top: 24px;">
+          <!-- Gráfico 1: Semanal del mes actual -->
+          <div class="chart-card">
+            <div class="chart-header">
+              <div>
+                <h4 class="chart-title">Ingresos por Semana</h4>
+                <p class="chart-subtitle" id="chart-week-subtitle">Mes actual (Créditos + Ventas directas)</p>
+              </div>
+              <span class="chart-badge-gold" id="chart-week-total">$0.00 USD</span>
+            </div>
+            <div class="chart-svg-container" id="chart-weeks-container">
+              <!-- SVG generado dinámicamente -->
+            </div>
+          </div>
+
+          <!-- Gráfico 2: Últimos 6 meses -->
+          <div class="chart-card">
+            <div class="chart-header">
+              <div>
+                <h4 class="chart-title">Ingresos Últimos 6 Meses</h4>
+                <p class="chart-subtitle" id="chart-months-subtitle">Flujo semestral consolidado</p>
+              </div>
+              <span class="chart-badge-navy" id="chart-months-total">$0.00 USD</span>
+            </div>
+            <div class="chart-svg-container" id="chart-months-container">
+              <!-- SVG generado dinámicamente -->
+            </div>
+          </div>
+        </div>
+
+        <!-- 3. Tabla de Créditos Vencidos -->
+        <div class="dashboard-overdue-section" style="margin-top: 28px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 8px;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 1.3rem;">🚨</span>
+              <div>
+                <h3 style="margin: 0; color: #991b1b; font-size: 1.1rem; font-weight: 700;">Créditos con Cuotas Vencidas</h3>
+                <small style="color: var(--color-text-muted);">Prioridad de cobranza ordenada por mayor retraso</small>
+              </div>
+            </div>
+            <span id="overdue-credits-badge" class="badge-overdue-counter hidden">0 créditos en mora</span>
+          </div>
+
+          <div class="table-responsive-wrapper">
+            <table class="data-table" id="dashboard-overdue-table">
+              <thead>
+                <tr>
+                  <th>Cliente</th>
+                  <th>Cuotas Vencidas</th>
+                  <th>Monto Vencido Total</th>
+                  <th>Días de Retraso</th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="dashboard-overdue-tbody">
+                <!-- Dinámico -->
+              </tbody>
+            </table>
+          </div>
+          <div id="no-overdue-credits-card" class="no-overdue-card">
+            <div style="font-size: 2rem; margin-bottom: 6px;">🎉</div>
+            <h4 style="color: #15803d; margin: 0; font-size: 1.05rem;">¡Excelente! Todos los créditos están al día</h4>
+            <p style="color: #166534; font-size: 0.88rem; margin-top: 4px;">No se registran créditos con cuotas vencidas actualmente.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- 2. Clientes -->
+      <section id="panel-clientes" class="section-panel" aria-labelledby="heading-clientes">
+        <div class="module-header">
+          <div>
+            <h2 id="heading-clientes" class="module-title">Clientes</h2>
+            <p class="module-subtitle">Directorio y perfiles de clientes</p>
+          </div>
+          <button type="button" id="btn-open-add-client" class="btn-add-product">
+            ＋ Agregar Cliente
+          </button>
+        </div>
+
+        <!-- Barra de Búsqueda -->
+        <div class="search-bar-container">
+          <div class="search-input-wrapper">
+            <svg class="search-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+            </svg>
+            <input 
+              type="text" 
+              id="client-search-input" 
+              class="search-input" 
+              placeholder="Buscar cliente por nombre o cédula..." 
+              autocomplete="off"
+            >
+            <button type="button" id="btn-clear-search-client" class="btn-clear-search hidden" title="Limpiar búsqueda">&times;</button>
+          </div>
+        </div>
+
+        <!-- Contenedor y tabla de clientes -->
+        <div class="clients-table-card">
+          <div class="table-responsive-wrapper">
+            <table class="clients-table" id="clients-table">
+              <thead>
+                <tr>
+                  <th scope="col">Cédula</th>
+                  <th scope="col">Nombre completo</th>
+                  <th scope="col">Teléfono</th>
+                  <th scope="col">Dirección</th>
+                  <th scope="col" class="th-actions">Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="clients-tbody">
+                <!-- Filas renderizadas dinámicamente -->
+              </tbody>
+            </table>
+          </div>
+          <div id="no-clients-msg" class="empty-clients-msg hidden">
+            <p>No hay clientes registrados.</p>
+          </div>
+        </div>
+
+        <!-- Modal Formulario de Cliente (Agregar / Editar) -->
+        <div id="client-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="modal-client-title">
+          <div class="modal-card">
+            <div class="modal-header">
+              <h3 id="modal-client-title" class="modal-title">Agregar Cliente</h3>
+              <button type="button" id="btn-close-client-modal" class="modal-close" aria-label="Cerrar modal">&times;</button>
+            </div>
+            
+            <form id="client-form" class="client-form">
+              <input type="hidden" id="client-id" value="">
+
+              <div id="client-form-error" class="error-message" role="alert"></div>
+
+              <!-- Cédula -->
+              <div class="form-group">
+                <label for="client-dni-input" class="form-label">Cédula</label>
+                <input 
+                  type="text" 
+                  id="client-dni-input" 
+                  class="form-input" 
+                  placeholder="Ej: V-12345678" 
+                  required
+                >
+              </div>
+
+              <!-- Nombre completo -->
+              <div class="form-group">
+                <label for="client-name-input" class="form-label">Nombre completo</label>
+                <input 
+                  type="text" 
+                  id="client-name-input" 
+                  class="form-input" 
+                  placeholder="Ej: María Pérez" 
+                  required
+                >
+              </div>
+
+              <!-- Teléfono -->
+              <div class="form-group">
+                <label for="client-phone-input" class="form-label">Teléfono</label>
+                <input 
+                  type="tel" 
+                  id="client-phone-input" 
+                  class="form-input" 
+                  placeholder="Ej: 0414-1234567" 
+                  required
+                >
+              </div>
+
+              <!-- Dirección -->
+              <div class="form-group">
+                <label for="client-address-input" class="form-label">Dirección</label>
+                <input 
+                  type="text" 
+                  id="client-address-input" 
+                  class="form-input" 
+                  placeholder="Ej: Av. Principal, Casa #12, Sector Centro" 
+                  required
+                >
+              </div>
+
+              <!-- Botones Guardar y Cancelar -->
+              <div class="modal-footer-actions">
+                <button type="button" id="btn-cancel-client" class="btn-modal-cancel">Cancelar</button>
+                <button type="submit" id="btn-save-client" class="btn-modal-save">Guardar</button>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <!-- Modal Perfil del Cliente (Ver) -->
+        <div id="client-profile-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="profile-modal-title">
+          <div class="modal-card profile-modal-card">
+            <div class="modal-header">
+              <h3 id="profile-modal-title" class="modal-title">Perfil del Cliente</h3>
+              <button type="button" id="btn-close-profile-modal" class="modal-close" aria-label="Cerrar">&times;</button>
+            </div>
+            
+            <div class="profile-modal-body">
+              <div class="profile-header-badge">
+                <div class="profile-avatar">👤</div>
+                <div>
+                  <h4 id="profile-client-name" class="profile-name">Nombre Cliente</h4>
+                  <p id="profile-client-dni" class="profile-dni">Cédula: -</p>
+                </div>
+              </div>
+
+              <div class="profile-info-grid">
+                <div class="profile-info-item">
+                  <span class="profile-label">Teléfono:</span>
+                  <span id="profile-client-phone" class="profile-value">-</span>
+                </div>
+                <div class="profile-info-item">
+                  <span class="profile-label">Dirección:</span>
+                  <span id="profile-client-address" class="profile-value">-</span>
+                </div>
+              </div>
+
+              <div class="profile-section-divider">
+                <h4 class="profile-section-title">Historial de créditos</h4>
+                <div id="profile-credit-history" class="profile-credit-history">
+                  <div class="empty-history">
+                    <p>Sin créditos registrados.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="modal-footer-actions">
+              <button type="button" id="btn-close-profile" class="btn-modal-cancel">Cerrar</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Modal de Confirmación para Eliminar Cliente -->
+        <div id="client-delete-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="client-delete-modal-title">
+          <div class="modal-card confirm-modal-card">
+            <div class="modal-header">
+              <h3 id="client-delete-modal-title" class="modal-title">Confirmar Eliminación</h3>
+              <button type="button" id="btn-close-client-delete-modal" class="modal-close" aria-label="Cerrar modal">&times;</button>
+            </div>
+            <div class="confirm-modal-content">
+              <p id="client-delete-modal-msg" class="confirm-modal-text">¿Estás seguro de que deseas eliminar este cliente?</p>
+            </div>
+            <div class="modal-footer-actions">
+              <button type="button" id="btn-cancel-client-delete" class="btn-modal-cancel">Cancelar</button>
+              <button type="button" id="btn-confirm-client-delete" class="btn-modal-danger">Eliminar</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 3. Productos -->
+      <section id="panel-productos" class="section-panel" aria-labelledby="heading-productos">
+        <div class="module-header">
+          <div>
+            <h2 id="heading-productos" class="module-title">Productos</h2>
+            <p class="module-subtitle">Catálogo e inventario de productos</p>
+          </div>
+          <button type="button" id="btn-open-add-product" class="btn-add-product">
+            ＋ Agregar Producto
+          </button>
+        </div>
+
+        <!-- Contenedor y tabla de productos -->
+        <div class="products-table-card">
+          <div class="table-responsive-wrapper">
+            <table class="products-table" id="products-table">
+              <thead>
+                <tr>
+                  <th scope="col" class="th-photo">Foto</th>
+                  <th scope="col">Nombre</th>
+                  <th scope="col">Precio (USD)</th>
+                  <th scope="col">Cantidad disponible</th>
+                  <th scope="col" class="th-actions">Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="products-tbody">
+                <!-- Filas renderizadas por JS -->
+              </tbody>
+            </table>
+          </div>
+          <div id="no-products-msg" class="empty-products-msg hidden">
+            <p>No hay productos registrados.</p>
+          </div>
+        </div>
+
+        <!-- Modal Formulario de Producto -->
+        <div id="product-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="modal-product-title">
+          <div class="modal-card">
+            <div class="modal-header">
+              <h3 id="modal-product-title" class="modal-title">Agregar Producto</h3>
+              <button type="button" id="btn-close-modal" class="modal-close" aria-label="Cerrar modal">&times;</button>
+            </div>
+            
+            <form id="product-form" class="product-form">
+              <input type="hidden" id="product-id" value="">
+
+              <!-- Foto -->
+              <div class="form-group">
+                <label for="product-photo-input" class="form-label">Foto del producto</label>
+                <div class="photo-field-wrapper">
+                  <div class="photo-preview-container" id="photo-preview-container">
+                    <img id="photo-preview-img" src="" alt="Vista previa" class="photo-preview-thumb hidden">
+                    <span id="photo-preview-placeholder" class="photo-preview-placeholder">📷 Sin foto</span>
+                  </div>
+                  <input type="file" id="product-photo-input" accept="image/*" class="file-input-control">
+                </div>
+              </div>
+
+              <!-- Nombre -->
+              <div class="form-group">
+                <label for="product-name-input" class="form-label">Nombre del producto</label>
+                <input type="text" id="product-name-input" class="form-input" placeholder="Ej: Nevera Samsung 12 pies" required>
+              </div>
+
+              <!-- Precio en USD -->
+              <div class="form-group">
+                <label for="product-price-input" class="form-label">Precio en USD</label>
+                <div class="price-input-wrapper">
+                  <span class="currency-symbol">$</span>
+                  <input type="number" id="product-price-input" class="form-input price-input" placeholder="0.00" step="0.01" min="0" required>
+                </div>
+              </div>
+
+              <!-- Cantidad disponible (opcional) -->
+              <div class="form-group">
+                <label for="product-qty-input" class="form-label">Cantidad disponible (opcional)</label>
+                <input type="number" id="product-qty-input" class="form-input" placeholder="Opcional" step="1">
+              </div>
+
+              <!-- Botones Guardar y Cancelar -->
+              <div class="modal-footer-actions">
+                <button type="button" id="btn-cancel-product" class="btn-modal-cancel">Cancelar</button>
+                <button type="submit" id="btn-save-product" class="btn-modal-save">Guardar</button>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <!-- Modal de Confirmación para Eliminar Producto -->
+        <div id="delete-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="delete-modal-title">
+          <div class="modal-card confirm-modal-card">
+            <div class="modal-header">
+              <h3 id="delete-modal-title" class="modal-title">Confirmar Eliminación</h3>
+              <button type="button" id="btn-close-delete-modal" class="modal-close" aria-label="Cerrar modal">&times;</button>
+            </div>
+            <div class="confirm-modal-content">
+              <p id="delete-modal-msg" class="confirm-modal-text">¿Estás seguro de que deseas eliminar este producto?</p>
+            </div>
+            <div class="modal-footer-actions">
+              <button type="button" id="btn-cancel-delete" class="btn-modal-cancel">Cancelar</button>
+              <button type="button" id="btn-confirm-delete" class="btn-modal-danger">Eliminar</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 4. Créditos -->
+      <section id="panel-creditos" class="section-panel" aria-labelledby="heading-creditos">
+        <div class="module-header">
+          <div>
+            <h2 id="heading-creditos" class="module-title">Créditos y Cuotas</h2>
+            <p class="module-subtitle">Gestión de planes de crédito y cronograma de cuotas</p>
+          </div>
+          <button type="button" id="btn-open-create-credit" class="btn-add-product">
+            ＋ Nuevo Crédito
+          </button>
+        </div>
+
+        <!-- Contenedor y tabla de créditos -->
+        <div class="credits-table-card">
+          <div class="table-responsive-wrapper">
+            <table class="credits-table" id="credits-table">
+              <thead>
+                <tr>
+                  <th scope="col">Cliente</th>
+                  <th scope="col">Producto(s)</th>
+                  <th scope="col">Cuota inicial pagada</th>
+                  <th scope="col">Cuotas</th>
+                  <th scope="col">Próxima cuota</th>
+                  <th scope="col">Vencimiento</th>
+                  <th scope="col">Estado</th>
+                  <th scope="col" class="th-actions">Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="credits-tbody">
+                <!-- Filas renderizadas por JS -->
+              </tbody>
+            </table>
+          </div>
+          <div id="no-credits-msg" class="empty-credits-msg hidden">
+            <p>No hay créditos registrados.</p>
+          </div>
+        </div>
+
+        <!-- Modal Formulario para Crear Crédito -->
+        <div id="credit-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="modal-credit-title">
+          <div class="modal-card credit-modal-card">
+            <div class="modal-header">
+              <h3 id="modal-credit-title" class="modal-title">Nuevo Crédito</h3>
+              <button type="button" id="btn-close-credit-modal" class="modal-close" aria-label="Cerrar modal">&times;</button>
+            </div>
+
+            <form id="credit-form" class="credit-form">
+              <div id="credit-form-error" class="error-message" role="alert"></div>
+
+              <!-- 1. Seleccionar cliente -->
+              <div class="form-group">
+                <label for="credit-client-select" class="form-label">1. Seleccionar cliente</label>
+                <div class="client-picker-wrapper">
+                  <select id="credit-client-select" class="form-input" required>
+                    <option value="">-- Seleccionar cliente registrado --</option>
+                  </select>
+                </div>
+                <small class="field-hint" id="client-select-hint">¿No está en la lista? Registra el cliente primero en la sección Clientes.</small>
+              </div>
+
+              <!-- 2. Seleccionar productos del catálogo -->
+              <div class="form-group">
+                <label class="form-label">2. Seleccionar producto(s) del catálogo</label>
+                <div class="add-product-row">
+                  <select id="credit-product-select" class="form-input product-select-dropdown">
+                    <option value="">-- Seleccionar producto --</option>
+                  </select>
+                  <input type="number" id="credit-product-qty" class="form-input qty-input-control" placeholder="Cant." min="1" value="1">
+                  <button type="button" id="btn-add-product-to-credit" class="btn-action-add-item">
+                    ＋ Añadir
+                  </button>
+                </div>
+
+                <!-- Lista de productos añadidos al crédito -->
+                <div class="credit-items-container">
+                  <table class="credit-items-table" id="credit-items-table">
+                    <thead>
+                      <tr>
+                        <th>Producto</th>
+                        <th>Cant.</th>
+                        <th>Precio unit.</th>
+                        <th>Subtotal</th>
+                        <th></th>
+                      </tr>
+                    </thead>
+                    <tbody id="credit-items-tbody">
+                      <!-- Renderizado dinámicamente -->
+                    </tbody>
+                  </table>
+                  <p id="empty-credit-items-msg" class="empty-items-text">Añade al menos un producto a la venta.</p>
+                </div>
+              </div>
+
+              <!-- 3. Cuota inicial: Monto libre y Porcentaje opcional -->
+              <div class="form-group">
+                <label for="credit-downpayment-currency" class="form-label">3. Moneda de pago de la inicial</label>
+                <select id="credit-downpayment-currency" class="form-input">
+                  <option value="USD" selected>Divisas ($ USD)</option>
+                  <option value="BS">Bolívares (Bs.)</option>
+                  <option value="MIXED">Mixto (Parte en $ y parte en Bs.)</option>
+                </select>
+                <small class="field-hint">Selecciona la moneda con la que el cliente entrega la inicial (o déjala en 0 si no da inicial)</small>
+              </div>
+
+              <!-- Porcentaje de inicial opcional (sincronizado bidireccionalmente con el monto) -->
+              <div class="form-group">
+                <label for="credit-downpayment-percent" class="form-label">Porcentaje de inicial (% opcional)</label>
+                <div class="price-input-wrapper">
+                  <input type="number" id="credit-downpayment-percent" class="form-input" placeholder="0" min="0" max="100" step="any" value="0">
+                  <span class="currency-symbol" style="left: auto; right: 14px; color: var(--color-primary); font-weight: 700;">%</span>
+                </div>
+                <small class="field-hint">Opcional: puedes escribir el % o escribir el monto abajo; ambos se calculan automáticamente en tiempo real</small>
+              </div>
+
+              <!-- Campo para inicial en Divisas ($) -->
+              <div id="downpayment-box-usd" class="form-group">
+                <label for="credit-downpayment-amount-usd" class="form-label">Monto de inicial en Divisas ($ USD)</label>
+                <div class="price-input-wrapper">
+                  <span class="currency-symbol">$</span>
+                  <input type="number" id="credit-downpayment-amount-usd" class="form-input price-input" placeholder="0.00" min="0" step="0.01" value="0.00">
+                </div>
+                <small class="field-hint">Ingresa el monto recibido en dólares (ej: 50)</small>
+              </div>
+
+              <!-- Campos para inicial en Bolívares (Bs) y su Tasa BCV de hoy -->
+              <div id="downpayment-box-bs" class="form-grid-2col hidden">
+                <div class="form-group">
+                  <label for="credit-downpayment-amount-bs" class="form-label">Monto de inicial en Bolívares (Bs.)</label>
+                  <div class="price-input-wrapper">
+                    <span class="rate-prefix">Bs.</span>
+                    <input type="number" id="credit-downpayment-amount-bs" class="form-input rate-input" placeholder="0.00" min="0" step="0.01" value="0.00">
+                  </div>
+                  <small class="field-hint">Ingresa el monto recibido en Bs. (ej: 200000)</small>
+                </div>
+                <div class="form-group">
+                  <label for="credit-downpayment-rate-bcv" class="form-label">Tasa BCV de hoy (Bs/USD)</label>
+                  <div class="price-input-wrapper">
+                    <span class="rate-prefix">Bs.</span>
+                    <input type="number" id="credit-downpayment-rate-bcv" class="form-input rate-input" placeholder="Ej: 50.00" min="0.01" step="0.01">
+                  </div>
+                  <small class="field-hint">Tasa para calcular la equivalencia en USD de los Bs. entregados</small>
+                </div>
+              </div>
+
+              <!-- 4. Número de cuotas -->
+              <div class="form-group">
+                <label for="credit-installments-count" class="form-label">4. Número de cuotas (1 a 12)</label>
+                <input type="number" id="credit-installments-count" class="form-input" min="1" max="12" step="1" value="3" required>
+                <small class="field-hint">Cantidad total de cuotas</small>
+              </div>
+
+              <!-- Frecuencia de pago -->
+              <div class="form-group">
+                <label for="credit-payment-frequency" class="form-label">Frecuencia de pago</label>
+                <select id="credit-payment-frequency" class="form-input" required>
+                  <option value="7">Semanal (cada 7 días)</option>
+                  <option value="15">Quincenal (cada 15 días)</option>
+                  <option value="30" selected>Mensual (cada 30 días)</option>
+                </select>
+                <small class="field-hint">Define el intervalo de tiempo entre cada cuota</small>
+              </div>
+
+              <!-- 5. Flete -->
+              <div class="form-group">
+                <label class="form-label">5. Flete (envío a domicilio)</label>
+                <label class="checkbox-container">
+                  <input type="checkbox" id="credit-has-shipping">
+                  <span class="checkbox-label">¿Incluye flete?</span>
+                </label>
+                <div id="credit-shipping-input-box" class="shipping-input-box hidden">
+                  <div class="price-input-wrapper">
+                    <span class="currency-symbol">$</span>
+                    <input type="number" id="credit-shipping-amount" class="form-input price-input" placeholder="0.00" min="0" step="0.01" value="0.00">
+                  </div>
+                </div>
+              </div>
+
+              <!-- CÁLCULO AUTOMÁTICO EN TIEMPO REAL -->
+              <div class="credit-calculation-card">
+                <h4 class="calc-card-title">Cálculo Automático en Tiempo Real</h4>
+                <div class="calc-grid">
+                  <div class="calc-item">
+                    <span class="calc-label">Total productos:</span>
+                    <span class="calc-value" id="calc-products-total">$0.00</span>
+                  </div>
+                  <div class="calc-item">
+                    <span class="calc-label">+ Flete:</span>
+                    <span class="calc-value" id="calc-shipping-total">$0.00</span>
+                  </div>
+                  <div class="calc-item highlight-navy">
+                    <span class="calc-label">= Total venta (USD):</span>
+                    <span class="calc-value bold" id="calc-sale-total">$0.00</span>
+                  </div>
+                  <div class="calc-item">
+                    <span class="calc-label">Monto cuota inicial:</span>
+                    <span class="calc-value" id="calc-downpayment-amount">$0.00</span>
+                  </div>
+                  <div class="calc-item">
+                    <span class="calc-label">Saldo restante:</span>
+                    <span class="calc-value" id="calc-remaining-balance">$0.00</span>
+                  </div>
+                  <div class="calc-item highlight-gold">
+                    <span class="calc-label">Monto de cada cuota:</span>
+                    <span class="calc-value bold" id="calc-installment-amount">$0.00</span>
+                  </div>
+                </div>
+
+                <!-- Detalle de pago de inicial y referencia sin mezclar -->
+                <div class="downpayment-detail-box">
+                  <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                    <span style="color: var(--color-text-muted);">Cuota inicial pagada en divisas:</span>
+                    <strong id="calc-downpayment-paid-usd" style="color: #15803d;">$0.00</strong>
+                  </div>
+                  <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                    <span style="color: var(--color-text-muted);">Cuota inicial pagada en Bolívares:</span>
+                    <strong id="calc-downpayment-paid-bs" style="color: #1d4ed8;">Bs. 0,00</strong>
+                  </div>
+                  <div id="calc-downpayment-ref-container" style="font-size: 0.82rem; color: #b45309; background: #fef3c7; padding: 4px 8px; border-radius: 4px; margin-top: 6px;">
+                    <span>Referencia:</span> <span id="calc-downpayment-ref">0$ al cambio BCV = Bs. 0,00</span>
+                  </div>
+                </div>
+
+                <!-- Totales Separados al Final del Resumen -->
+                <div class="totales-resumen-grid">
+                  <div class="total-badge-box total-divisas-box">
+                    <span class="total-badge-label">Total en divisas</span>
+                    <span class="total-badge-val" id="calc-final-total-divisas">$0.00</span>
+                  </div>
+                  <div class="total-badge-box total-bs-box">
+                    <span class="total-badge-label">Total en Bs</span>
+                    <span class="total-badge-val" id="calc-final-total-bs">Bs. 0,00</span>
+                  </div>
+                </div>
+
+                <!-- Lista de Fechas Estimadas -->
+                <div class="installment-schedule-box">
+                  <span class="schedule-title">Fechas estimadas de cuotas:</span>
+                  <div id="calc-schedule-list" class="schedule-chips-list">
+                    <!-- Chips con fechas -->
+                  </div>
+                </div>
+              </div>
+
+              <!-- Botones Guardar y Cancelar -->
+              <div class="modal-footer-actions">
+                <button type="button" id="btn-cancel-credit" class="btn-modal-cancel">Cancelar</button>
+                <button type="submit" id="btn-save-credit" class="btn-modal-save">Crear Crédito</button>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <!-- Modal Ver Detalle del Crédito -->
+        <div id="credit-detail-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="credit-detail-title">
+          <div class="modal-card credit-detail-card">
+            <div class="modal-header">
+              <h3 id="credit-detail-title" class="modal-title">Detalle del Crédito</h3>
+              <button type="button" id="btn-close-credit-detail-modal" class="modal-close" aria-label="Cerrar modal">&times;</button>
+            </div>
+
+            <div class="credit-detail-body">
+              <!-- Datos del Cliente -->
+              <div class="detail-section-box">
+                <h4 class="detail-section-title">Datos del Cliente</h4>
+                <div class="detail-info-grid">
+                  <div><span class="detail-label">Nombre:</span> <strong id="detail-client-name">-</strong></div>
+                  <div><span class="detail-label">Cédula:</span> <strong id="detail-client-dni">-</strong></div>
+                  <div><span class="detail-label">Teléfono:</span> <strong id="detail-client-phone">-</strong></div>
+                  <div><span class="detail-label">Dirección:</span> <strong id="detail-client-address">-</strong></div>
+                </div>
+              </div>
+
+              <!-- Productos Comprados -->
+              <div class="detail-section-box">
+                <h4 class="detail-section-title">Producto(s) Comprados</h4>
+                <div class="table-responsive-wrapper">
+                  <table class="detail-products-table">
+                    <thead>
+                      <tr>
+                        <th>Producto</th>
+                        <th>Cant.</th>
+                        <th>Precio unit.</th>
+                        <th>Subtotal</th>
+                      </tr>
+                    </thead>
+                    <tbody id="detail-products-tbody">
+                      <!-- Filas de productos -->
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <!-- Resumen Financiero Completo -->
+              <div class="detail-section-box">
+                <h4 class="detail-section-title">Resumen Financiero Completo</h4>
+                <div class="detail-financial-grid">
+                  <div class="fin-item"><span>Total venta USD:</span> <strong id="detail-total-usd">$0.00</strong></div>
+                  <div class="fin-item"><span>Flete:</span> <strong id="detail-shipping-usd">$0.00</strong></div>
+                  <div class="fin-item"><span>Cuota inicial calculada:</span> <strong id="detail-downpayment-usd">$0.00</strong></div>
+                  <div class="fin-item"><span>Saldo restante (USD):</span> <strong id="detail-remaining-usd">$0.00</strong></div>
+                  <div class="fin-item"><span>Frecuencia:</span> <strong id="detail-frequency">-</strong></div>
+                  <div class="fin-item"><span>Tasa BCV:</span> <strong id="detail-rate-bcv" style="font-size: 0.85rem; color: #0284c7;">Variable (del día de pago)</strong></div>
+                </div>
+
+                <!-- Detalle pago de cuota inicial y referencia sin mezclar monedas -->
+                <div class="downpayment-detail-box">
+                  <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                    <span style="color: var(--color-text-muted);">Cuota inicial pagada en divisas:</span>
+                    <strong id="detail-downpayment-paid-usd" style="color: #15803d;">$0.00</strong>
+                  </div>
+                  <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                    <span style="color: var(--color-text-muted);">Cuota inicial pagada en Bolívares:</span>
+                    <strong id="detail-downpayment-paid-bs" style="color: #1d4ed8;">Bs. 0,00</strong>
+                  </div>
+                  <div id="detail-downpayment-ref-container" style="font-size: 0.82rem; color: #b45309; background: #fef3c7; padding: 4px 8px; border-radius: 4px; margin-top: 6px;">
+                    <span>Referencia:</span> <span id="detail-downpayment-ref">-</span>
+                  </div>
+                </div>
+
+                <!-- Totales Separados al Final del Resumen -->
+                <div class="totales-resumen-grid">
+                  <div class="total-badge-box total-divisas-box">
+                    <span class="total-badge-label">Total en divisas</span>
+                    <span class="total-badge-val" id="detail-total-divisas">$0.00</span>
+                  </div>
+                  <div class="total-badge-box total-bs-box">
+                    <span class="total-badge-label">Total en Bs</span>
+                    <span class="total-badge-val" id="detail-total-bs">Bs. 0,00</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Tabla de Cuotas -->
+              <div class="detail-section-box">
+                <h4 class="detail-section-title">Cronograma y Plan de Cuotas (en USD)</h4>
+                <div class="table-responsive-wrapper">
+                  <table class="schedule-table">
+                    <thead>
+                      <tr>
+                        <th>Cuota</th>
+                        <th>Fecha de Vencimiento</th>
+                        <th>Monto (USD)</th>
+                        <th>Tasa BCV al pagar</th>
+                        <th>Estado</th>
+                      </tr>
+                    </thead>
+                    <tbody id="detail-schedule-tbody">
+                      <!-- Cuotas renderizadas -->
+                    </tbody>
+                  </table>
+                </div>
+                <small style="display: block; margin-top: 6px; color: var(--color-text-muted); font-size: 0.78rem;">
+                  * Nota: Al pagar en Bolívares, se utiliza la tasa BCV oficial del día exacto en que se realiza el pago.
+                </small>
+              </div>
+
+              <!-- Historial de Pagos y Abonos Registrados -->
+              <div class="detail-section-box">
+                <h4 class="detail-section-title">Historial de Pagos y Abonos Registrados</h4>
+                <div class="table-responsive-wrapper">
+                  <table class="schedule-table">
+                    <thead>
+                      <tr>
+                        <th>Fecha</th>
+                        <th>Tipo</th>
+                        <th>Monto (USD)</th>
+                        <th>Moneda</th>
+                        <th>Tasa BCV</th>
+                        <th>Monto en Bs.</th>
+                        <th>Referencia</th>
+                        <th>Comprobante</th>
+                        <th>Acciones</th>
+                      </tr>
+                    </thead>
+                    <tbody id="detail-payments-tbody">
+                      <!-- Pagos renderizados dinámicamente -->
+                    </tbody>
+                  </table>
+                </div>
+                <p id="empty-payments-msg" class="empty-items-text hidden" style="text-align: center; padding: 12px; color: var(--color-text-muted);">Sin abonos adicionales registrados aún.</p>
+              </div>
+            </div>
+
+            <div class="modal-footer-actions">
+              <button type="button" id="btn-close-credit-detail" class="btn-modal-cancel">Cerrar</button>
+              <button type="button" id="btn-generate-invoice-from-detail" class="btn-modal-save" style="background: #1a3a6b;">📄 Generar Factura</button>
+              <button type="button" id="btn-pay-installment-from-detail" class="btn-modal-save" style="background: #16a34a;">✓ Pagar Cuota</button>
+              <button type="button" id="btn-open-payment-from-detail" class="btn-modal-save" style="background: #0284c7;">💳 Abonar</button>
+            </div>
+          </div>
+        </div>
+
+              </section>
+
+
+
+      <!-- 5. Pagos -->
+      <section id="panel-pagos" class="section-panel" aria-labelledby="heading-pagos">
+        <div class="module-header">
+          <div>
+            <h2 id="heading-pagos" class="module-title">Gestión de Pagos</h2>
+            <p class="module-subtitle">Créditos activos ordenados por próxima cuota más cercana</p>
+          </div>
+        </div>
+
+        <!-- Barra de Búsqueda de Pagos -->
+        <div class="search-bar-container">
+          <div class="search-input-wrapper">
+            <svg class="search-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+            </svg>
+            <input 
+              type="text" 
+              id="pagos-search-input" 
+              class="search-input" 
+              placeholder="Buscar por cliente o cédula..." 
+              aria-label="Buscar en pagos">
+          </div>
+        </div>
+
+        <!-- Tabla de Créditos Activos -->
+        <div class="table-responsive-wrapper">
+          <table class="data-table" id="pagos-table">
+            <thead>
+              <tr>
+                <th>Cliente</th>
+                <th>Producto(s)</th>
+                <th>Cuotas</th>
+                <th>Próxima Cuota</th>
+                <th>Vencimiento</th>
+                <th>Estado</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="pagos-tbody">
+              <!-- Filas dinámicas -->
+            </tbody>
+          </table>
+        </div>
+        <p id="empty-pagos-msg" class="empty-items-text hidden">No hay créditos activos pendientes de pago.</p>
+      </section>
+
+<!-- Modal Registrar Pago Libre de Crédito -->
+        <div id="credit-payment-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="credit-payment-title">
+          <div class="modal-card credit-payment-card" style="max-width: 560px;">
+            <div class="modal-header">
+              <h3 id="credit-payment-title" class="modal-title">Registrar Pago de Crédito</h3>
+              <button type="button" id="btn-close-payment-modal" class="modal-close" aria-label="Cerrar modal">&times;</button>
+            </div>
+            <form id="credit-payment-form" class="credit-payment-form" style="padding: 20px; display: flex; flex-direction: column; gap: 16px;">
+              <div id="payment-form-error" class="form-error-banner hidden" style="display: none;"></div>
+              <input type="hidden" id="payment-credit-id">
+
+              <!-- Resumen de deuda actual -->
+              <div class="payment-debt-summary" style="background: #f8fafc; border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 14px 16px;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+                  <span style="color: var(--color-text-muted); font-size: 0.88rem;">Cliente:</span>
+                  <strong id="pay-client-name" style="color: var(--color-primary);">-</strong>
+                </div>
+                <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+                  <span style="color: var(--color-text-muted); font-size: 0.88rem;">Deuda total original:</span>
+                  <strong id="pay-total-debt">$0.00</strong>
+                </div>
+                <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+                  <span style="color: var(--color-text-muted); font-size: 0.88rem;">Saldo restante actual:</span>
+                  <strong id="pay-current-balance" style="color: #b91c1c; font-size: 1.08rem;">$0.00</strong>
+                </div>
+                <div style="display: flex; justify-content: space-between;">
+                  <span style="color: var(--color-text-muted); font-size: 0.88rem;">Cuotas pendientes:</span>
+                  <strong id="pay-pending-count">-</strong>
+                </div>
+              </div>
+
+              <!-- Moneda con la que paga -->
+              <div class="form-group">
+                <label for="payment-currency-select" class="form-label">Moneda del pago</label>
+                <select id="payment-currency-select" class="form-input">
+                  <option value="USD" selected>Divisas ($ USD en efectivo / Zelle)</option>
+                  <option value="BS">Bolívares (Bs. al cambio BCV de hoy)</option>
+                </select>
+                <div id="payment-currency-ref" style="font-size: 0.82rem; color: #1e40af; margin-top: 4px;"></div>
+              </div>
+
+              <!-- Campo Tasa BCV de hoy (solo aparece al pagar en Bolívares) -->
+              <div id="payment-rate-bcv-box" class="form-group hidden">
+                <label for="payment-rate-bcv-today" class="form-label">Tasa BCV de hoy (Bs/USD)</label>
+                <div class="price-input-wrapper">
+                  <span class="rate-prefix">Bs.</span>
+                  <input type="number" id="payment-rate-bcv-today" class="form-input rate-input" placeholder="Ej: 50.00" min="0.01" step="0.01">
+                </div>
+                <small class="field-hint">Ingresa la tasa BCV oficial de hoy para calcular el equivalente en USD</small>
+              </div>
+
+              <!-- Monto pagado en Bolívares (visible cuando elige Bolívares) -->
+              <div id="payment-amount-bs-box" class="form-group hidden">
+                <label for="payment-amount-bs-input" class="form-label">Monto pagado en Bolívares (Bs.)</label>
+                <div class="price-input-wrapper">
+                  <span class="rate-prefix">Bs.</span>
+                  <input type="number" id="payment-amount-bs-input" class="form-input price-input" placeholder="0.00" min="0.01" step="0.01">
+                </div>
+                <small class="field-hint">Monto en Bolívares cancelado por el cliente</small>
+              </div>
+
+              <!-- Campo de monto libre a abonar (USD) -->
+              <div class="form-group">
+                <label for="payment-amount-input" class="form-label" id="payment-amount-label">Monto a abonar (USD)</label>
+                <div class="price-input-wrapper">
+                  <span class="currency-symbol">$</span>
+                  <input type="number" id="payment-amount-input" class="form-input price-input" placeholder="0.00" min="0.01" step="0.01" required>
+                </div>
+                <small class="field-hint" id="payment-amount-hint">Ingresa cualquier monto libre en dólares a abonar (ej: 10 o 100)</small>
+              </div>
+
+              <!-- Fecha del Pago -->
+              <div class="form-group">
+                <label for="payment-date" class="form-label">Fecha del pago</label>
+                <input type="date" id="payment-date" class="form-input" required>
+              </div>
+
+              <!-- CÁLCULO AUTOMÁTICO EN TIEMPO REAL DEL PAGO -->
+              <div class="payment-calculation-card" style="background: #f0fdf4; border: 1.5px solid #86efac; border-radius: var(--radius-md); padding: 14px 16px;">
+                <h4 style="font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.5px; color: #166534; margin-bottom: 10px; font-weight: 700;">
+                  Cálculo Automático del Abono
+                </h4>
+
+                <!-- Fila destacada cuando paga en Bolívares -->
+                <div id="calc-pay-bs-box" style="display: none; background: #eff6ff; border: 1.5px solid #93c5fd; border-radius: 6px; padding: 10px 12px; margin-bottom: 10px;">
+                  <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span style="color: #1e40af; font-weight: 700; font-size: 0.88rem;">* Monto a cobrar en Bs. hoy:</span>
+                    <strong id="calc-pay-bs-amount" style="color: #1d4ed8; font-size: 1.2rem;">Bs. 0,00</strong>
+                  </div>
+                  <small id="calc-pay-bs-formula" style="display: block; color: #3b82f6; font-size: 0.78rem; margin-top: 4px;">Fórmula: Monto USD × Tasa BCV de hoy</small>
+                </div>
+
+                <div style="display: flex; flex-direction: column; gap: 8px; font-size: 0.92rem;">
+                  <div style="display: flex; justify-content: space-between;">
+                    <span style="color: #166534;">* Monto pagado:</span>
+                    <strong id="calc-pay-amount" style="color: #15803d; font-size: 1.1rem;">$0.00</strong>
+                  </div>
+                  <div style="display: flex; justify-content: space-between;">
+                    <span style="color: #166534;">* Porcentaje que representa:</span>
+                    <strong id="calc-pay-percent" style="color: #15803d; font-size: 1.05rem;">0%</strong>
+                  </div>
+                  <div style="display: flex; justify-content: space-between;">
+                    <span style="color: #166534;">* Saldo restante:</span>
+                    <strong id="calc-pay-remaining" style="color: #b91c1c; font-size: 1.15rem;">$0.00</strong>
+                  </div>
+                </div>
+
+                <!-- Vista previa de cómo se aplica el abono a las cuotas -->
+                <div style="margin-top: 12px; padding-top: 10px; border-top: 1px dashed #86efac;">
+                  <span style="font-size: 0.82rem; font-weight: 700; color: #166534; display: block; margin-bottom: 6px;">
+                    * Aplicación del abono cuota por cuota (cronológico):
+                  </span>
+                  <div id="calc-pay-redistribution-list" style="display: flex; flex-direction: column; gap: 4px; font-size: 0.85rem;">
+                    <!-- Lista de cuotas redistribuidas -->
+                  </div>
+                </div>
+              </div>
+
+              <!-- Comprobante (opcional) y Número de Referencia -->
+              <div class="form-group">
+                <label for="payment-reference" class="form-label">Número de referencia (opcional)</label>
+                <input type="text" id="payment-reference" class="form-input" placeholder="Ej: 00482910">
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">Comprobante de pago (opcional)</label>
+                <div class="photo-field-wrapper">
+                  <div class="photo-preview-container" id="payment-receipt-preview-container">
+                    <img id="payment-receipt-preview-img" src="" alt="Comprobante" class="photo-preview-thumb hidden">
+                    <span id="payment-receipt-placeholder" class="photo-preview-placeholder">🧾 Sin comprobante</span>
+                  </div>
+                  <div style="display: flex; flex-direction: column; gap: 6px; flex: 1;">
+                    <input type="file" id="payment-receipt-file" accept="image/*" class="file-input-control">
+                    <button type="button" id="btn-remove-payment-receipt" class="btn-text-danger hidden" style="font-size: 0.8rem; text-align: left; cursor: pointer; background: none; border: none; color: var(--color-error); padding: 0;">✕ Quitar comprobante</button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Botones Guardar y Cancelar -->
+              <div class="modal-footer-actions">
+                <button type="button" id="btn-cancel-payment" class="btn-modal-cancel">Cancelar</button>
+                <button type="submit" id="btn-save-payment" class="btn-modal-save">Confirmar Pago</button>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <!-- Modal Pagar Cuota Específica (Paso a paso, cuota a cuota) -->
+        <div id="credit-pay-installment-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="pay-installment-title">
+          <div class="modal-card credit-payment-card" style="max-width: 540px;">
+            <div class="modal-header">
+              <h3 id="pay-installment-title" class="modal-title">Pagar Cuota</h3>
+              <button type="button" id="btn-close-pay-installment-modal" class="modal-close" aria-label="Cerrar modal">&times;</button>
+            </div>
+            <form id="credit-pay-installment-form" style="padding: 20px; display: flex; flex-direction: column; gap: 16px;">
+              <div id="pay-installment-error" class="form-error-banner hidden" style="display: none;"></div>
+              <input type="hidden" id="pay-inst-credit-id">
+
+              <!-- Resumen de la cuota a cancelar -->
+              <div style="background: #f0fdf4; border: 1.5px solid #86efac; border-radius: var(--radius-md); padding: 14px 16px;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+                  <span style="color: var(--color-text-muted); font-size: 0.88rem;">Cliente:</span>
+                  <strong id="pay-inst-client-name" style="color: var(--color-primary);">-</strong>
+                </div>
+                <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+                  <span style="color: var(--color-text-muted); font-size: 0.88rem;">Cuota correspondiente:</span>
+                  <strong id="pay-inst-number-badge" style="color: #15803d; font-size: 1.05rem;">Cuota -</strong>
+                </div>
+                <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+                  <span style="color: var(--color-text-muted); font-size: 0.88rem;">Fecha de vencimiento:</span>
+                  <strong id="pay-inst-due-date">-</strong>
+                </div>
+                <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+                  <span style="color: var(--color-text-muted); font-size: 0.88rem;">Monto exacto de la cuota:</span>
+                  <strong id="pay-inst-amount-usd" style="color: #15803d; font-size: 1.25rem;">$0.00 USD</strong>
+                </div>
+                <div style="display: flex; justify-content: space-between;">
+                  <span style="color: var(--color-text-muted); font-size: 0.88rem;">Saldo restante del crédito:</span>
+                  <strong id="pay-inst-credit-balance">$0.00 USD</strong>
+                </div>
+              </div>
+
+              <!-- Moneda de pago -->
+              <div class="form-group">
+                <label for="pay-inst-currency-select" class="form-label">Moneda de pago</label>
+                <select id="pay-inst-currency-select" class="form-input">
+                  <option value="USD" selected>Divisas ($ USD en efectivo / Zelle)</option>
+                  <option value="BS">Bolívares (Bs. al cambio BCV de hoy)</option>
+                </select>
+                <small class="field-hint">Selecciona la moneda con la que se cancela esta cuota</small>
+              </div>
+
+              <!-- Campo Tasa BCV de hoy (solo visible al pagar en Bolívares) -->
+              <div id="pay-inst-rate-bcv-box" class="form-group hidden">
+                <label for="pay-inst-rate-bcv-today" class="form-label">Tasa BCV de hoy (Bs/USD)</label>
+                <div class="price-input-wrapper">
+                  <span class="rate-prefix">Bs.</span>
+                  <input type="number" id="pay-inst-rate-bcv-today" class="form-input rate-input" placeholder="Ej: 50.00" min="0.01" step="0.01">
+                </div>
+                <small class="field-hint">Ingresa la tasa BCV oficial de hoy para calcular el cobro de la cuota en Bolívares</small>
+              </div>
+
+              <!-- Monto pagado -->
+              <div class="form-group">
+                <label for="pay-inst-monto-pagado-input" class="form-label">Monto pagado</label>
+                <div class="price-input-wrapper">
+                  <span class="currency-symbol">$</span>
+                  <input type="text" id="pay-inst-monto-pagado-input" class="form-input price-input" readonly value="$0.00 USD">
+                </div>
+                <small class="field-hint">Monto exacto de la cuota correspondiente</small>
+              </div>
+
+              <!-- Fecha del Pago -->
+              <div class="form-group">
+                <label for="pay-inst-date" class="form-label">Fecha del pago</label>
+                <input type="date" id="pay-inst-date" class="form-input" required>
+              </div>
+
+              <!-- Cálculo del cobro en Bs hoy -->
+              <div id="pay-inst-calc-bs-box" style="display: none; background: #eff6ff; border: 1.5px solid #93c5fd; border-radius: 6px; padding: 12px; font-size: 0.92rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <span style="color: #1e40af; font-weight: 700;">* Monto a cobrar en Bs:</span>
+                  <strong id="pay-inst-calc-bs-amount" style="color: #1d4ed8; font-size: 1.25rem;">Bs. 0,00</strong>
+                </div>
+                <small id="pay-inst-calc-bs-formula" style="display: block; color: #3b82f6; font-size: 0.8rem; margin-top: 4px;">Fórmula: Cuota USD × Tasa BCV de hoy</small>
+              </div>
+
+              <!-- Comprobante (opcional) y Número de Referencia -->
+              <div class="form-group">
+                <label for="pay-inst-reference" class="form-label">Número de referencia (opcional)</label>
+                <input type="text" id="pay-inst-reference" class="form-input" placeholder="Ej: 00482910">
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">Comprobante de pago (opcional)</label>
+                <div class="photo-field-wrapper">
+                  <div class="photo-preview-container" id="pay-inst-receipt-preview-container">
+                    <img id="pay-inst-receipt-preview-img" src="" alt="Comprobante" class="photo-preview-thumb hidden">
+                    <span id="pay-inst-receipt-placeholder" class="photo-preview-placeholder">🧾 Sin comprobante</span>
+                  </div>
+                  <div style="display: flex; flex-direction: column; gap: 6px; flex: 1;">
+                    <input type="file" id="pay-inst-receipt-file" accept="image/*" class="file-input-control">
+                    <button type="button" id="btn-remove-pay-inst-receipt" class="btn-text-danger hidden" style="font-size: 0.8rem; text-align: left; cursor: pointer; background: none; border: none; color: var(--color-error); padding: 0;">✕ Quitar comprobante</button>
+                  </div>
+                </div>
+              </div>
+
+              <div style="background: #f8fafc; border: 1px dashed var(--color-border); border-radius: 6px; padding: 10px 12px; font-size: 0.82rem; color: var(--color-text-muted);">
+                ℹ️ <strong>Nota:</strong> Al confirmar, esta cuota se marcará como <strong>Pagada</strong> y el crédito avanzará a la siguiente cuota. Las demás cuotas mantendrán intacto su monto original.
+              </div>
+
+              <div class="modal-footer-actions">
+                <button type="button" id="btn-cancel-pay-installment" class="btn-modal-cancel">Cancelar</button>
+                <button type="submit" id="btn-save-pay-installment" class="btn-modal-save" style="background: #16a34a;">✓ Confirmar Pago de Cuota</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      
+
+<!-- Modal Historial de Pagos del Crédito -->
+        <div id="credit-payments-history-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="history-modal-title">
+          <div class="modal-card credit-detail-card" style="max-width: 880px;">
+            <div class="modal-header">
+              <h3 id="history-modal-title" class="modal-title">Historial de Pagos</h3>
+              <button type="button" id="btn-close-payments-history-modal" class="modal-close" aria-label="Cerrar modal">&times;</button>
+            </div>
+
+            <div class="credit-detail-body" style="padding: 18px 20px;">
+              <!-- Resumen del Crédito -->
+              <div class="detail-section-box" style="margin-bottom: 16px;">
+                <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 8px;">
+                  <div>
+                    <h4 id="history-client-name" style="color: var(--color-primary); font-size: 1.15rem; font-weight: 700;">-</h4>
+                    <span id="history-client-dni" style="color: var(--color-text-muted); font-size: 0.85rem;">-</span>
+                  </div>
+                  <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                    <button type="button" id="history-btn-pay-installment" class="btn-action-pay-installment" style="padding: 6px 12px;">✓ Pagar Cuota</button>
+                    <button type="button" id="history-btn-abonar" class="btn-action-abonar" style="padding: 6px 12px;">💳 Abonar</button>
+                  </div>
+                </div>
+
+                <div class="totales-resumen-grid" style="margin-top: 10px;">
+                  <div class="total-badge-box total-divisas-box" style="padding: 10px 14px;">
+                    <span class="total-badge-label">Saldo Pendiente (USD)</span>
+                    <span class="total-badge-val" id="history-remaining-balance" style="color: #b91c1c;">$0.00</span>
+                  </div>
+                  <div class="total-badge-box" style="padding: 10px 14px; background: #f0fdf4; border: 1.5px solid #86efac;">
+                    <span class="total-badge-label" style="color: #166534;">Total Pagado en Divisas</span>
+                    <span class="total-badge-val" id="history-total-divisas" style="color: #15803d;">$0.00</span>
+                  </div>
+                  <div class="total-badge-box total-bs-box" style="padding: 10px 14px;">
+                    <span class="total-badge-label">Total Pagado en Bs</span>
+                    <span class="total-badge-val" id="history-total-bs">Bs. 0,00</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Lista cronológica de pagos -->
+              <div class="detail-section-box">
+                <h4 class="detail-section-title">Registro Cronológico de Pagos</h4>
+                <div class="table-responsive-wrapper">
+                  <table class="schedule-table">
+                    <thead>
+                      <tr>
+                        <th>Fecha</th>
+                        <th>Tipo</th>
+                        <th>Moneda</th>
+                        <th>Monto USD</th>
+                        <th>Tasa BCV</th>
+                        <th>Monto Bs.</th>
+                        <th>Referencia</th>
+                        <th>Comprobante</th>
+                        <th>Acciones</th>
+                      </tr>
+                    </thead>
+                    <tbody id="payments-history-tbody">
+                      <!-- Pagos dinámicos -->
+                    </tbody>
+                  </table>
+                </div>
+                <p id="empty-history-payments-msg" class="empty-items-text hidden" style="text-align: center; padding: 18px; color: var(--color-text-muted);">Sin pagos registrados aún para este crédito.</p>
+              </div>
+            </div>
+
+            <div class="modal-footer-actions">
+              <button type="button" id="btn-close-payments-history-footer" class="btn-modal-cancel">Cerrar</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Modal Editar Pago -->
+        <div id="modal-edit-payment" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="edit-payment-title">
+          <div class="modal-card credit-payment-card" style="max-width: 540px;">
+            <div class="modal-header">
+              <h3 id="edit-payment-title" class="modal-title">Editar Pago</h3>
+              <button type="button" id="btn-close-edit-payment" class="modal-close" aria-label="Cerrar modal">&times;</button>
+            </div>
+            <form id="edit-payment-form" style="padding: 20px; display: flex; flex-direction: column; gap: 14px;">
+              <div id="edit-payment-error" class="form-error-banner hidden" style="display: none;"></div>
+              <input type="hidden" id="edit-pay-credit-id">
+              <input type="hidden" id="edit-pay-payment-id">
+
+              <div class="form-group">
+                <label for="edit-pay-currency" class="form-label">Moneda</label>
+                <select id="edit-pay-currency" class="form-input">
+                  <option value="USD">Divisas ($ USD)</option>
+                  <option value="BS">Bolívares (Bs.)</option>
+                </select>
+              </div>
+
+              <div id="edit-pay-rate-bcv-box" class="form-group hidden">
+                <label for="edit-pay-rate-bcv" class="form-label">Tasa BCV de hoy (Bs/USD)</label>
+                <div class="price-input-wrapper">
+                  <span class="rate-prefix">Bs.</span>
+                  <input type="number" id="edit-pay-rate-bcv" class="form-input rate-input" step="0.01" min="0.01">
+                </div>
+                <div id="edit-pay-calc-bs" style="margin-top: 6px; font-size: 0.88rem; color: #1e40af; font-weight: 600;"></div>
+              </div>
+
+              <div id="edit-pay-amount-bs-box" class="form-group hidden">
+                <label for="edit-pay-amount-bs" class="form-label">Monto pagado en Bolívares (Bs.)</label>
+                <div class="price-input-wrapper">
+                  <span class="rate-prefix">Bs.</span>
+                  <input type="number" id="edit-pay-amount-bs" class="form-input price-input" step="0.01" min="0.01">
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label for="edit-pay-amount-usd" class="form-label">Monto pagado en USD ($)</label>
+                <div class="price-input-wrapper">
+                  <span class="currency-symbol">$</span>
+                  <input type="number" id="edit-pay-amount-usd" class="form-input price-input" step="0.01" min="0.01" required>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label for="edit-pay-date" class="form-label">Fecha del pago</label>
+                <input type="date" id="edit-pay-date" class="form-input" required>
+              </div>
+
+              <div class="form-group">
+                <label for="edit-pay-reference" class="form-label">Número de referencia</label>
+                <input type="text" id="edit-pay-reference" class="form-input" placeholder="Ej: 123456">
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">Comprobante de pago</label>
+                <div class="photo-field-wrapper">
+                  <div class="photo-preview-container" id="edit-pay-receipt-preview-container">
+                    <img id="edit-pay-receipt-preview-img" src="" alt="Comprobante" class="photo-preview-thumb hidden">
+                    <span id="edit-pay-receipt-placeholder" class="photo-preview-placeholder">🧾 Sin comprobante</span>
+                  </div>
+                  <div style="display: flex; flex-direction: column; gap: 6px; flex: 1;">
+                    <input type="file" id="edit-pay-receipt-file" accept="image/*" class="file-input-control">
+                    <button type="button" id="btn-remove-edit-pay-receipt" class="btn-text-danger hidden" style="font-size: 0.8rem; text-align: left; cursor: pointer; background: none; border: none; color: var(--color-error); padding: 0;">✕ Quitar comprobante</button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="modal-footer-actions">
+                <button type="button" id="btn-cancel-edit-payment" class="btn-modal-cancel">Cancelar</button>
+                <button type="submit" id="btn-save-edit-payment" class="btn-modal-save">Guardar Cambios</button>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <!-- Modal Confirmar Eliminación de Pago -->
+        <div id="modal-confirm-delete-payment" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="delete-payment-modal-title">
+          <div class="modal-card confirm-modal-card">
+            <div class="modal-header">
+              <h3 id="delete-payment-modal-title" class="modal-title">Confirmar Eliminación de Pago</h3>
+              <button type="button" id="btn-close-delete-payment-modal" class="modal-close" aria-label="Cerrar modal">&times;</button>
+            </div>
+            <div class="confirm-modal-content">
+              <p id="delete-payment-modal-msg" class="confirm-modal-text">¿Estás seguro de que deseas eliminar este registro de pago? Esta acción revertirá el monto en el saldo y cuotas del crédito.</p>
+            </div>
+            <div class="modal-footer-actions">
+              <button type="button" id="btn-cancel-delete-payment" class="btn-modal-cancel">Cancelar</button>
+              <button type="button" id="btn-confirm-delete-payment" class="btn-modal-danger">Eliminar Pago</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Modal Visor de Comprobante (Lightbox) -->
+        <div id="receipt-lightbox-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true">
+          <div class="modal-card" style="max-width: 90vw; max-height: 90vh; padding: 16px; background: rgba(15, 23, 42, 0.96); border: 1px solid rgba(255,255,255,0.2); display: flex; flex-direction: column; align-items: center; justify-content: center;">
+            <div style="width: 100%; display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; color: #ffffff;">
+              <h4 id="receipt-lightbox-title" style="font-size: 1.05rem; font-weight: 600;">Comprobante de Pago</h4>
+              <button type="button" id="btn-close-receipt-lightbox" class="modal-close" style="color: #ffffff; font-size: 1.6rem; background: none; border: none; cursor: pointer;">&times;</button>
+            </div>
+            <div style="max-width: 100%; max-height: 75vh; overflow: auto; display: flex; justify-content: center; align-items: center;">
+              <img id="receipt-lightbox-img" src="" alt="Comprobante en tamaño completo" style="max-width: 100%; max-height: 75vh; object-fit: contain; border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.5);">
+            </div>
+          </div>
+        </div>
+      
+
+      <!-- 6. Ventas Directas (Fase 6) -->
+      <section id="panel-ventas" class="section-panel" aria-labelledby="heading-ventas">
+        <div class="section-header-row">
+          <div class="section-title-group">
+            <h2 id="heading-ventas" class="section-title">Ventas Directas</h2>
+            <p class="section-subtitle">Registro y control de ventas al contado (sin cuotas)</p>
+          </div>
+          <button type="button" id="btn-open-add-sale" class="btn-primary-action">
+            <svg fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24" style="width: 18px; height: 18px;">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+            </svg>
+            <span>＋ Nueva Venta</span>
+          </button>
+        </div>
+
+        <!-- Barra de Búsqueda de Ventas -->
+        <div class="search-bar-container">
+          <div class="search-input-wrapper">
+            <svg class="search-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+            </svg>
+            <input 
+              type="text" 
+              id="ventas-search-input" 
+              class="search-input" 
+              placeholder="Buscar por cliente o cédula..." 
+              aria-label="Buscar en ventas directas">
+          </div>
+        </div>
+
+        <!-- Tabla de Ventas Directas -->
+        <div class="table-responsive-wrapper">
+          <table class="data-table" id="ventas-table">
+            <thead>
+              <tr>
+                <th>Fecha</th>
+                <th>Cliente</th>
+                <th>Producto(s)</th>
+                <th>Precio Venta USD</th>
+                <th>Método de Pago</th>
+                <th>Comprobante</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="ventas-tbody">
+              <!-- Filas dinámicas -->
+            </tbody>
+          </table>
+        </div>
+        <p id="empty-ventas-msg" class="empty-items-text hidden">No hay ventas directas registradas.</p>
+      </section>
+
+      <!-- Modal Registrar / Editar Venta Directa -->
+      <div id="modal-sale" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="sale-modal-title">
+        <div class="modal-card credit-payment-card" style="max-width: 600px;">
+          <div class="modal-header">
+            <h3 id="sale-modal-title" class="modal-title">Registrar Venta Directa</h3>
+            <button type="button" id="btn-close-sale-modal" class="modal-close" aria-label="Cerrar modal">&times;</button>
+          </div>
+          <form id="sale-form" style="padding: 20px; display: flex; flex-direction: column; gap: 16px;">
+            <div id="sale-form-error" class="form-error-banner hidden" style="display: none;"></div>
+            <input type="hidden" id="sale-edit-id" value="">
+
+            <!-- 1. Seleccionar Cliente -->
+            <div class="form-group">
+              <label for="sale-client-select" class="form-label">1. Seleccionar cliente</label>
+              <select id="sale-client-select" class="form-input" required>
+                <option value="">-- Seleccionar cliente registrado --</option>
+              </select>
+              <small class="field-hint">¿No aparece en la lista? Registra el cliente primero en la sección Clientes.</small>
+            </div>
+
+            <!-- 2. Seleccionar Producto(s) del catálogo -->
+            <div class="form-group">
+              <label class="form-label">2. Seleccionar producto(s) del catálogo</label>
+              <div class="add-product-row">
+                <select id="sale-product-select" class="form-input product-select-dropdown">
+                  <option value="">-- Seleccionar producto --</option>
+                </select>
+                <input type="number" id="sale-product-qty" class="form-input qty-input-control" placeholder="Cant." min="1" value="1">
+                <button type="button" id="btn-add-product-to-sale" class="btn-action-add-item">
+                  ＋ Añadir
+                </button>
+              </div>
+
+              <!-- Lista de productos añadidos a la venta -->
+              <div class="credit-items-container" style="margin-top: 10px;">
+                <table class="credit-items-table" id="sale-items-table">
+                  <thead>
+                    <tr>
+                      <th>Producto</th>
+                      <th>Cant.</th>
+                      <th>Precio unit.</th>
+                      <th>Subtotal</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody id="sale-items-tbody">
+                    <!-- Dinámico -->
+                  </tbody>
+                </table>
+                <p id="empty-sale-items-msg" class="empty-items-text">Añade al menos un producto a la venta.</p>
+              </div>
+            </div>
+
+            <!-- 3. Precio de venta en USD -->
+            <div class="form-group">
+              <label for="sale-price-usd" class="form-label">3. Precio de venta final ($ USD)</label>
+              <div class="price-input-wrapper">
+                <span class="currency-symbol">$</span>
+                <input type="number" id="sale-price-usd" class="form-input price-input" placeholder="0.00" min="0.01" step="0.01" required>
+              </div>
+              <small class="field-hint">
+                Precio acordado de la venta en USD. Subtotal referencial del catálogo: <strong id="sale-catalog-subtotal" style="color: var(--color-primary);">$0.00</strong>. Puedes ajustarlo libremente.
+              </small>
+            </div>
+
+            <!-- 4. Método de pago -->
+            <div class="form-group">
+              <label for="sale-payment-method" class="form-label">4. Método de pago</label>
+              <select id="sale-payment-method" class="form-input" required>
+                <option value="USD">Divisas ($)</option>
+                <option value="BS">Bolívares (Bs.)</option>
+                <option value="ZELLE">Zelle</option>
+                <option value="TRANSFERENCIA">Transferencia</option>
+              </select>
+            </div>
+
+            <!-- Campos específicos para Bolívares (Tasa BCV y Monto Bs) -->
+            <div id="sale-bs-box" class="form-grid-2col hidden" style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: var(--radius-md); padding: 12px; gap: 12px;">
+              <div class="form-group" style="margin-bottom: 0;">
+                <label for="sale-rate-bcv" class="form-label">Tasa BCV de hoy (Bs/$)</label>
+                <div class="price-input-wrapper">
+                  <span class="rate-prefix">Bs.</span>
+                  <input type="number" id="sale-rate-bcv" class="form-input rate-input" placeholder="Ej: 52.50" step="0.01" min="0.01">
+                </div>
+                <small class="field-hint">Tasa oficial de cambio</small>
+              </div>
+              <div class="form-group" style="margin-bottom: 0;">
+                <label for="sale-amount-bs" class="form-label">Monto cobrado en Bs.</label>
+                <div class="price-input-wrapper">
+                  <span class="rate-prefix">Bs.</span>
+                  <input type="number" id="sale-amount-bs" class="form-input rate-input" placeholder="0.00" step="0.01" min="0.01">
+                </div>
+                <small class="field-hint">Calcula automáticamente con el precio USD</small>
+              </div>
+            </div>
+
+            <!-- 5. Fecha de la venta -->
+            <div class="form-group">
+              <label for="sale-date" class="form-label">5. Fecha de la venta</label>
+              <input type="date" id="sale-date" class="form-input" required>
+            </div>
+
+            <!-- 6. Número de referencia (opcional) -->
+            <div class="form-group">
+              <label for="sale-reference" class="form-label">Número de referencia (opcional)</label>
+              <input type="text" id="sale-reference" class="form-input" placeholder="Ej: 00482910 o REF-ZELLE-54">
+            </div>
+
+            <!-- 7. Comprobante (opcional) -->
+            <div class="form-group">
+              <label class="form-label">Comprobante de pago (opcional)</label>
+              <div class="photo-field-wrapper">
+                <div class="photo-preview-container" id="sale-receipt-preview-container">
+                  <img id="sale-receipt-preview-img" src="" alt="Comprobante" class="photo-preview-thumb hidden">
+                  <span id="sale-receipt-placeholder" class="photo-preview-placeholder">🧾 Sin comprobante</span>
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 6px; flex: 1;">
+                  <input type="file" id="sale-receipt-file" accept="image/*" class="file-input-control">
+                  <button type="button" id="btn-remove-sale-receipt" class="btn-text-danger hidden" style="font-size: 0.8rem; text-align: left; cursor: pointer; background: none; border: none; color: var(--color-error); padding: 0;">✕ Quitar comprobante</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- 8. Notas (opcional) -->
+            <div class="form-group">
+              <label for="sale-notes" class="form-label">Notas u observaciones (opcional)</label>
+              <textarea id="sale-notes" class="form-input" rows="2" placeholder="Observaciones de la venta, entrega o cliente..."></textarea>
+            </div>
+
+            <!-- Acciones -->
+            <div class="modal-footer-actions">
+              <button type="button" id="btn-cancel-sale" class="btn-modal-cancel">Cancelar</button>
+              <button type="submit" id="btn-save-sale" class="btn-modal-save">Guardar Venta</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- Modal Ver Detalle de Venta Directa -->
+      <div id="modal-sale-detail" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="sale-detail-title">
+        <div class="modal-card credit-detail-card" style="max-width: 620px;">
+          <div class="modal-header">
+            <h3 id="sale-detail-title" class="modal-title">Detalle de Venta Directa</h3>
+            <button type="button" id="btn-close-sale-detail" class="modal-close" aria-label="Cerrar modal">&times;</button>
+          </div>
+          <div class="detail-body" style="padding: 20px; display: flex; flex-direction: column; gap: 16px;">
+            <!-- Información del Cliente -->
+            <div class="detail-section" style="background: #f8fafc; border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 14px 16px;">
+              <h4 style="color: var(--color-primary); font-size: 0.95rem; margin-bottom: 8px; font-weight: 700;">Datos del Cliente</h4>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 0.88rem;">
+                <div><span style="color: var(--color-text-muted);">Nombre:</span> <strong id="detail-sale-client-name">-</strong></div>
+                <div><span style="color: var(--color-text-muted);">Cédula:</span> <strong id="detail-sale-client-dni">-</strong></div>
+                <div><span style="color: var(--color-text-muted);">Teléfono:</span> <span id="detail-sale-client-phone">-</span></div>
+                <div><span style="color: var(--color-text-muted);">Fecha de Venta:</span> <strong id="detail-sale-date">-</strong></div>
+              </div>
+            </div>
+
+            <!-- Productos Vendidos -->
+            <div class="detail-section">
+              <h4 style="color: var(--color-primary); font-size: 0.95rem; margin-bottom: 8px; font-weight: 700;">Producto(s) Comprado(s)</h4>
+              <div class="table-responsive-wrapper" style="border: 1px solid var(--color-border); border-radius: var(--radius-md); overflow: hidden;">
+                <table class="data-table" style="margin: 0; font-size: 0.88rem;">
+                  <thead>
+                    <tr>
+                      <th>Producto</th>
+                      <th>Cant.</th>
+                      <th>Precio Unit.</th>
+                      <th>Subtotal</th>
+                    </tr>
+                  </thead>
+                  <tbody id="detail-sale-items-tbody">
+                    <!-- Dinámico -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Resumen Financiero -->
+            <div class="detail-section" style="background: #f0fdf4; border: 1px solid #86efac; border-radius: var(--radius-md); padding: 14px 16px;">
+              <h4 style="color: #166534; font-size: 0.95rem; margin-bottom: 10px; font-weight: 700;">Resumen del Pago</h4>
+              <div style="display: flex; flex-direction: column; gap: 6px; font-size: 0.9rem;">
+                <div style="display: flex; justify-content: space-between;">
+                  <span style="color: #166534;">Precio de Venta (USD):</span>
+                  <strong id="detail-sale-price-usd" style="color: #15803d; font-size: 1.15rem;">$0.00 USD</strong>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <span style="color: #166534;">Método de Pago:</span>
+                  <span id="detail-sale-method-badge" class="badge-divisas">Divisas ($)</span>
+                </div>
+                <div id="detail-sale-bs-row" class="hidden" style="display: flex; justify-content: space-between; padding-top: 4px; border-top: 1px dashed #86efac;">
+                  <span style="color: #166534;">Detalle en Bolívares:</span>
+                  <span id="detail-sale-bs-text" style="font-weight: 700; color: #1d4ed8;">Bs. 0,00 (Tasa: 0.00)</span>
+                </div>
+                <div id="detail-sale-ref-row" style="display: flex; justify-content: space-between;">
+                  <span style="color: var(--color-text-muted);">Nº Referencia:</span>
+                  <code id="detail-sale-reference" style="font-size: 0.9rem;">—</code>
+                </div>
+                <div id="detail-sale-notes-row" style="display: flex; flex-direction: column; gap: 2px; margin-top: 4px;">
+                  <span style="color: var(--color-text-muted); font-size: 0.82rem;">Notas:</span>
+                  <p id="detail-sale-notes" style="background: #ffffff; padding: 6px 10px; border-radius: 4px; border: 1px solid #bbf7d0; font-size: 0.85rem; margin: 0; white-space: pre-wrap;">—</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Comprobante adjunto -->
+            <div id="detail-sale-receipt-section" class="detail-section">
+              <h4 style="color: var(--color-primary); font-size: 0.95rem; margin-bottom: 8px; font-weight: 700;">Comprobante de Pago</h4>
+              <div id="detail-sale-receipt-container" style="display: flex; align-items: center; gap: 12px;">
+                <!-- Imagen o sin comprobante -->
+              </div>
+            </div>
+
+            <div class="modal-footer-actions" style="margin-top: 8px;">
+              <button type="button" id="btn-close-sale-detail-footer" class="btn-modal-cancel">Cerrar</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal Confirmar Eliminación de Venta Directa -->
+      <div id="modal-confirm-delete-sale" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="delete-sale-modal-title">
+        <div class="modal-card confirm-modal-card">
+          <div class="modal-header">
+            <h3 id="delete-sale-modal-title" class="modal-title">Confirmar Eliminación de Venta</h3>
+            <button type="button" id="btn-close-delete-sale-modal" class="modal-close" aria-label="Cerrar modal">&times;</button>
+          </div>
+          <div class="confirm-modal-content">
+            <p id="delete-sale-modal-msg" class="confirm-modal-text">¿Estás seguro de que deseas eliminar esta venta directa? Se restaurarán automáticamente las unidades de los productos al inventario.</p>
+          </div>
+          <div class="modal-footer-actions">
+            <button type="button" id="btn-cancel-delete-sale" class="btn-modal-cancel">Cancelar</button>
+            <button type="button" id="btn-confirm-delete-sale" class="btn-modal-danger">Eliminar Venta</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 7. Módulo de Proveedores y Costos (Fase 7) -->
+      <section id="panel-proveedores" class="section-panel" aria-labelledby="heading-proveedores">
+        <!-- Sub-Navegación Interna -->
+        <div class="subnav-container" style="display: flex; gap: 8px; margin-bottom: 20px; border-bottom: 2px solid var(--color-border); padding-bottom: 12px; flex-wrap: wrap;">
+          <button type="button" class="subnav-tab active" data-subtab="directorio" id="subtab-btn-directorio">
+            🏢 Directorio de Proveedores
+          </button>
+          <button type="button" class="subnav-tab" data-subtab="comparativa" id="subtab-btn-comparativa">
+            🔍 Comparativa entre Proveedores
+          </button>
+          <button type="button" class="subnav-tab" data-subtab="gastos" id="subtab-btn-gastos">
+            💸 Gastos Operativos
+          </button>
+        </div>
+
+        <!-- SUBTAB 1: DIRECTORIO DE PROVEEDORES -->
+        <div id="subtab-content-directorio" class="proveedores-subtab-view">
+          <div class="section-header-row">
+            <div class="section-title-group">
+              <h2 id="heading-proveedores" class="section-title">Directorio de Proveedores</h2>
+              <p class="section-subtitle">Gestión de aliados comerciales, listas de costos y márgenes de ganancia</p>
+            </div>
+            <button type="button" id="btn-open-add-supplier" class="btn-primary-action">
+              <svg fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24" style="width: 18px; height: 18px;">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+              </svg>
+              <span>＋ Nuevo Proveedor</span>
+            </button>
+          </div>
+
+          <!-- Barra de Búsqueda de Proveedores -->
+          <div class="search-bar-container">
+            <div class="search-input-wrapper">
+              <svg class="search-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+              </svg>
+              <input 
+                type="text" 
+                id="suppliers-search-input" 
+                class="search-input" 
+                placeholder="Buscar proveedor por nombre o ubicación..." 
+                aria-label="Buscar proveedor">
+            </div>
+          </div>
+
+          <!-- Tabla de Proveedores -->
+          <div class="table-responsive-wrapper">
+            <table class="data-table" id="suppliers-table">
+              <thead>
+                <tr>
+                  <th>Proveedor</th>
+                  <th>Ubicación</th>
+                  <th>Métodos de Pago Aceptados</th>
+                  <th>Productos con Costo</th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="suppliers-tbody">
+                <!-- Dinámico -->
+              </tbody>
+            </table>
+          </div>
+          <p id="empty-suppliers-msg" class="empty-items-text hidden">No hay proveedores registrados.</p>
+        </div>
+
+        <!-- SUBTAB 2: COMPARATIVA ENTRE PROVEEDORES -->
+        <div id="subtab-content-comparativa" class="proveedores-subtab-view hidden">
+          <div class="section-header-row">
+            <div class="section-title-group">
+              <h2 class="section-title">Comparativa de Costos por Producto</h2>
+              <p class="section-subtitle">Selecciona un producto del catálogo para ver cuál proveedor ofrece el mejor precio de costo</p>
+            </div>
+          </div>
+
+          <div style="background: #ffffff; border: 1px solid var(--color-border); border-radius: var(--radius-lg); padding: 18px; margin-bottom: 20px;">
+            <label for="compare-product-select" class="form-label" style="font-weight: 700; color: var(--color-primary); font-size: 0.95rem;">
+              Seleccionar Producto del Catálogo:
+            </label>
+            <select id="compare-product-select" class="form-input" style="max-width: 500px;">
+              <option value="">-- Selecciona un producto para comparar --</option>
+            </select>
+          </div>
+
+          <!-- Información del Producto y Tabla Comparativa -->
+          <div id="compare-results-container" class="hidden">
+            <div id="compare-product-card" style="background: #f8fafc; border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 14px 18px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+              <div>
+                <h3 id="compare-product-name" style="margin: 0; color: var(--color-primary); font-size: 1.1rem; font-weight: 700;">-</h3>
+                <span id="compare-product-cat-info" style="color: var(--color-text-muted); font-size: 0.85rem;">-</span>
+              </div>
+              <div style="text-align: right;">
+                <span style="color: var(--color-text-muted); font-size: 0.85rem; display: block;">Precio en Catálogo (Venta):</span>
+                <strong id="compare-product-price" style="font-size: 1.2rem; color: #15803d;">$0.00 USD</strong>
+              </div>
+            </div>
+
+            <div class="table-responsive-wrapper">
+              <table class="data-table" id="compare-suppliers-table">
+                <thead>
+                  <tr>
+                    <th>Proveedor</th>
+                    <th>Ubicación</th>
+                    <th>Precio Lista</th>
+                    <th>Descuento en Divisas</th>
+                    <th>Costo Real</th>
+                    <th>Margen en USD</th>
+                    <th>Margen %</th>
+                    <th>Métodos de Pago</th>
+                    <th>Ventaja / Evaluación</th>
+                  </tr>
+                </thead>
+                <tbody id="compare-suppliers-tbody">
+                  <!-- Dinámico -->
+                </tbody>
+              </table>
+            </div>
+            <p id="empty-compare-suppliers-msg" class="empty-items-text hidden">Ningún proveedor tiene registrado este producto aún.</p>
+          </div>
+          <p id="prompt-select-product-msg" class="empty-items-text">Selecciona un producto arriba para visualizar la tabla comparativa de costos.</p>
+        </div>
+
+        <!-- SUBTAB 3: GASTOS OPERATIVOS -->
+        <div id="subtab-content-gastos" class="proveedores-subtab-view hidden">
+          <!-- Tarjeta de Total de Gastos del Mes -->
+          <div style="background: linear-gradient(135deg, #1a3a6b 0%, #2a5298 100%); color: #ffffff; border-radius: var(--radius-lg); padding: 22px 24px; margin-bottom: 20px; box-shadow: var(--shadow-md); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+            <div>
+              <span style="font-size: 0.85rem; text-transform: uppercase; letter-spacing: 1px; color: #f5c400; font-weight: 700;">
+                Control de Costos del Negocio
+              </span>
+              <h3 style="margin: 4px 0 0 0; font-size: 1.4rem; font-weight: 700;">Total de Gastos del Mes Actual</h3>
+              <p id="expenses-month-label" style="margin: 2px 0 0 0; font-size: 0.88rem; color: #cbd5e1;">-</p>
+            </div>
+            <div style="display: flex; gap: 24px; align-items: center; flex-wrap: wrap;">
+              <div style="text-align: right;">
+                <span style="font-size: 0.8rem; color: #94a3b8; display: block;">Total Divisas</span>
+                <strong id="expenses-month-total-usd" style="font-size: 1.7rem; color: #ffffff;">$0.00 USD</strong>
+              </div>
+              <div style="text-align: right; border-left: 1px solid rgba(255,255,255,0.2); padding-left: 20px;">
+                <span style="font-size: 0.8rem; color: #94a3b8; display: block;">Total Bolívares</span>
+                <strong id="expenses-month-total-bs" style="font-size: 1.4rem; color: #f5c400;">Bs. 0,00</strong>
+              </div>
+            </div>
+          </div>
+
+          <div class="section-header-row">
+            <div class="section-title-group">
+              <h3 class="section-title" style="font-size: 1.15rem;">Registro de Gastos Operativos</h3>
+              <p class="section-subtitle">Control de fletes, emergencias y gastos operativos de la tienda</p>
+            </div>
+            <button type="button" id="btn-open-add-expense" class="btn-primary-action">
+              <svg fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24" style="width: 18px; height: 18px;">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+              </svg>
+              <span>＋ Registrar Gasto</span>
+            </button>
+          </div>
+
+          <!-- Barra de Búsqueda / Filtro de Gastos -->
+          <div class="search-bar-container">
+            <div class="search-input-wrapper">
+              <svg class="search-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+              </svg>
+              <input 
+                type="text" 
+                id="expenses-search-input" 
+                class="search-input" 
+                placeholder="Buscar gasto por descripción o tipo..." 
+                aria-label="Buscar gasto">
+            </div>
+          </div>
+
+          <!-- Tabla de Gastos -->
+          <div class="table-responsive-wrapper">
+            <table class="data-table" id="expenses-table">
+              <thead>
+                <tr>
+                  <th>Fecha</th>
+                  <th>Tipo</th>
+                  <th>Descripción</th>
+                  <th>Monto</th>
+                  <th>Equivalencia / Tasa</th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="expenses-tbody">
+                <!-- Dinámico -->
+              </tbody>
+            </table>
+          </div>
+          <p id="empty-expenses-msg" class="empty-items-text hidden">No hay gastos operativos registrados.</p>
+        </div>
+      </section>
+
+      <!-- Modal Registrar / Editar Proveedor -->
+      <div id="modal-supplier" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="supplier-modal-title">
+        <div class="modal-card credit-payment-card" style="max-width: 580px;">
+          <div class="modal-header">
+            <h3 id="supplier-modal-title" class="modal-title">Registrar Proveedor</h3>
+            <button type="button" id="btn-close-supplier-modal" class="modal-close" aria-label="Cerrar modal">&times;</button>
+          </div>
+          <form id="supplier-form" style="padding: 20px; display: flex; flex-direction: column; gap: 16px;">
+            <div id="supplier-form-error" class="form-error-banner hidden" style="display: none;"></div>
+            <input type="hidden" id="supplier-edit-id" value="">
+
+            <div class="form-group">
+              <label for="supplier-name" class="form-label">Nombre del proveedor</label>
+              <input type="text" id="supplier-name" class="form-input" placeholder="Ej: Distribuidora Noeluis o Mayorista Caracas" required>
+            </div>
+
+            <div class="form-group">
+              <label for="supplier-location" class="form-label">Ubicación (ciudad o dirección)</label>
+              <input type="text" id="supplier-location" class="form-input" placeholder="Ej: Barquisimeto, Av. Libertador" required>
+            </div>
+
+            <div class="form-group">
+              <label for="supplier-phone" class="form-label">Teléfono / Contacto (opcional)</label>
+              <input type="text" id="supplier-phone" class="form-input" placeholder="Ej: 0414-1234567">
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Métodos de pago aceptados (selección múltiple):</label>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; background: #f8fafc; padding: 12px; border-radius: var(--radius-md); border: 1px solid var(--color-border);">
+                <label style="display: flex; align-items: center; gap: 8px; font-size: 0.88rem; cursor: pointer;">
+                  <input type="checkbox" name="supplier_payment_methods" value="Zelle" class="custom-checkbox">
+                  <span>Zelle</span>
+                </label>
+                <label style="display: flex; align-items: center; gap: 8px; font-size: 0.88rem; cursor: pointer;">
+                  <input type="checkbox" name="supplier_payment_methods" value="USDT" class="custom-checkbox">
+                  <span>USDT (Cripto)</span>
+                </label>
+                <label style="display: flex; align-items: center; gap: 8px; font-size: 0.88rem; cursor: pointer;">
+                  <input type="checkbox" name="supplier_payment_methods" value="Electrónico/Transferencia" class="custom-checkbox">
+                  <span>Electrónico / Transf.</span>
+                </label>
+                <label style="display: flex; align-items: center; gap: 8px; font-size: 0.88rem; cursor: pointer;">
+                  <input type="checkbox" name="supplier_payment_methods" value="Divisas efectivo" class="custom-checkbox">
+                  <span>Divisas efectivo ($)</span>
+                </label>
+                <label style="display: flex; align-items: center; gap: 8px; font-size: 0.88rem; cursor: pointer;">
+                  <input type="checkbox" name="supplier_payment_methods" value="Bolívares efectivo" class="custom-checkbox">
+                  <span>Bolívares efectivo (Bs)</span>
+                </label>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="supplier-notes" class="form-label">Notas u observaciones (opcional)</label>
+              <textarea id="supplier-notes" class="form-input" rows="2" placeholder="Condiciones de flete, garantía, días de despacho, etc."></textarea>
+            </div>
+
+            <div class="modal-footer-actions">
+              <button type="button" id="btn-cancel-supplier" class="btn-modal-cancel">Cancelar</button>
+              <button type="submit" id="btn-save-supplier" class="btn-modal-save">Guardar Proveedor</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- Modal Perfil del Proveedor y Costos -->
+      <div id="modal-supplier-profile" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="supplier-profile-title">
+        <div class="modal-card credit-detail-card" style="max-width: 820px; max-height: 90vh; overflow-y: auto;">
+          <div class="modal-header">
+            <h3 id="supplier-profile-title" class="modal-title">Perfil del Proveedor</h3>
+            <button type="button" id="btn-close-supplier-profile" class="modal-close" aria-label="Cerrar modal">&times;</button>
+          </div>
+          <div class="detail-body" style="padding: 20px; display: flex; flex-direction: column; gap: 20px;">
+            <!-- Cabecera del Proveedor -->
+            <div style="background: #f8fafc; border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 16px;">
+              <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 10px; margin-bottom: 10px;">
+                <div>
+                  <h3 id="prof-supplier-name" style="margin: 0; color: var(--color-primary); font-size: 1.25rem; font-weight: 700;">-</h3>
+                  <span id="prof-supplier-location" style="color: var(--color-text-muted); font-size: 0.9rem;">📍 -</span>
+                  <span id="prof-supplier-phone" style="color: var(--color-text-muted); font-size: 0.9rem; margin-left: 12px;">📞 -</span>
+                </div>
+                <div id="prof-supplier-methods" style="display: flex; gap: 6px; flex-wrap: wrap;">
+                  <!-- Badges de métodos -->
+                </div>
+              </div>
+              <p id="prof-supplier-notes" style="margin: 0; font-size: 0.85rem; color: var(--color-text-muted); font-style: italic;">Sin notas.</p>
+            </div>
+
+            <!-- SECCIÓN 1: COSTOS POR PRODUCTO -->
+            <div style="border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 16px; background: #ffffff;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 10px;">
+                <div>
+                  <h4 style="margin: 0; color: var(--color-primary); font-size: 1.05rem; font-weight: 700;">Costos por Producto</h4>
+                  <small style="color: var(--color-text-muted);">Márgenes de ganancia y descuentos definidos para este proveedor</small>
+                </div>
+                <button type="button" id="btn-open-add-cost" class="btn-primary-action" style="padding: 6px 12px; font-size: 0.84rem;">
+                  ＋ Asignar Producto / Costo
+                </button>
+              </div>
+
+              <div class="table-responsive-wrapper">
+                <table class="data-table" id="supplier-costs-table" style="font-size: 0.88rem;">
+                  <thead>
+                    <tr>
+                      <th>Producto</th>
+                      <th>Precio Lista</th>
+                      <th>Descuento Proveedor</th>
+                      <th>Costo Real Pagado</th>
+                      <th>Precio Venta</th>
+                      <th>Margen Real</th>
+                      <th>Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody id="supplier-costs-tbody">
+                    <!-- Dinámico -->
+                  </tbody>
+                </table>
+              </div>
+              <p id="empty-supplier-costs-msg" class="empty-items-text hidden">No hay costos de productos asignados a este proveedor aún.</p>
+            </div>
+
+            <!-- SECCIÓN 2: COMPARATIVA DIVISAS VS BOLÍVARES -->
+            <div style="background: #eff6ff; border: 1.5px solid #bfdbfe; border-radius: var(--radius-md); padding: 18px;">
+              <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px;">
+                <span style="font-size: 1.3rem;">⚖️</span>
+                <div>
+                  <h4 style="margin: 0; color: #1e40af; font-size: 1.05rem; font-weight: 700;">Comparativa de Compra: Divisas vs. Bolívares</h4>
+                  <small style="color: #3b82f6;">Decide si te conviene comprar divisas para pagar al proveedor o pagar directo en Bolívares</small>
+                </div>
+              </div>
+
+              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 14px;">
+                <div class="form-group" style="margin-bottom: 0;">
+                  <label for="calc-cmp-usd" class="form-label" style="font-size: 0.82rem;">Precio proveedor en Divisas ($ USD)</label>
+                  <div class="price-input-wrapper">
+                    <span class="currency-symbol">$</span>
+                    <input type="number" id="calc-cmp-usd" class="form-input price-input" placeholder="0.00" step="0.01">
+                  </div>
+                </div>
+
+                <div class="form-group" style="margin-bottom: 0;">
+                  <label for="calc-cmp-bs" class="form-label" style="font-size: 0.82rem;">Precio proveedor en Bolívares (Bs.)</label>
+                  <div class="price-input-wrapper">
+                    <span class="rate-prefix">Bs.</span>
+                    <input type="number" id="calc-cmp-bs" class="form-input rate-input" placeholder="0.00" step="0.01">
+                  </div>
+                </div>
+
+                <div class="form-group" style="margin-bottom: 0;">
+                  <label for="calc-cmp-rate" class="form-label" style="font-size: 0.82rem;">Tasa a la que consigo divisas (Bs/$)</label>
+                  <div class="price-input-wrapper">
+                    <span class="rate-prefix">Bs.</span>
+                    <input type="number" id="calc-cmp-rate" class="form-input rate-input" placeholder="Costo de $1 en Bs" step="0.01">
+                  </div>
+                  <small style="font-size: 0.72rem; color: #64748b;">Lo que te cuesta comprar $1 en Bs.</small>
+                </div>
+
+                <div class="form-group" style="margin-bottom: 0;">
+                  <label for="calc-cmp-usd-discount" class="form-label" style="font-size: 0.82rem;">Descuento en divisas (% opcional)</label>
+                  <div class="price-input-wrapper">
+                    <input type="number" id="calc-cmp-usd-discount" class="form-input" placeholder="0" step="0.1" min="0" max="100" value="0">
+                    <span class="currency-symbol" style="left: auto; right: 14px; color: var(--color-primary); font-weight: 700;">%</span>
+                  </div>
+                  <small style="font-size: 0.72rem; color: #64748b;">Si el proveedor da rebaja al pagar en $</small>
+                </div>
+              </div>
+
+              <!-- Resultado del cálculo de ahorro -->
+              <div id="calc-cmp-result-box" style="background: #ffffff; border: 1.5px solid #93c5fd; border-radius: var(--radius-md); padding: 14px 16px;">
+                <div id="calc-cmp-result-text" style="font-size: 0.92rem; color: #1e3a8a;">
+                  Ingresa los datos arriba para comparar qué opción es más barata y cuánto te ahorras.
+                </div>
+              </div>
+            </div>
+
+            <div class="modal-footer-actions">
+              <button type="button" id="btn-close-supplier-profile-footer" class="btn-modal-cancel">Cerrar</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal Asignar / Editar Costo de Producto a Proveedor -->
+      <div id="modal-supplier-cost-form" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="cost-modal-title">
+        <div class="modal-card credit-payment-card" style="max-width: 520px;">
+          <div class="modal-header">
+            <h3 id="cost-modal-title" class="modal-title">Asignar Costo de Producto</h3>
+            <button type="button" id="btn-close-cost-modal" class="modal-close" aria-label="Cerrar modal">&times;</button>
+          </div>
+          <form id="cost-form" style="padding: 20px; display: flex; flex-direction: column; gap: 14px;">
+            <div id="cost-form-error" class="form-error-banner hidden" style="display: none;"></div>
+            <input type="hidden" id="cost-edit-product-id" value="">
+
+            <div class="form-group">
+              <label for="cost-product-select" class="form-label">Seleccionar producto del catálogo</label>
+              <select id="cost-product-select" class="form-input" required>
+                <option value="">-- Seleccionar producto --</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="cost-currency" class="form-label">Moneda de costo del proveedor</label>
+              <select id="cost-currency" class="form-input">
+                <option value="USD" selected>Divisas ($ USD)</option>
+                <option value="BS">Bolívares (Bs.)</option>
+              </select>
+            </div>
+
+            <!-- Campos auxiliares si el costo es en Bs -->
+            <div id="cost-bs-fields-box" class="form-grid-2col hidden" style="background: #f8fafc; border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 10px; gap: 10px;">
+              <div class="form-group" style="margin-bottom: 0;">
+                <label for="cost-amount-bs" class="form-label" style="font-size: 0.8rem;">Costo en Bs.</label>
+                <div class="price-input-wrapper">
+                  <span class="rate-prefix">Bs.</span>
+                  <input type="number" id="cost-amount-bs" class="form-input rate-input" placeholder="0.00" step="0.01">
+                </div>
+              </div>
+              <div class="form-group" style="margin-bottom: 0;">
+                <label for="cost-rate-bcv" class="form-label" style="font-size: 0.8rem;">Tasa de cambio</label>
+                <div class="price-input-wrapper">
+                  <span class="rate-prefix">Bs.</span>
+                  <input type="number" id="cost-rate-bcv" class="form-input rate-input" placeholder="Ej: 52.50" step="0.01">
+                </div>
+              </div>
+            </div>
+
+            <div class="form-grid-2col" style="gap: 12px;">
+              <div class="form-group" style="margin-bottom: 0;">
+                <label for="cost-price-usd" class="form-label">Precio de Lista ($ USD)</label>
+                <div class="price-input-wrapper">
+                  <span class="currency-symbol">$</span>
+                  <input type="number" id="cost-price-usd" class="form-input price-input" placeholder="0.00" step="0.01" min="0.01" required>
+                </div>
+              </div>
+              <div class="form-group" style="margin-bottom: 0;">
+                <label for="cost-sale-price-usd" class="form-label">Precio de Venta ($ USD)</label>
+                <div class="price-input-wrapper">
+                  <span class="currency-symbol">$</span>
+                  <input type="number" id="cost-sale-price-usd" class="form-input price-input" placeholder="0.00" step="0.01" min="0.01" required>
+                </div>
+              </div>
+            </div>
+
+            <!-- Descuento del proveedor (%) y Selector de método de pago -->
+            <div class="form-grid-2col" style="gap: 12px;">
+              <div class="form-group" style="margin-bottom: 0;">
+                <label for="cost-supplier-discount" class="form-label">Descuento del proveedor (%)</label>
+                <div class="price-input-wrapper">
+                  <input type="number" id="cost-supplier-discount" class="form-input" placeholder="Ej: 15" step="0.1" min="0" max="100" value="0">
+                  <span class="currency-symbol" style="left: auto; right: 14px; color: var(--color-primary); font-weight: 700;">%</span>
+                </div>
+              </div>
+              <div class="form-group" style="margin-bottom: 0;">
+                <label for="cost-supplier-discount-method" class="form-label">Aplica a método de pago</label>
+                <select id="cost-supplier-discount-method" class="form-input">
+                  <option value="Divisas efectivo" selected>Divisas efectivo</option>
+                  <option value="Zelle">Zelle</option>
+                  <option value="USDT">USDT</option>
+                  <option value="Electrónico">Electrónico</option>
+                  <option value="Bolívares">Bolívares</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Cálculo automático del precio real que pago y margen real -->
+            <div id="cost-real-calc-box" style="background: #f0fdf4; border: 1.5px solid #86efac; border-radius: var(--radius-md); padding: 12px 14px; font-size: 0.88rem;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; flex-wrap: wrap; gap: 4px;">
+                <span style="color: #166534; font-weight: 600;">Costo Real que pago:</span>
+                <strong id="calc-cost-real-usd" style="color: #15803d; font-size: 1.05rem;">$0.00 USD</strong>
+              </div>
+              <div id="calc-cost-real-example" style="font-size: 0.82rem; color: #166534; background: #ffffff; padding: 6px 10px; border-radius: 6px; border: 1px dashed #86efac; margin-bottom: 8px;">
+                Precio lista: $0.00 → con 0% descuento en Divisas efectivo = $0.00 USD
+              </div>
+              <div style="display: flex; justify-content: space-between; font-size: 0.84rem; color: #166534;">
+                <span>Margen de ganancia real:</span>
+                <strong id="calc-cost-real-margin">$0.00 USD (0%)</strong>
+              </div>
+            </div>
+
+            <div class="modal-footer-actions">
+              <button type="button" id="btn-cancel-cost" class="btn-modal-cancel">Cancelar</button>
+              <button type="submit" id="btn-save-cost" class="btn-modal-save">Guardar Costo</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- Modal Confirmar Eliminación de Proveedor -->
+      <div id="modal-confirm-delete-supplier" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="delete-supplier-modal-title">
+        <div class="modal-card confirm-modal-card">
+          <div class="modal-header">
+            <h3 id="delete-supplier-modal-title" class="modal-title">Confirmar Eliminación de Proveedor</h3>
+            <button type="button" id="btn-close-delete-supplier-modal" class="modal-close" aria-label="Cerrar modal">&times;</button>
+          </div>
+          <div class="confirm-modal-content">
+            <p class="confirm-modal-text">¿Estás seguro de que deseas eliminar este proveedor? Se eliminarán también sus costos de productos asociados.</p>
+          </div>
+          <div class="modal-footer-actions">
+            <button type="button" id="btn-cancel-delete-supplier" class="btn-modal-cancel">Cancelar</button>
+            <button type="button" id="btn-confirm-delete-supplier" class="btn-modal-danger">Eliminar Proveedor</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal Registrar / Editar Gasto Operativo -->
+      <div id="modal-expense" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="expense-modal-title">
+        <div class="modal-card credit-payment-card" style="max-width: 520px;">
+          <div class="modal-header">
+            <h3 id="expense-modal-title" class="modal-title">Registrar Gasto Operativo</h3>
+            <button type="button" id="btn-close-expense-modal" class="modal-close" aria-label="Cerrar modal">&times;</button>
+          </div>
+          <form id="expense-form" style="padding: 20px; display: flex; flex-direction: column; gap: 14px;">
+            <div id="expense-form-error" class="form-error-banner hidden" style="display: none;"></div>
+            <input type="hidden" id="expense-edit-id" value="">
+
+            <div class="form-group">
+              <label for="expense-type" class="form-label">Tipo de gasto</label>
+              <select id="expense-type" class="form-input" required>
+                <option value="Flete">Flete / Transporte</option>
+                <option value="Emergencia">Emergencia / Imprevisto</option>
+                <option value="Otro">Otro gasto operativo</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="expense-desc" class="form-label">Descripción del gasto</label>
+              <input type="text" id="expense-desc" class="form-input" placeholder="Ej: Flete traslado lote de neveras desde Valencia" required>
+            </div>
+
+            <div class="form-grid-2col" style="gap: 12px;">
+              <div class="form-group" style="margin-bottom: 0;">
+                <label for="expense-currency" class="form-label">Moneda</label>
+                <select id="expense-currency" class="form-input">
+                  <option value="USD" selected>Divisas ($ USD)</option>
+                  <option value="BS">Bolívares (Bs.)</option>
+                </select>
+              </div>
+
+              <div class="form-group" style="margin-bottom: 0;">
+                <label for="expense-amount" class="form-label">Monto</label>
+                <div class="price-input-wrapper">
+                  <span id="expense-currency-symbol" class="currency-symbol">$</span>
+                  <input type="number" id="expense-amount" class="form-input price-input" placeholder="0.00" step="0.01" min="0.01" required>
+                </div>
+              </div>
+            </div>
+
+            <!-- Tasa BCV si el gasto es en Bs -->
+            <div id="expense-bs-box" class="form-group hidden" style="background: #f8fafc; border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 10px;">
+              <label for="expense-rate-bcv" class="form-label" style="font-size: 0.82rem;">Tasa BCV del día (para calcular equivalente en USD):</label>
+              <div class="price-input-wrapper">
+                <span class="rate-prefix">Bs.</span>
+                <input type="number" id="expense-rate-bcv" class="form-input rate-input" placeholder="Ej: 52.50" step="0.01">
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="expense-date" class="form-label">Fecha del gasto</label>
+              <input type="date" id="expense-date" class="form-input" required>
+            </div>
+
+            <div class="form-group">
+              <label for="expense-notes" class="form-label">Notas u observaciones (opcional)</label>
+              <textarea id="expense-notes" class="form-input" rows="2" placeholder="Detalles de la factura, chofer, etc."></textarea>
+            </div>
+
+            <div class="modal-footer-actions">
+              <button type="button" id="btn-cancel-expense" class="btn-modal-cancel">Cancelar</button>
+              <button type="submit" id="btn-save-expense" class="btn-modal-save">Guardar Gasto</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- Modal Confirmar Eliminación de Gasto -->
+      <div id="modal-confirm-delete-expense" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="delete-expense-modal-title">
+        <div class="modal-card confirm-modal-card">
+          <div class="modal-header">
+            <h3 id="delete-expense-modal-title" class="modal-title">Confirmar Eliminación de Gasto</h3>
+            <button type="button" id="btn-close-delete-expense-modal" class="modal-close" aria-label="Cerrar modal">&times;</button>
+          </div>
+          <div class="confirm-modal-content">
+            <p class="confirm-modal-text">¿Estás seguro de que deseas eliminar este registro de gasto operativo?</p>
+          </div>
+          <div class="modal-footer-actions">
+            <button type="button" id="btn-cancel-delete-expense" class="btn-modal-cancel">Cancelar</button>
+            <button type="button" id="btn-confirm-delete-expense" class="btn-modal-danger">Eliminar Gasto</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 8. Facturación (Fase 9) -->
+      <section id="panel-facturacion" class="section-panel" aria-labelledby="heading-facturacion">
+        <div class="module-header">
+          <div>
+            <h2 id="heading-facturacion" class="module-title">Facturación y Recibos</h2>
+            <p class="module-subtitle">Historial de facturas de créditos y recibos de pagos emitidos</p>
+          </div>
+          <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+            <button type="button" id="btn-refresh-invoices" class="btn-refresh-dashboard" title="Actualizar historial">
+              <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="width:16px;height:16px;">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+              </svg>
+              <span>Actualizar</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Métricas Principales de Facturación -->
+        <div class="dashboard-kpi-grid" style="margin-bottom: 24px;">
+          <div class="kpi-card" style="border-left: 4px solid var(--color-primary);">
+            <div class="kpi-card-header">
+              <span class="kpi-title">Total Documentos Emitidos</span>
+              <div class="kpi-icon-badge" style="background: rgba(26, 58, 107, 0.1); color: var(--color-primary);">
+                <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="width:20px;height:20px;">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+              </div>
+            </div>
+            <div class="kpi-value" id="kpi-inv-total-docs">0</div>
+            <div class="kpi-trend" id="kpi-inv-docs-breakdown">0 Facturas · 0 Recibos</div>
+          </div>
+
+          <div class="kpi-card" style="border-left: 4px solid #16a34a;">
+            <div class="kpi-card-header">
+              <span class="kpi-title">Total Facturado en Créditos</span>
+              <div class="kpi-icon-badge" style="background: rgba(22, 163, 74, 0.1); color: #16a34a;">
+                <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="width:20px;height:20px;">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+            </div>
+            <div class="kpi-value" id="kpi-inv-total-credit-amount">$0.00</div>
+            <div class="kpi-trend">Monto total de ventas respaldadas</div>
+          </div>
+
+          <div class="kpi-card" style="border-left: 4px solid var(--color-gold);">
+            <div class="kpi-card-header">
+              <span class="kpi-title">Total Cobrado en Recibos</span>
+              <div class="kpi-icon-badge" style="background: rgba(245, 196, 0, 0.15); color: #b45309;">
+                <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="width:20px;height:20px;">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 013 6H2.25m0 0v.75c0 .414.336.75.75.75H3m14.25-3h.75a.75.75 0 01.75.75v.75m0 0h-.75m0 0a.75.75 0 01-.75-.75V3m0 3v.75c0 .414.336.75.75.75h.75m-7.5-6h.75a.75.75 0 01.75.75v.75m0 0h-.75m0 0a.75.75 0 01-.75-.75V1.5m0 3v.75c0 .414.336.75.75.75h.75" />
+                </svg>
+              </div>
+            </div>
+            <div class="kpi-value" id="kpi-inv-total-receipts-amount">$0.00</div>
+            <div class="kpi-trend">Pagos certificados con comprobante</div>
+          </div>
+        </div>
+
+        <!-- Filtros y Búsqueda -->
+        <div class="sales-toolbar" style="margin-bottom: 16px; display: flex; gap: 12px; flex-wrap: wrap; align-items: center; justify-content: space-between;">
+          <div style="display: flex; gap: 10px; flex-wrap: wrap; flex: 1; max-width: 600px;">
+            <input type="text" id="input-search-invoices" class="form-input" placeholder="Buscar por cliente, cédula o Nº documento..." style="flex: 2; min-width: 200px;">
+            <select id="select-filter-invoice-type" class="form-input" style="flex: 1; min-width: 170px;">
+              <option value="all">Todos los comprobantes</option>
+              <option value="factura_credito">Facturas de Crédito</option>
+              <option value="recibo_pago">Recibos de Pago</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Tabla de Historial de Facturas y Recibos -->
+        <div class="table-responsive">
+          <table class="data-table" id="invoices-table">
+            <thead>
+              <tr>
+                <th>Fecha</th>
+                <th>Nº Documento</th>
+                <th>Cliente</th>
+                <th>Tipo</th>
+                <th>Monto Total</th>
+                <th style="text-align: right;">Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="invoices-tbody">
+              <!-- Renderizado dinámico -->
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Estado vacío -->
+        <div id="empty-invoices-msg" class="empty-state-card hidden" style="text-align: center; padding: 40px 20px; background: #fff; border-radius: 12px; border: 1px dashed var(--color-border); margin-top: 16px;">
+          <div style="font-size: 2.5rem; margin-bottom: 12px;">📄</div>
+          <h3 style="color: var(--color-primary); margin-bottom: 6px;">No hay facturas ni recibos generados aún</h3>
+          <p style="color: var(--color-text-muted); max-width: 500px; margin: 0 auto 16px;">
+            Los documentos generados desde la sección <strong>Créditos</strong> (botón "Generar factura") o desde la sección <strong>Pagos</strong> (botón "Generar recibo") quedarán guardados aquí automáticamente.
+          </p>
+        </div>
+      </section>
+
+      <!-- 9. Respaldo / Backup (Fase 11) -->
+      <section id="panel-backup" class="section-panel" aria-labelledby="heading-backup">
+        <div class="module-header" style="margin-bottom: 24px;">
+          <div>
+            <h2 id="heading-backup" class="module-title">Respaldo / Backup en la Nube</h2>
+            <p class="module-subtitle">Exporta tu base de datos a Google Sheets y tus comprobantes de pago a Google Drive</p>
+          </div>
+        </div>
+
+        <!-- Banner de estado de conexión / offline -->
+        <div id="backup-offline-banner" class="alert-offline-box hidden" style="background: #fef2f2; border: 1px solid #f87171; border-radius: 10px; padding: 12px 16px; margin-bottom: 20px; display: flex; align-items: center; gap: 10px; color: #991b1b; font-weight: 500;">
+          <span style="font-size: 1.3rem;">⚠️</span>
+          <span>Sin conexión. El respaldo se hará cuando vuelva el internet.</span>
+        </div>
+
+        <!-- Tarjeta de Conexión con Cuenta de Google -->
+        <div class="card" style="background: #ffffff; border: 1px solid var(--color-border); border-radius: 12px; padding: 22px; margin-bottom: 24px; box-shadow: var(--shadow-sm);">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 16px; margin-bottom: 16px;">
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <div style="width: 46px; height: 46px; border-radius: 10px; background: rgba(26, 58, 107, 0.08); display: flex; align-items: center; justify-content: center; font-size: 1.5rem;">
+                ☁️
+              </div>
+              <div>
+                <h3 style="margin: 0; font-size: 1.15rem; color: var(--color-primary); font-weight: 700;">Cuenta de Google</h3>
+                <p style="margin: 4px 0 0; color: var(--color-text-muted); font-size: 0.88rem;">Conecta tu cuenta para autorizar la exportación a Google Drive y Google Sheets</p>
+              </div>
+            </div>
+            <div id="gdrive-status-badge">
+              <span class="badge" style="background: #f1f5f9; color: #64748b; padding: 6px 12px; border-radius: 20px; font-size: 0.84rem; font-weight: 600;">⚪ No conectado</span>
+            </div>
+          </div>
+
+          <div id="gdrive-user-info" class="hidden" style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 10px 14px; margin-bottom: 16px; color: #166534; font-size: 0.9rem; font-weight: 600;">
+            <span id="gdrive-user-email-text">✅ Conectado como usuario@gmail.com</span>
+          </div>
+
+          <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+            <button type="button" id="btn-connect-google" class="btn-primary-action" style="background: var(--color-primary); color: #fff; padding: 10px 18px; border-radius: 8px; font-weight: 600; display: inline-flex; align-items: center; gap: 8px; cursor: pointer; border: none;">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+                <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" fill="#FBBC05"/>
+                <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" fill="#EA4335"/>
+              </svg>
+              <span>Conectar con Google</span>
+            </button>
+            <button type="button" id="btn-disconnect-google" class="btn-modal-cancel hidden" style="padding: 10px 16px; border-radius: 8px; font-weight: 600; cursor: pointer;">
+              Desconectar
+            </button>
+          </div>
+        </div>
+
+        <!-- Cuadrícula de Acciones de Respaldo -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px; margin-bottom: 24px;">
+          <!-- 1. Exportar a Google Sheets -->
+          <div class="card" style="background: #ffffff; border: 1px solid var(--color-border); border-radius: 12px; padding: 22px; box-shadow: var(--shadow-sm); display: flex; flex-direction: column; justify-content: space-between;">
+            <div>
+              <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+                <span style="font-size: 1.6rem;">📊</span>
+                <h3 style="margin: 0; font-size: 1.1rem; color: var(--color-primary); font-weight: 700;">Base de Datos (Google Sheets)</h3>
+              </div>
+              <p style="color: var(--color-text-muted); font-size: 0.88rem; line-height: 1.5; margin-bottom: 14px;">
+                Crea o actualiza el archivo <code>HogarFlex_DB</code> en tu Google Drive con hojas para <strong>Clientes</strong>, <strong>Créditos</strong>, <strong>Pagos</strong>, <strong>Ventas Directas</strong> y <strong>Configuración</strong>.
+              </p>
+              <div style="background: #f8fafc; border-radius: 8px; padding: 10px 12px; font-size: 0.84rem; color: #475569; margin-bottom: 16px;">
+                🕒 <span id="sheets-last-backup-text">Último respaldo: Nunca</span>
+              </div>
+            </div>
+
+            <div>
+              <div id="sheets-status-msg" class="hidden" style="margin-bottom: 12px; padding: 10px; border-radius: 8px; font-size: 0.88rem;"></div>
+              <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                <button type="button" id="btn-export-sheets" class="btn-primary-action" style="background: var(--color-primary); color: #fff; width: 100%; justify-content: center; padding: 11px 16px; border-radius: 8px; font-weight: 600; display: inline-flex; align-items: center; gap: 8px; cursor: pointer; border: none;" disabled>
+                  <span>📊</span> Exportar a Google Sheets
+                </button>
+                <button type="button" id="btn-retry-sheets" class="btn-primary-action hidden" style="background: #f5c400; color: #1a3a6b; width: 100%; justify-content: center; padding: 10px 16px; border-radius: 8px; font-weight: 700; display: inline-flex; align-items: center; gap: 8px; cursor: pointer; border: none;">
+                  <span>🔄</span> Reintentar exportación
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- 2. Exportar Comprobantes a Drive -->
+          <div class="card" style="background: #ffffff; border: 1px solid var(--color-border); border-radius: 12px; padding: 22px; box-shadow: var(--shadow-sm); display: flex; flex-direction: column; justify-content: space-between;">
+            <div>
+              <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+                <span style="font-size: 1.6rem;">📁</span>
+                <h3 style="margin: 0; font-size: 1.1rem; color: var(--color-primary); font-weight: 700;">Comprobantes (Google Drive)</h3>
+              </div>
+              <p style="color: var(--color-text-muted); font-size: 0.88rem; line-height: 1.5; margin-bottom: 14px;">
+                Crea la carpeta <code>HogarFlex_Comprobantes</code> en Drive con subcarpetas por mes (ej. <code>09_Septiembre</code>) y sube las fotos/comprobantes de los pagos registrados sin duplicados.
+              </p>
+              <div style="background: #f8fafc; border-radius: 8px; padding: 10px 12px; font-size: 0.84rem; color: #475569; margin-bottom: 16px;">
+                🖼️ <span id="receipts-available-count-text">Comprobantes listos para subir: Calculando...</span>
+              </div>
+            </div>
+
+            <div>
+              <div id="receipts-status-msg" class="hidden" style="margin-bottom: 12px; padding: 10px; border-radius: 8px; font-size: 0.88rem;"></div>
+              <button type="button" id="btn-export-receipts" class="btn-primary-action" style="background: var(--color-primary); color: #fff; width: 100%; justify-content: center; padding: 11px 16px; border-radius: 8px; font-weight: 600; display: inline-flex; align-items: center; gap: 8px; cursor: pointer; border: none;" disabled>
+                <span>📁</span> Exportar comprobantes a Drive
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3. Configuración de Respaldo Automático -->
+        <div class="card" style="background: #ffffff; border: 1px solid var(--color-border); border-radius: 12px; padding: 22px; margin-bottom: 24px; box-shadow: var(--shadow-sm);">
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <span style="font-size: 1.5rem;">⚡</span>
+              <div>
+                <h3 style="margin: 0; font-size: 1.05rem; color: var(--color-primary); font-weight: 700;">Respaldo automático al cerrar</h3>
+                <p style="margin: 4px 0 0; color: var(--color-text-muted); font-size: 0.86rem;">
+                  Si está activado, cuando cierres o recargues la página se ejecutará automáticamente la exportación a Google Sheets.
+                </p>
+              </div>
+            </div>
+            <div>
+              <label class="checkbox-container" style="cursor: pointer; display: flex; align-items: center; gap: 8px; font-weight: 600; color: var(--color-primary);">
+                <input type="checkbox" id="toggle-auto-backup" style="width: 20px; height: 20px; accent-color: var(--color-primary); cursor: pointer;">
+                <span>Activar respaldo al salir</span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <!-- 4. Nota de Configuración y Ayuda -->
+        <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 12px; padding: 18px 20px; color: #1e3a8a; font-size: 0.86rem; line-height: 1.5;">
+          <div style="font-weight: 700; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
+            <span>ℹ️</span> Nota sobre credenciales de Google:
+          </div>
+          <p style="margin: 0 0 8px;">
+            Las credenciales <code>GDRIVE_CLIENT_ID</code> y <code>GDRIVE_API_KEY</code> se encuentran configuradas con valores placeholder al inicio de <code>js/app.js</code>. La gestión del sistema se mantiene íntegramente dentro de esta aplicación.
+          </p>
+          <p style="margin: 0;">
+            Al desplegar la app en producción (ej. Abacus), se configuran el Client ID de OAuth 2.0 y la API Key desde <a href="https://console.cloud.google.com" target="_blank" rel="noopener" style="color: #2563eb; text-decoration: underline;">Google Cloud Console</a> habilitando Google Drive API y Google Sheets API.
+          </p>
+        </div>
+      </section>
+
+      <!-- Modal de Vista Previa de Factura / Recibo (Fase 9) -->
+      <div id="modal-invoice-preview" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="invoice-preview-modal-title">
+        <div class="modal-card invoice-preview-modal-card">
+          <div class="modal-header invoice-modal-header">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 1.3rem;" id="invoice-preview-type-icon">📄</span>
+              <h3 id="invoice-preview-modal-title" class="modal-title">Vista Previa de Comprobante</h3>
+            </div>
+            <button type="button" id="btn-close-invoice-preview" class="modal-close" aria-label="Cerrar modal">&times;</button>
+          </div>
+
+          <div class="modal-body" style="padding: 0; background: #f8fafc; max-height: calc(88vh - 130px); overflow-y: auto;">
+            <!-- Hoja de documento imprimible -->
+            <div id="invoice-printable-sheet" class="invoice-printable-sheet">
+              <!-- Contenido renderizado dinámicamente -->
+            </div>
+          </div>
+
+          <div class="modal-footer-actions invoice-modal-actions">
+            <button type="button" id="btn-close-invoice-footer" class="btn-modal-cancel">Cerrar</button>
+            <button type="button" id="btn-share-invoice-whatsapp" class="btn-whatsapp-share" title="Compartir resumen por WhatsApp">
+              <svg fill="currentColor" viewBox="0 0 24 24" style="width:18px;height:18px;margin-right:6px;display:inline-block;vertical-align:middle;">
+                <path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.711 2.598 2.669-.699c.969.54 1.777.818 2.791.819h.002c3.18 0 5.767-2.586 5.768-5.766 0-3.18-2.587-5.765-5.77-5.765zm3.376 8.204c-.149.42-1.047.809-1.442.86-.395.051-.9.083-2.617-.629-1.413-.586-2.338-2.023-2.408-2.117-.07-.093-.574-.764-.574-1.457 0-.693.363-1.034.492-1.176.129-.142.28-.178.373-.178.093 0 .187.001.267.005.085.004.198-.032.31.236.115.275.395.964.43 1.034.035.07.058.152.012.245-.047.093-.07.151-.139.233-.07.082-.147.182-.21.245-.07.07-.143.146-.062.285.082.139.363.599.78 1.01.536.529.988.692 1.127.762.139.07.221.058.303-.035.082-.093.349-.408.443-.548.093-.14.187-.117.314-.07.128.047.815.385.955.455.14.07.233.105.268.163.035.058.035.338-.114.758z"/>
+              </svg>
+              <span>Compartir por WhatsApp</span>
+            </button>
+            <button type="button" id="btn-print-invoice-pdf" class="btn-download-pdf" title="Descargar o imprimir documento en PDF">
+              <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="width:18px;height:18px;margin-right:6px;display:inline-block;vertical-align:middle;">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M6.72 13.829c-.24-1.077-.42-2.222-.52-3.418m11.6 0c-.1 1.196-.28 2.341-.52 3.418m-10.56 0c.937 3.323 3.65 5.766 6.88 5.766 3.23 0 5.943-2.443 6.88-5.766m-13.76 0a60.07 60.07 0 0113.76 0m0 0A48.667 48.667 0 0012 12a48.667 48.667 0 00-7.24 1.829m14.48 0A12.01 12.01 0 0012 3a12.01 12.01 0 00-7.24 8.829M12 9v4m0 0l-2-2m2 2l2-2" />
+              </svg>
+              <span>Descargar PDF</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="js/app.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function() {
+        navigator.serviceWorker.register('./sw.js')
+          .then(function(reg) { console.log('SW registrado:', reg.scope); })
+          .catch(function(err) { console.log('SW error:', err); });
+      });
+    }
+  </script>
+</body>
+</html>
