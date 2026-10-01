@@ -90,6 +90,14 @@
         </div>
       </div>
       <div class="header-actions">
+        <button id="btn-cloud-save-header" class="btn-cloud-header" type="button" title="Guardar en la nube (Google Sheets)">
+          <span class="cloud-icon">☁️⬆️</span>
+          <span class="cloud-label">Guardar en nube</span>
+        </button>
+        <button id="btn-cloud-reload-header" class="btn-cloud-header" type="button" title="Recargar desde la nube (Google Sheets)">
+          <span class="cloud-icon">☁️⬇️</span>
+          <span class="cloud-label">Recargar de nube</span>
+        </button>
         <span class="user-badge" id="current-user-display">👤 Yorgeh2023</span>
         <button id="btn-logout" class="btn-logout" type="button" title="Cerrar sesión">
           Cerrar Sesión
@@ -2516,10 +2524,15 @@
 
             <div>
               <div id="sheets-status-msg" class="hidden" style="margin-bottom: 12px; padding: 10px; border-radius: 8px; font-size: 0.88rem;"></div>
-              <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-                <button type="button" id="btn-export-sheets" class="btn-primary-action" style="background: var(--color-primary); color: #fff; width: 100%; justify-content: center; padding: 11px 16px; border-radius: 8px; font-weight: 600; display: inline-flex; align-items: center; gap: 8px; cursor: pointer; border: none;" disabled>
-                  <span>📊</span> Exportar a Google Sheets
-                </button>
+              <div style="display: flex; gap: 10px; flex-direction: column;">
+                <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                  <button type="button" id="btn-export-sheets" class="btn-primary-action" style="flex: 1; min-width: 140px; background: var(--color-primary); color: #fff; justify-content: center; padding: 11px 16px; border-radius: 8px; font-weight: 600; display: inline-flex; align-items: center; gap: 8px; cursor: pointer; border: none;" disabled>
+                    <span class="btn-icon">☁️⬆️</span> <span class="btn-text">Guardar en la nube</span>
+                  </button>
+                  <button type="button" id="btn-import-sheets" class="btn-primary-action" style="flex: 1; min-width: 140px; background: #059669; color: #fff; justify-content: center; padding: 11px 16px; border-radius: 8px; font-weight: 600; display: inline-flex; align-items: center; gap: 8px; cursor: pointer; border: none;" disabled>
+                    <span class="btn-icon">☁️⬇️</span> <span class="btn-text">Recargar desde la nube</span>
+                  </button>
+                </div>
                 <button type="button" id="btn-retry-sheets" class="btn-primary-action hidden" style="background: #f5c400; color: #1a3a6b; width: 100%; justify-content: center; padding: 10px 16px; border-radius: 8px; font-weight: 700; display: inline-flex; align-items: center; gap: 8px; cursor: pointer; border: none;">
                   <span>🔄</span> Reintentar exportación
                 </button>
@@ -2634,5 +2647,11 @@
       });
     }
   </script>
+  <!-- Toast flotante para sincronización con Google Sheets / Drive -->
+  <div id="cloud-sync-toast" class="cloud-toast" role="status" aria-live="polite">
+    <span id="cloud-sync-toast-icon">ℹ️</span>
+    <span id="cloud-sync-toast-text"></span>
+  </div>
+
 </body>
 </html>

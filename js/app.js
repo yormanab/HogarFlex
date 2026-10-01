@@ -1,4 +1,4 @@
-﻿// ============================================================
+// ============================================================
 // HOGARFLEX NOELUIS — Sistema de Créditos
 // Fase 1: Autenticación y Navegación Base
 // ============================================================
@@ -19,15 +19,16 @@ const BACKUP_AUTO_CLOSE_KEY = "hogarflex_auto_backup_on_close";
 const GDRIVE_TOKEN_KEY = "hogarflex_gdrive_token";
 const GDRIVE_EMAIL_KEY = "hogarflex_gdrive_email";
 
-const savedGdriveToken = sessionStorage.getItem(GDRIVE_TOKEN_KEY);
+const savedGdriveToken = sessionStorage.getItem(GDRIVE_TOKEN_KEY) || localStorage.getItem(GDRIVE_TOKEN_KEY);
 if (savedGdriveToken && savedGdriveToken.startsWith("demo_token_")) {
   sessionStorage.removeItem(GDRIVE_TOKEN_KEY);
   sessionStorage.removeItem(GDRIVE_EMAIL_KEY);
 }
-let gdriveAccessToken = sessionStorage.getItem(GDRIVE_TOKEN_KEY) || null;
-let gdriveUserEmail = sessionStorage.getItem(GDRIVE_EMAIL_KEY) || null;
+let gdriveAccessToken = sessionStorage.getItem(GDRIVE_TOKEN_KEY) || localStorage.getItem(GDRIVE_TOKEN_KEY) || null;
+let gdriveUserEmail = sessionStorage.getItem(GDRIVE_EMAIL_KEY) || localStorage.getItem(GDRIVE_EMAIL_KEY) || null;
 let gdriveTokenClient = null;
 let isExportingSheets = false;
+let isImportingSheets = false;
 let isExportingReceipts = false;
 
 // Variables de respaldo inicializadas arriba
@@ -7648,6 +7649,9 @@ function initBackupModule() {
   const btnConnect = document.getElementById("btn-connect-google");
   const btnDisconnect = document.getElementById("btn-disconnect-google");
   const btnExportSheets = document.getElementById("btn-export-sheets");
+  const btnImportSheets = document.getElementById("btn-import-sheets");
+  const btnCloudSaveHeader = document.getElementById("btn-cloud-save-header");
+  const btnCloudReloadHeader = document.getElementById("btn-cloud-reload-header");
   const btnRetrySheets = document.getElementById("btn-retry-sheets");
   const btnExportReceipts = document.getElementById("btn-export-receipts");
   const toggleAutoBackup = document.getElementById("toggle-auto-backup");
@@ -7667,6 +7671,24 @@ function initBackupModule() {
   if (btnExportSheets) {
     btnExportSheets.addEventListener("click", () => {
       exportToGoogleSheets();
+    });
+  }
+
+  if (btnImportSheets) {
+    btnImportSheets.addEventListener("click", () => {
+      importFromGoogleSheets();
+    });
+  }
+
+  if (btnCloudSaveHeader) {
+    btnCloudSaveHeader.addEventListener("click", () => {
+      exportToGoogleSheets();
+    });
+  }
+
+  if (btnCloudReloadHeader) {
+    btnCloudReloadHeader.addEventListener("click", () => {
+      importFromGoogleSheets();
     });
   }
 
@@ -7707,6 +7729,10 @@ function initBackupModule() {
   // Comprobar estado de conexión guardado
   if (gdriveAccessToken) {
     updateGoogleConnectUI(true);
+    // Sincronización automática desde la nube al arrancar
+    setTimeout(() => {
+      importFromGoogleSheets(true);
+    }, 600);
   }
 }
 
@@ -7763,6 +7789,9 @@ function updateGoogleConnectUI(isConnected) {
   const btnDisconnect = document.getElementById("btn-disconnect-google");
   const btnExportSheets = document.getElementById("btn-export-sheets");
   const btnExportReceipts = document.getElementById("btn-export-receipts");
+  const btnImportSheets = document.getElementById("btn-import-sheets");
+  const btnCloudSave = document.getElementById("btn-cloud-save-header");
+  const btnCloudReload = document.getElementById("btn-cloud-reload-header");
 
   if (isConnected && gdriveAccessToken) {
     if (badge) {
@@ -7776,6 +7805,15 @@ function updateGoogleConnectUI(isConnected) {
     if (btnDisconnect) btnDisconnect.classList.remove("hidden");
     if (btnExportSheets) btnExportSheets.removeAttribute("disabled");
     if (btnExportReceipts) btnExportReceipts.removeAttribute("disabled");
+    if (btnImportSheets) btnImportSheets.removeAttribute("disabled");
+    if (btnCloudSave) {
+      btnCloudSave.removeAttribute("disabled");
+      btnCloudSave.title = "Guardar en la nube (Google Sheets)";
+    }
+    if (btnCloudReload) {
+      btnCloudReload.removeAttribute("disabled");
+      btnCloudReload.title = "Recargar desde la nube (Google Sheets)";
+    }
   } else {
     if (badge) {
       badge.innerHTML = `<span class="badge" style="background:#f1f5f9;color:#64748b;padding:6px 12px;border-radius:20px;font-size:0.84rem;font-weight:600;">⚪ No conectado</span>`;
@@ -7785,6 +7823,13 @@ function updateGoogleConnectUI(isConnected) {
     if (btnDisconnect) btnDisconnect.classList.add("hidden");
     if (btnExportSheets) btnExportSheets.setAttribute("disabled", "true");
     if (btnExportReceipts) btnExportReceipts.setAttribute("disabled", "true");
+    if (btnImportSheets) btnImportSheets.setAttribute("disabled", "true");
+    if (btnCloudSave) {
+      btnCloudSave.title = "Conecta tu cuenta de Google para guardar en la nube";
+    }
+    if (btnCloudReload) {
+      btnCloudReload.title = "Conecta tu cuenta de Google para recargar desde la nube";
+    }
   }
 }
 
@@ -7814,8 +7859,12 @@ function connectWithGoogle() {
             }
             gdriveAccessToken = tokenResponse.access_token;
             sessionStorage.setItem(GDRIVE_TOKEN_KEY, gdriveAccessToken);
+            localStorage.setItem(GDRIVE_TOKEN_KEY, gdriveAccessToken);
             await fetchGoogleUserEmail(gdriveAccessToken);
             updateGoogleConnectUI(true);
+
+            await importFromGoogleSheets(true);
+
           }
         });
       }
@@ -7854,6 +7903,9 @@ function disconnectGoogle() {
   gdriveUserEmail = null;
   sessionStorage.removeItem(GDRIVE_TOKEN_KEY);
   sessionStorage.removeItem(GDRIVE_EMAIL_KEY);
+  localStorage.removeItem(GDRIVE_TOKEN_KEY);
+  localStorage.removeItem(GDRIVE_EMAIL_KEY);
+  localStorage.removeItem("hogarflex_spreadsheet_id");
   updateGoogleConnectUI(false);
 }
 
@@ -7867,16 +7919,21 @@ async function exportToGoogleSheets(isSilent = false) {
   }
 
   if (!gdriveAccessToken) {
-    if (!isSilent) alert("Debes conectar tu cuenta de Google antes de exportar.");
+    if (!isSilent) {
+      const wantConnect = confirm("Debes conectar tu cuenta de Google antes de guardar en la nube. ¿Deseas conectarla ahora?");
+      if (wantConnect) connectWithGoogle();
+    }
     return;
   }
 
   isExportingSheets = true;
+  setCloudButtonsLoading(true, "export");
   const statusEl = document.getElementById("sheets-status-msg");
   const retryBtn = document.getElementById("btn-retry-sheets");
   const exportBtn = document.getElementById("btn-export-sheets");
 
   if (!isSilent) {
+    showCloudSyncToast("⏳ Guardando datos en Google Sheets...", "info");
     showSheetsStatus("⏳ Procesando respaldo de datos en Google Sheets...", "info");
     if (exportBtn) exportBtn.setAttribute("disabled", "true");
     if (retryBtn) retryBtn.classList.add("hidden");
@@ -8087,22 +8144,563 @@ async function exportToGoogleSheets(isSilent = false) {
     }
 
     localStorage.setItem(BACKUP_LAST_SHEETS_KEY, nowStr);
+    localStorage.setItem("hogarflex_spreadsheet_id", spreadsheetId);
     renderBackupSection();
 
     if (!isSilent) {
       showSheetsStatus(`✅ Respaldo completado: ${nowStr}`, "success");
+      showCloudSyncToast(`✅ Guardado con éxito en Google Sheets (${nowStr})`, "success");
     }
   } catch (err) {
     console.error("Error al exportar a Google Sheets:", err);
     if (!isSilent) {
       showSheetsStatus(`Error: ${err.message || err}`, "error");
+      showCloudSyncToast(`Error al guardar en la nube: ${err.message || err}`, "error");
       if (retryBtn) retryBtn.classList.remove("hidden");
     }
   } finally {
     isExportingSheets = false;
+    setCloudButtonsLoading(false, "export");
     if (!isSilent && exportBtn) {
       exportBtn.removeAttribute("disabled");
     }
+  }
+}
+
+// ============================================================
+// IMPORTAR DESDE GOOGLE SHEETS (MÓDULO 1: PERSISTENCIA)
+// ============================================================
+async function importFromGoogleSheets(isSilent = false) {
+  if (isImportingSheets || isExportingSheets) return;
+
+  if (!navigator.onLine) {
+    if (!isSilent) {
+      showCloudSyncToast("Sin conexión. No se pudo recargar desde la nube.", "error");
+      showSheetsStatus("Sin conexión. No se pudo recargar desde la nube.", "error");
+    }
+    return;
+  }
+
+  if (!gdriveAccessToken) {
+    if (!isSilent) {
+      const wantConnect = confirm("Debes conectar tu cuenta de Google antes de recargar. ¿Deseas conectarla ahora?");
+      if (wantConnect) connectWithGoogle();
+    }
+    return;
+  }
+
+  isImportingSheets = true;
+  setCloudButtonsLoading(true, "import");
+
+  if (!isSilent) {
+    showCloudSyncToast("⏳ Descargando base de datos desde Google Sheets...", "info");
+    showSheetsStatus("⏳ Descargando base de datos desde Google Sheets...", "info");
+  }
+
+  try {
+    // Si es modo demo (token simulado)
+    if (gdriveAccessToken.startsWith("demo_token_")) {
+      await new Promise((r) => setTimeout(r, 800));
+      if (!isSilent) {
+        showSheetsStatus("✅ Datos recargados desde Google Sheets (Modo Demostración)", "success");
+        showCloudSyncToast("✅ Datos recargados desde la nube (Modo Demostración)", "success");
+      }
+      return;
+    }
+
+    // 1. Buscar el archivo "HogarFlex_DB" en Google Drive por nombre
+    const searchRes = await fetch(
+      "https://www.googleapis.com/drive/v3/files?q=name='HogarFlex_DB' and mimeType='application/vnd.google-apps.spreadsheet' and trashed=false&fields=files(id,name)",
+      { headers: { Authorization: `Bearer ${gdriveAccessToken}` } }
+    );
+
+    if (searchRes.status === 401) {
+      disconnectGoogle();
+      throw new Error("La sesión de Google expiró. Por favor vuelve a conectar tu cuenta.");
+    }
+
+    if (!searchRes.ok) {
+      const errJson = await searchRes.json().catch(() => ({}));
+      throw new Error(errJson.error?.message || `Error al buscar en Google Drive (${searchRes.status})`);
+    }
+
+    const searchData = await searchRes.json();
+    const spreadsheetId = searchData.files && searchData.files.length > 0 ? searchData.files[0].id : null;
+
+    if (!spreadsheetId) {
+      throw new Error("No se encontró el archivo 'HogarFlex_DB' en tu Google Drive. Guarda primero en la nube para crearlo.");
+    }
+
+    localStorage.setItem("hogarflex_spreadsheet_id", spreadsheetId);
+
+    // 2. Leer las 5 pestañas en batchGet: Clientes, Créditos, Pagos, Ventas_Directas, Config
+    const ranges = encodeURIComponent("Clientes!A:Z") + "&ranges=" +
+      encodeURIComponent("Créditos!A:Z") + "&ranges=" +
+      encodeURIComponent("Pagos!A:Z") + "&ranges=" +
+      encodeURIComponent("Ventas_Directas!A:Z") + "&ranges=" +
+      encodeURIComponent("Config!A:Z");
+
+    const batchRes = await fetch(
+      `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values:batchGet?ranges=${ranges}`,
+      { headers: { Authorization: `Bearer ${gdriveAccessToken}` } }
+    );
+
+    if (batchRes.status === 401) {
+      disconnectGoogle();
+      throw new Error("La sesión de Google expiró. Por favor vuelve a conectar tu cuenta.");
+    }
+
+    if (!batchRes.ok) {
+      const errJson = await batchRes.json().catch(() => ({}));
+      throw new Error(errJson.error?.message || `Error al leer de Google Sheets (${batchRes.status})`);
+    }
+
+    const batchData = await batchRes.json();
+    const valueRanges = batchData.valueRanges || [];
+
+    // Mapear cada pestaña por nombre normalizado
+    const sheetsMap = {};
+    valueRanges.forEach((vr) => {
+      const sheetTitle = (vr.range || "").split("!")[0].replace(/'/g, "").trim();
+      sheetsMap[sheetTitle] = vr.values || [];
+    });
+
+    const clientsRows = sheetsMap["Clientes"] || [];
+    const creditsRows = sheetsMap["Créditos"] || [];
+    const paymentsRows = sheetsMap["Pagos"] || [];
+    const salesRows = sheetsMap["Ventas_Directas"] || [];
+    const configRows = sheetsMap["Config"] || [];
+
+    // Validar si las pestañas tienen filas con datos más allá del encabezado
+    const hasClientData = clientsRows.length > 1;
+    const hasCreditData = creditsRows.length > 1;
+    const hasSalesData = salesRows.length > 1;
+
+    if (!hasClientData && !hasCreditData && !hasSalesData) {
+      throw new Error("La base de datos 'HogarFlex_DB' en Google Sheets está vacía o sin registros válidos.");
+    }
+
+    // 3. Procesar CLIENTES (hoja 1) -> hogarflex_clients
+    const existingClients = getStoredClients();
+    const existingClientByDni = {};
+    const existingClientByName = {};
+    existingClients.forEach((c) => {
+      if (c.dni) existingClientByDni[String(c.dni).trim().toLowerCase()] = c;
+      if (c.name) existingClientByName[String(c.name).trim().toLowerCase()] = c;
+    });
+
+    const importedClients = [];
+    for (let i = 1; i < clientsRows.length; i++) {
+      const row = clientsRows[i];
+      if (!row || row.length === 0) continue;
+      const dni = String(row[0] || "").trim();
+      const name = String(row[1] || "").trim();
+      const phone = String(row[2] || "").trim();
+      const address = String(row[3] || "").trim();
+
+      if (!dni && !name) continue;
+
+      const existing = existingClientByDni[dni.toLowerCase()] || existingClientByName[name.toLowerCase()];
+      const clientId = existing ? existing.id : ("client_" + (Date.now() + i));
+      const createdAt = existing && existing.createdAt ? existing.createdAt : (Date.now() - (clientsRows.length - i) * 60000);
+
+      importedClients.push({
+        id: clientId,
+        dni,
+        name,
+        phone,
+        address,
+        createdAt,
+        updatedAt: Date.now()
+      });
+    }
+
+    // 4. Procesar PAGOS (hoja 3) -> indexados por ID Crédito y Nombre Cliente
+    const paymentsByCreditId = {};
+    const paymentsByClientName = {};
+
+    for (let pIdx = 1; pIdx < paymentsRows.length; pIdx++) {
+      const row = paymentsRows[pIdx];
+      if (!row || row.length === 0) continue;
+      const pId = String(row[0] || "").trim();
+      const crId = String(row[1] || "").trim();
+      const clientName = String(row[2] || "").trim();
+      const typeStr = String(row[3] || "").trim();
+      const amountUSD = parseFloat(row[4]) || 0;
+      const currency = String(row[5] || "USD").trim().toUpperCase();
+      const rateBCV = row[6] ? parseFloat(row[6]) : null;
+      const amountBs = row[7] ? parseFloat(row[7]) : 0;
+      const date = String(row[8] || "").trim();
+      const reference = String(row[9] || "").trim();
+
+      let instNum = null;
+      const matchInst = typeStr.match(/(\d+)/);
+      if (matchInst) instNum = parseInt(matchInst[1], 10);
+
+      const paymentObj = {
+        id: pId || ("pay_" + Date.now() + "_" + pIdx),
+        date: date || new Date().toISOString(),
+        type: typeStr.toLowerCase().includes("cuota") ? "cuota" : "abono",
+        description: typeStr || "Pago",
+        installmentNumber: instNum,
+        amountUSD,
+        currency: currency === "BS" ? "BS" : "USD",
+        rateBCVToday: rateBCV,
+        amountBs,
+        referenceNumber: reference,
+        receiptUrl: null,
+        remainingBalanceAfter: null
+      };
+
+      if (crId) {
+        if (!paymentsByCreditId[crId]) paymentsByCreditId[crId] = [];
+        paymentsByCreditId[crId].push(paymentObj);
+      }
+      if (clientName) {
+        const key = clientName.toLowerCase();
+        if (!paymentsByClientName[key]) paymentsByClientName[key] = [];
+        paymentsByClientName[key].push(paymentObj);
+      }
+    }
+
+    // 5. Procesar CRÉDITOS (hoja 2) con PAGOS anidados -> hogarflex_credits
+    const existingCredits = getStoredCredits();
+    const existingCreditMap = {};
+    existingCredits.forEach((c) => {
+      if (c.id) existingCreditMap[String(c.id).trim()] = c;
+    });
+
+    const importedCredits = [];
+    for (let cIdx = 1; cIdx < creditsRows.length; cIdx++) {
+      const row = creditsRows[cIdx];
+      if (!row || row.length === 0) continue;
+      const crId = String(row[0] || "").trim();
+      const clientName = String(row[1] || "").trim();
+      const productsSummary = String(row[2] || "").trim();
+      const totalSaleUSD = parseFloat(row[3]) || 0;
+      const downpaymentAmount = parseFloat(row[4]) || 0;
+      const remainingBalance = parseFloat(row[5]) || 0;
+      const status = String(row[6] || "Al día").trim();
+      const dateStr = String(row[7] || "").trim();
+
+      if (!crId && !clientName) continue;
+
+      const existingCr = existingCreditMap[crId];
+
+      // Vincular con cliente existente o importado
+      const matchingClient = importedClients.find((c) =>
+        c.name.toLowerCase() === clientName.toLowerCase()
+      ) || (existingCr ? existingCr.client : null) || {
+        id: "client_" + Date.now(),
+        name: clientName,
+        dni: "",
+        phone: "",
+        address: ""
+      };
+
+      // Items / Productos
+      let items = existingCr && existingCr.items && existingCr.items.length > 0
+        ? existingCr.items
+        : parseProductsSummaryString(productsSummary, totalSaleUSD);
+
+      // Pagos anidados correspondientes a este crédito
+      let creditPayments = paymentsByCreditId[crId] || paymentsByClientName[clientName.toLowerCase()] || [];
+
+      // Preservar comprobantes locales si existían
+      if (existingCr && Array.isArray(existingCr.payments)) {
+        creditPayments.forEach((p) => {
+          const matchP = existingCr.payments.find((lp) =>
+            (lp.id && lp.id === p.id) ||
+            (lp.referenceNumber && lp.referenceNumber === p.referenceNumber && lp.amountUSD === p.amountUSD)
+          );
+          if (matchP && matchP.receiptUrl) {
+            p.receiptUrl = matchP.receiptUrl;
+          }
+        });
+      }
+
+      // Fecha de creación
+      let createdAtTime = Date.now();
+      if (existingCr && existingCr.createdAt) {
+        createdAtTime = existingCr.createdAt;
+      } else if (dateStr) {
+        const parts = dateStr.split("/");
+        if (parts.length === 3) {
+          const d = parseInt(parts[0], 10);
+          const m = parseInt(parts[1], 10) - 1;
+          const y = parseInt(parts[2], 10);
+          createdAtTime = new Date(y, m, d).getTime();
+        } else {
+          const parsed = Date.parse(dateStr);
+          if (!isNaN(parsed)) createdAtTime = parsed;
+        }
+      }
+
+      const creditObj = {
+        id: crId || ("cred_" + (Date.now() + cIdx)),
+        createdAt: createdAtTime,
+        clientId: matchingClient.id,
+        client: {
+          id: matchingClient.id,
+          name: matchingClient.name,
+          dni: matchingClient.dni || "",
+          phone: matchingClient.phone || "",
+          address: matchingClient.address || ""
+        },
+        items,
+        totalSaleUSD,
+        downpaymentAmount,
+        remainingBalance,
+        status,
+        downpaymentCurrency: existingCr ? existingCr.downpaymentCurrency : "USD",
+        downpaymentPercent: totalSaleUSD > 0 ? Math.round((downpaymentAmount / totalSaleUSD) * 100) : 0,
+        downpaymentPaidUSD: existingCr ? existingCr.downpaymentPaidUSD : downpaymentAmount,
+        downpaymentPaidBs: existingCr ? existingCr.downpaymentPaidBs : 0,
+        installmentsCount: existingCr && existingCr.installmentsCount ? existingCr.installmentsCount : (creditPayments.length > 0 ? creditPayments.length : 1),
+        installments: existingCr && Array.isArray(existingCr.installments) && existingCr.installments.length > 0 ? existingCr.installments : [],
+        payments: creditPayments
+      };
+
+      // Reconstruir cuotas si es necesario
+      if (!creditObj.installments || creditObj.installments.length === 0) {
+        const debt = Math.max(0, totalSaleUSD - downpaymentAmount);
+        const count = creditObj.installmentsCount || 1;
+        const perInst = count > 0 ? (debt / count) : debt;
+        for (let num = 1; num <= count; num++) {
+          creditObj.installments.push({
+            number: num,
+            dueDate: new Date(createdAtTime + num * 30 * 24 * 3600 * 1000).toISOString().split("T")[0],
+            amountUSD: perInst,
+            status: remainingBalance <= 0 ? "Pagada" : "Pendiente"
+          });
+        }
+      }
+
+      if (typeof recalculateCreditFinances === "function") {
+        recalculateCreditFinances(creditObj);
+      }
+
+      importedCredits.push(creditObj);
+    }
+
+    // 6. Procesar VENTAS DIRECTAS (hoja 4) -> hogarflex_ventas_directas
+    const existingSales = getStoredSales();
+    const existingSaleMap = {};
+    existingSales.forEach((s) => {
+      if (s.id) existingSaleMap[String(s.id).trim()] = s;
+    });
+
+    const importedSales = [];
+    for (let sIdx = 1; sIdx < salesRows.length; sIdx++) {
+      const row = salesRows[sIdx];
+      if (!row || row.length === 0) continue;
+      const sId = String(row[0] || "").trim();
+      const clientName = String(row[1] || "").trim();
+      const prodsSummary = String(row[2] || "").trim();
+      const priceUSD = parseFloat(row[3]) || 0;
+      const method = String(row[4] || "USD").trim();
+      const dateStr = String(row[5] || "").trim();
+
+      if (!sId && !clientName) continue;
+
+      const existingSale = existingSaleMap[sId];
+      const matchingClient = importedClients.find((c) =>
+        c.name.toLowerCase() === clientName.toLowerCase()
+      ) || (existingSale ? existingSale.client : null) || {
+        id: "client_" + Date.now(),
+        name: clientName,
+        dni: "",
+        phone: "",
+        address: ""
+      };
+
+      importedSales.push({
+        id: sId || ("sale_" + (Date.now() + sIdx)),
+        clientId: matchingClient.id,
+        client: {
+          id: matchingClient.id,
+          name: matchingClient.name,
+          dni: matchingClient.dni || "",
+          phone: matchingClient.phone || "",
+          address: matchingClient.address || ""
+        },
+        items: existingSale && existingSale.items ? existingSale.items : parseProductsSummaryString(prodsSummary, priceUSD),
+        salePriceUSD: priceUSD,
+        catalogTotalUSD: existingSale ? existingSale.catalogTotalUSD : priceUSD,
+        paymentMethod: method,
+        rateBCVToday: existingSale ? existingSale.rateBCVToday : null,
+        amountBs: existingSale ? existingSale.amountBs : 0,
+        date: dateStr || (existingSale ? existingSale.date : new Date().toISOString().split("T")[0]),
+        referenceNumber: existingSale ? existingSale.referenceNumber : "",
+        receiptUrl: existingSale ? existingSale.receiptUrl : null,
+        notes: existingSale ? existingSale.notes : "",
+        createdAt: existingSale ? existingSale.createdAt : (dateStr || new Date().toISOString())
+      });
+    }
+
+    // 7. Procesar CONFIGURACIÓN (hoja 5) -> hogarflex_config
+    const importedConfig = {};
+    for (let cfgIdx = 1; cfgIdx < configRows.length; cfgIdx++) {
+      const row = configRows[cfgIdx];
+      if (row && row[0]) {
+        importedConfig[String(row[0]).trim()] = String(row[1] || "").trim();
+      }
+    }
+
+    // 8. Sobrescribir localStorage únicamente tras validar y parsear con éxito
+    if (importedClients.length > 0) {
+      localStorage.setItem(CLIENTS_STORAGE_KEY, JSON.stringify(importedClients));
+    }
+    if (importedCredits.length > 0) {
+      localStorage.setItem(CREDITS_STORAGE_KEY, JSON.stringify(importedCredits));
+    }
+    if (importedSales.length > 0) {
+      localStorage.setItem(SALES_STORAGE_KEY, JSON.stringify(importedSales));
+    }
+    if (Object.keys(importedConfig).length > 0) {
+      localStorage.setItem("hogarflex_config", JSON.stringify(importedConfig));
+      if (importedConfig["Fecha Último Respaldo"]) {
+        localStorage.setItem(BACKUP_LAST_SHEETS_KEY, importedConfig["Fecha Último Respaldo"]);
+      }
+    }
+
+    // 9. Actualizar todas las vistas activas
+    if (typeof renderClients === "function") renderClients();
+    if (typeof renderCredits === "function") renderCredits();
+    if (typeof renderPagosSection === "function") renderPagosSection();
+    if (typeof renderVentasSection === "function") renderVentasSection();
+    if (typeof renderDashboardSection === "function") renderDashboardSection();
+    if (typeof renderBackupSection === "function") renderBackupSection();
+
+    const successSummary = `✅ Sincronizado: ${importedClients.length} clientes, ${importedCredits.length} créditos, ${importedSales.length} ventas.`;
+    showSheetsStatus(successSummary, "success");
+    if (!isSilent) {
+      showCloudSyncToast(successSummary, "success");
+    }
+  } catch (err) {
+    console.error("Error al importar desde Google Sheets:", err);
+    if (!isSilent) {
+      showSheetsStatus(`Error al recargar desde la nube: ${err.message || err}`, "error");
+      showCloudSyncToast(`Error al recargar: ${err.message || err}`, "error");
+    }
+  } finally {
+    isImportingSheets = false;
+    setCloudButtonsLoading(false, "import");
+  }
+}
+
+// Utilidad auxiliar para reconstruir array de items desde resumen de texto de Google Sheets
+function parseProductsSummaryString(summary, fallbackPrice = 0) {
+  if (!summary || typeof summary !== "string" || !summary.trim()) {
+    return [{ id: "item_gen", name: "Producto", quantity: 1, priceUSD: fallbackPrice }];
+  }
+  const parts = summary.split(",");
+  const items = [];
+  parts.forEach((p, idx) => {
+    const trimmed = p.trim();
+    if (!trimmed) return;
+    const qtyMatch = trimmed.match(/\(x(\d+)\)/i);
+    let qty = 1;
+    let name = trimmed;
+    if (qtyMatch) {
+      qty = parseInt(qtyMatch[1], 10) || 1;
+      name = trimmed.replace(/\(x\d+\)/i, "").trim();
+    }
+    items.push({
+      id: "prod_import_" + idx,
+      name: name || "Producto",
+      quantity: qty,
+      priceUSD: (fallbackPrice / (parts.length || 1)) || 0
+    });
+  });
+  return items.length > 0 ? items : [{ id: "item_gen", name: "Producto", quantity: 1, priceUSD: fallbackPrice }];
+}
+
+// Feedback visual de botones de nube (spinners y estados)
+function setCloudButtonsLoading(isLoading, action = "export") {
+  const btnExport = document.getElementById("btn-export-sheets");
+  const btnImport = document.getElementById("btn-import-sheets");
+  const btnSaveHdr = document.getElementById("btn-cloud-save-header");
+  const btnReloadHdr = document.getElementById("btn-cloud-reload-header");
+
+  if (action === "export") {
+    if (btnExport) {
+      if (isLoading) {
+        btnExport.setAttribute("disabled", "true");
+        btnExport.innerHTML = `<span class="spinner-icon">🔄</span> <span>Guardando en la nube...</span>`;
+      } else {
+        if (gdriveAccessToken) btnExport.removeAttribute("disabled");
+        btnExport.innerHTML = `<span class="btn-icon">☁️⬆️</span> <span class="btn-text">Guardar en la nube</span>`;
+      }
+    }
+    if (btnSaveHdr) {
+      if (isLoading) {
+        btnSaveHdr.classList.add("loading");
+        btnSaveHdr.innerHTML = `<span class="spinner-icon">🔄</span> <span class="cloud-label">Guardando...</span>`;
+      } else {
+        btnSaveHdr.classList.remove("loading");
+        btnSaveHdr.innerHTML = `<span class="cloud-icon">☁️⬆️</span> <span class="cloud-label">Guardar en nube</span>`;
+      }
+    }
+  } else if (action === "import") {
+    if (btnImport) {
+      if (isLoading) {
+        btnImport.setAttribute("disabled", "true");
+        btnImport.innerHTML = `<span class="spinner-icon">🔄</span> <span>Recargando de la nube...</span>`;
+      } else {
+        if (gdriveAccessToken) btnImport.removeAttribute("disabled");
+        btnImport.innerHTML = `<span class="btn-icon">☁️⬇️</span> <span class="btn-text">Recargar desde la nube</span>`;
+      }
+    }
+    if (btnReloadHdr) {
+      if (isLoading) {
+        btnReloadHdr.classList.add("loading");
+        btnReloadHdr.innerHTML = `<span class="spinner-icon">🔄</span> <span class="cloud-label">Recargando...</span>`;
+      } else {
+        btnReloadHdr.classList.remove("loading");
+        btnReloadHdr.innerHTML = `<span class="cloud-icon">☁️⬇️</span> <span class="cloud-label">Recargar de nube</span>`;
+      }
+    }
+  }
+}
+
+// Toast flotante para feedback de sincronización en cualquier pantalla
+let cloudToastTimer = null;
+function showCloudSyncToast(message, type = "info") {
+  const toast = document.getElementById("cloud-sync-toast");
+  const toastText = document.getElementById("cloud-sync-toast-text");
+  const toastIcon = document.getElementById("cloud-sync-toast-icon");
+  if (!toast || !toastText) return;
+
+  if (cloudToastTimer) {
+    clearTimeout(cloudToastTimer);
+    cloudToastTimer = null;
+  }
+
+  toastText.textContent = message;
+  toast.className = "cloud-toast show";
+
+  if (type === "success") {
+    toast.style.background = "#f0fdf4";
+    toast.style.border = "1px solid #86efac";
+    toast.style.color = "#15803d";
+    if (toastIcon) toastIcon.textContent = "✅";
+  } else if (type === "error") {
+    toast.style.background = "#fef2f2";
+    toast.style.border = "1px solid #fca5a5";
+    toast.style.color = "#b91c1c";
+    if (toastIcon) toastIcon.textContent = "❌";
+  } else {
+    toast.style.background = "#eff6ff";
+    toast.style.border = "1px solid #93c5fd";
+    toast.style.color = "#1d4ed8";
+    if (toastIcon) toastIcon.textContent = "⏳";
+  }
+
+  if (type !== "info") {
+    cloudToastTimer = setTimeout(() => {
+      toast.classList.remove("show");
+    }, 4500);
   }
 }
 
@@ -8340,6 +8938,9 @@ function showReceiptsStatus(message, type) {
 window.initBackupModule = initBackupModule;
 window.renderBackupSection = renderBackupSection;
 window.exportToGoogleSheets = exportToGoogleSheets;
+window.importFromGoogleSheets = importFromGoogleSheets;
+window.setCloudButtonsLoading = setCloudButtonsLoading;
+window.showCloudSyncToast = showCloudSyncToast;
 window.exportReceiptsToGoogleDrive = exportReceiptsToGoogleDrive;
 window.connectWithGoogle = connectWithGoogle;
 window.disconnectGoogle = disconnectGoogle;
