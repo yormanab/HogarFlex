@@ -1545,14 +1545,26 @@ function handleAddProductToCredit() {
   const existingIdx = currentCreditItems.findIndex((item) => String(item.productId) === String(productId));
   if (existingIdx !== -1) {
     currentCreditItems[existingIdx].quantity += qty;
-    currentCreditItems[existingIdx].subtotal = currentCreditItems[existingIdx].quantity * currentCreditItems[existingIdx].price;
+    currentCreditItems[existingIdx].qty = currentCreditItems[existingIdx].quantity;
+    currentCreditItems[existingIdx].cantidad = currentCreditItems[existingIdx].quantity;
+    currentCreditItems[existingIdx].subtotal = parseFloat((currentCreditItems[existingIdx].quantity * currentCreditItems[existingIdx].price).toFixed(2));
+    currentCreditItems[existingIdx].totalLinea = currentCreditItems[existingIdx].subtotal;
   } else {
+    const lineTotal = parseFloat((qty * productPrice).toFixed(2));
     currentCreditItems.push({
+      id: "item_" + Date.now() + "_" + Math.random().toString(36).substr(2, 4),
       productId,
       name: productName,
+      nombre: productName,
       price: productPrice,
+      priceUSD: productPrice,
+      precioUnitario: productPrice,
+      unitPrice: productPrice,
       quantity: qty,
-      subtotal: qty * productPrice
+      qty: qty,
+      cantidad: qty,
+      subtotal: lineTotal,
+      totalLinea: lineTotal
     });
   }
 
@@ -1896,7 +1908,27 @@ function handleCreditFormSubmit(e) {
       phone: clientObj.phone,
       address: clientObj.address
     },
-    items: [...currentCreditItems],
+    items: currentCreditItems.map((it, idx) => {
+      const q = parseInt(it.cantidad !== undefined ? it.cantidad : (it.quantity !== undefined ? it.quantity : it.qty), 10) || 1;
+      const p = parseFloat(it.precioUnitario !== undefined ? it.precioUnitario : (it.price !== undefined ? it.price : (it.priceUSD !== undefined ? it.priceUSD : it.unitPrice))) || 0;
+      const tot = parseFloat(it.totalLinea !== undefined ? it.totalLinea : it.subtotal) || parseFloat((q * p).toFixed(2));
+      const n = String(it.nombre || it.name || "Producto").trim();
+      return {
+        id: it.id || `item_${Date.now()}_${idx}`,
+        productId: it.productId || "",
+        name: n,
+        nombre: n,
+        quantity: q,
+        qty: q,
+        cantidad: q,
+        price: p,
+        priceUSD: p,
+        precioUnitario: p,
+        unitPrice: p,
+        subtotal: tot,
+        totalLinea: tot
+      };
+    }),
     downpaymentCurrency: currency,
     downpaymentAmount: downpaymentAmountUSD,
     downpaymentPercent,
@@ -4353,14 +4385,26 @@ function handleAddProductToSale() {
   const existingIdx = currentSaleItems.findIndex((item) => String(item.productId) === String(productId));
   if (existingIdx !== -1) {
     currentSaleItems[existingIdx].quantity += qty;
-    currentSaleItems[existingIdx].subtotal = currentSaleItems[existingIdx].quantity * currentSaleItems[existingIdx].price;
+    currentSaleItems[existingIdx].qty = currentSaleItems[existingIdx].quantity;
+    currentSaleItems[existingIdx].cantidad = currentSaleItems[existingIdx].quantity;
+    currentSaleItems[existingIdx].subtotal = parseFloat((currentSaleItems[existingIdx].quantity * currentSaleItems[existingIdx].price).toFixed(2));
+    currentSaleItems[existingIdx].totalLinea = currentSaleItems[existingIdx].subtotal;
   } else {
+    const lineTotal = parseFloat((qty * productPrice).toFixed(2));
     currentSaleItems.push({
+      id: "item_sale_" + Date.now() + "_" + Math.random().toString(36).substr(2, 4),
       productId,
       name: productName,
+      nombre: productName,
       price: productPrice,
+      priceUSD: productPrice,
+      precioUnitario: productPrice,
+      unitPrice: productPrice,
       quantity: qty,
-      subtotal: qty * productPrice
+      qty: qty,
+      cantidad: qty,
+      subtotal: lineTotal,
+      totalLinea: lineTotal
     });
   }
 
@@ -6657,11 +6701,67 @@ let currentPreviewDoc = null;
 let currentInvoicesSearchQuery = "";
 let currentInvoicesTypeFilter = "all";
 
-// Obtener documentos de facturación guardados en localStorage
+// Obtener documentos de facturación guardados en localStorage con auto-recuperación de precios numéricos
 function getStoredInvoices() {
   try {
     const data = localStorage.getItem(INVOICES_STORAGE_KEY);
-    return data ? JSON.parse(data) : [];
+    if (!data) return [];
+    const list = JSON.parse(data);
+    if (!Array.isArray(list)) return [];
+
+    let modified = false;
+    list.forEach((inv) => {
+      if (inv && inv.data && Array.isArray(inv.data.items)) {
+        inv.data.items.forEach((it) => {
+          const qty = parseInt(it.cantidad !== undefined ? it.cantidad : (it.quantity !== undefined ? it.quantity : it.qty), 10) || 1;
+          let p = parseFloat(it.precioUnitario !== undefined ? it.precioUnitario : (it.price !== undefined ? it.price : (it.priceUSD !== undefined ? it.priceUSD : it.unitPrice))) || 0;
+          let sub = parseFloat(it.totalLinea !== undefined ? it.totalLinea : it.subtotal) || parseFloat((p * qty).toFixed(2));
+
+          if (p <= 0) {
+            // Auto-recuperar precio desde catálogo de productos
+            const catalog = typeof getStoredProducts === "function" ? getStoredProducts() : [];
+            const itemName = String(it.nombre || it.name || "").trim();
+            const cat = catalog.find(cp => (it.productId && String(cp.id) === String(it.productId)) || (cp.name && itemName && cp.name.trim().toLowerCase() === itemName.toLowerCase()));
+            if (cat && parseFloat(cat.price) > 0) {
+              p = parseFloat(cat.price);
+              sub = parseFloat((p * qty).toFixed(2));
+              modified = true;
+            } else if (sub > 0 && qty > 0) {
+              p = parseFloat((sub / qty).toFixed(2));
+              modified = true;
+            } else if (inv.totalAmountUSD && inv.data.items.length > 0) {
+              p = parseFloat((parseFloat(inv.totalAmountUSD) / inv.data.items.length / qty).toFixed(2));
+              sub = parseFloat((p * qty).toFixed(2));
+              modified = true;
+            }
+          }
+
+          if (it.precioUnitario === undefined || it.price === undefined || it.totalLinea === undefined) {
+            modified = true;
+          }
+
+          const n = it.nombre || it.name || "Producto";
+          it.name = n;
+          it.nombre = n;
+          it.quantity = qty;
+          it.qty = qty;
+          it.cantidad = qty;
+          it.price = p;
+          it.priceUSD = p;
+          it.precioUnitario = p;
+          it.unitPrice = p;
+          it.subtotal = sub;
+          it.totalLinea = sub;
+        });
+      }
+    });
+
+    if (modified) {
+      try {
+        localStorage.setItem(INVOICES_STORAGE_KEY, JSON.stringify(list));
+      } catch (_) {}
+    }
+    return list;
   } catch (e) {
     console.error("Error al leer facturas de localStorage:", e);
     return [];
@@ -6779,7 +6879,7 @@ function initFacturacionModule() {
   }
 }
 
-// Generar y abrir Factura de Crédito
+// Generar y abrir Factura de Crédito con precios numéricos incrustados de forma permanente
 function generateAndOpenCreditInvoice(creditId) {
   const credits = getStoredCredits();
   const credit = credits.find((c) => String(c.id) === String(creditId));
@@ -6803,6 +6903,69 @@ function generateAndOpenCreditInvoice(creditId) {
   const totalSaleUSD = credit.totalSaleUSD || 0;
   const totalSaleBs = rate ? totalSaleUSD * rate : null;
 
+  // Catálogo de productos para resolver precios faltantes en créditos antiguos
+  const catalogProducts = typeof getStoredProducts === "function" ? getStoredProducts() : [];
+  const rawItems = Array.isArray(credit.items) && credit.items.length > 0 ? credit.items : [];
+
+  // Incrustar precios reales y totales directamente en el array de items de la factura
+  const embeddedItems = rawItems.map((it, idx) => {
+    const qty = parseInt(it.cantidad !== undefined ? it.cantidad : (it.quantity !== undefined ? it.quantity : it.qty), 10) || 1;
+    let unitPrice = parseFloat(
+      it.precioUnitario !== undefined ? it.precioUnitario :
+      (it.price !== undefined ? it.price :
+      (it.priceUSD !== undefined ? it.priceUSD :
+      it.unitPrice))
+    ) || 0;
+
+    const itemName = String(it.nombre || it.name || "Producto").trim();
+
+    // Si el precio unitario es 0 o indefinido, resolver del catálogo en este momento
+    if (unitPrice <= 0 && catalogProducts.length > 0) {
+      const match = catalogProducts.find((p) =>
+        (it.productId && String(p.id) === String(it.productId)) ||
+        (it.id && String(p.id) === String(it.id)) ||
+        (p.name && itemName && p.name.trim().toLowerCase() === itemName.toLowerCase())
+      );
+      if (match && parseFloat(match.price) > 0) {
+        unitPrice = parseFloat(match.price);
+      }
+    }
+
+    // Si aún es 0, intentar calcular desde subtotal o totalLinea
+    if (unitPrice <= 0) {
+      const lineSub = parseFloat(it.totalLinea !== undefined ? it.totalLinea : it.subtotal) || 0;
+      if (lineSub > 0 && qty > 0) {
+        unitPrice = parseFloat((lineSub / qty).toFixed(2));
+      }
+    }
+
+    // Si aún es 0, distribuir proporcionalmente del total
+    if (unitPrice <= 0 && totalSaleUSD > 0 && rawItems.length > 0) {
+      const pTotal = parseFloat(credit.productsTotal) || (totalSaleUSD - (parseFloat(credit.shippingAmount) || 0));
+      if (pTotal > 0) {
+        unitPrice = parseFloat((pTotal / rawItems.length / qty).toFixed(2));
+      }
+    }
+
+    const lineTotal = parseFloat((qty * unitPrice).toFixed(2));
+
+    return {
+      id: it.id || it.productId || `item_${Date.now()}_${idx}`,
+      productId: it.productId || it.id || "",
+      name: itemName,
+      nombre: itemName,
+      quantity: qty,
+      qty: qty,
+      cantidad: qty,
+      price: unitPrice,
+      priceUSD: unitPrice,
+      precioUnitario: unitPrice,
+      unitPrice: unitPrice,
+      subtotal: lineTotal,
+      totalLinea: lineTotal
+    };
+  });
+
   const invoiceDoc = {
     id: existingDoc ? existingDoc.id : `inv_fac_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
     type: "factura_credito",
@@ -6820,7 +6983,7 @@ function generateAndOpenCreditInvoice(creditId) {
     totalAmountBs: totalSaleBs,
     rateBCV: rate,
     data: {
-      items: credit.items || [],
+      items: embeddedItems,
       hasShipping: !!credit.hasShipping,
       shippingAmount: credit.shippingAmount || 0,
       productsTotal: credit.productsTotal || (totalSaleUSD - (credit.shippingAmount || 0)),
@@ -6853,9 +7016,6 @@ function generateAndOpenCreditInvoice(creditId) {
 
   saveInvoicesToStorage(invoices);
   renderFacturacionSection();
-  }
-  if (sectionName === "backup") {
-    renderBackupSection();
   openInvoicePreviewModal(invoiceDoc);
 }
 
@@ -6920,9 +7080,6 @@ function generateAndOpenPaymentReceipt(creditId, paymentId) {
 
   saveInvoicesToStorage(invoices);
   renderFacturacionSection();
-  }
-  if (sectionName === "backup") {
-    renderBackupSection();
   openInvoicePreviewModal(receiptDoc);
 }
 
@@ -6974,17 +7131,35 @@ function renderInvoiceDocumentHTML(doc) {
 
   if (doc.type === "factura_credito") {
     // ---------------- FACTURA DE CRÉDITO ----------------
-    const items = doc.data.items || [];
-    const installments = doc.data.installments || [];
+    const items = (doc.data && Array.isArray(doc.data.items)) ? doc.data.items : [];
+    const installments = (doc.data && Array.isArray(doc.data.installments)) ? doc.data.installments : [];
 
     const productsRows = items.map((it) => {
-      const price = parseFloat(it.price) || 0;
-      const qty = parseInt(it.quantity, 10) || 1;
-      const sub = parseFloat(it.subtotal) || (price * qty);
+      const qty = parseInt(it.cantidad !== undefined ? it.cantidad : (it.quantity !== undefined ? it.quantity : it.qty), 10) || 1;
+      let price = parseFloat(
+        it.precioUnitario !== undefined ? it.precioUnitario :
+        (it.price !== undefined ? it.price :
+        (it.priceUSD !== undefined ? it.priceUSD :
+        it.unitPrice))
+      ) || 0;
+      let sub = parseFloat(it.totalLinea !== undefined ? it.totalLinea : it.subtotal) || parseFloat((price * qty).toFixed(2));
+
+      // Respaldo de emergencia si el documento histórico no traía precios incrustados
+      if (price <= 0) {
+        if (sub > 0 && qty > 0) {
+          price = parseFloat((sub / qty).toFixed(2));
+        } else if (doc.totalAmountUSD && items.length > 0) {
+          price = parseFloat((parseFloat(doc.totalAmountUSD) / items.length / qty).toFixed(2));
+          sub = parseFloat((price * qty).toFixed(2));
+        }
+      }
+
+      const itemName = it.nombre || it.name || "Producto";
+
       return `
         <tr>
           <td style="text-align: center; width: 60px;"><strong>${qty}</strong></td>
-          <td><strong>${escapeHtml(it.name)}</strong></td>
+          <td><strong>${escapeHtml(itemName)}</strong></td>
           <td style="text-align: right; width: 120px;">$${price.toFixed(2)} USD</td>
           <td style="text-align: right; width: 130px; font-weight: 700; color: var(--color-primary);">$${sub.toFixed(2)} USD</td>
         </tr>
@@ -7293,8 +7468,14 @@ function shareDocViaWhatsApp(doc) {
   let message = "";
 
   if (doc.type === "factura_credito") {
-    const items = doc.data.items || [];
-    const itemsList = items.map((it) => `• ${it.name} (x${it.quantity}) - $${((parseFloat(it.price) || 0) * (parseInt(it.quantity, 10) || 1)).toFixed(2)} USD`).join("\n");
+    const items = (doc.data && Array.isArray(doc.data.items)) ? doc.data.items : [];
+    const itemsList = items.map((it) => {
+      const qty = parseInt(it.cantidad !== undefined ? it.cantidad : (it.quantity !== undefined ? it.quantity : it.qty), 10) || 1;
+      const price = parseFloat(it.precioUnitario !== undefined ? it.precioUnitario : (it.price !== undefined ? it.price : it.priceUSD)) || 0;
+      const sub = parseFloat(it.totalLinea !== undefined ? it.totalLinea : it.subtotal) || (price * qty);
+      const name = it.nombre || it.name || "Producto";
+      return `• ${name} (x${qty}) - $${sub.toFixed(2)} USD ($${price.toFixed(2)} c/u)`;
+    }).join("\n");
     const shippingLine = doc.data.hasShipping && doc.data.shippingAmount > 0 ? `\n🚚 *Flete:* $${parseFloat(doc.data.shippingAmount).toFixed(2)} USD` : "";
     const bsTotalLine = doc.totalAmountBs ? `\n🇻🇪 *Total Bs:* Bs. ${formatBs(doc.totalAmountBs)}` + (doc.rateBCV ? ` (Tasa: ${parseFloat(doc.rateBCV).toFixed(2)} Bs/$)` : "") : "";
     const downpaymentStr = doc.data.downpaymentAmount > 0 ? `$${parseFloat(doc.data.downpaymentAmount).toFixed(2)} USD` : "$0.00";
@@ -7360,14 +7541,41 @@ function printInvoiceDoc() {
     items: cur.type === "recibo_pago"
       ? [{
           name: cur.data?.description || (cur.data?.paymentType === "cuota" ? `Pago Cuota #${cur.data?.installmentNumber || ''}` : "Abono libre a capital"),
+          nombre: cur.data?.description || (cur.data?.paymentType === "cuota" ? `Pago Cuota #${cur.data?.installmentNumber || ''}` : "Abono libre a capital"),
           qty: 1,
-          price: parseFloat(cur.totalAmountUSD) || 0
+          cantidad: 1,
+          price: parseFloat(cur.totalAmountUSD) || 0,
+          precioUnitario: parseFloat(cur.totalAmountUSD) || 0,
+          subtotal: parseFloat(cur.totalAmountUSD) || 0,
+          totalLinea: parseFloat(cur.totalAmountUSD) || 0
         }]
-      : (cur.data?.items || []).map((it) => ({
-          name: it.name || '',
-          qty: parseInt(it.quantity !== undefined ? it.quantity : it.qty, 10) || 1,
-          price: parseFloat(it.price) || 0
-        })),
+      : (cur.data?.items || []).map((it) => {
+          const qty = parseInt(it.cantidad !== undefined ? it.cantidad : (it.quantity !== undefined ? it.quantity : it.qty), 10) || 1;
+          let price = parseFloat(
+            it.precioUnitario !== undefined ? it.precioUnitario :
+            (it.price !== undefined ? it.price :
+            (it.priceUSD !== undefined ? it.priceUSD :
+            it.unitPrice))
+          ) || 0;
+          let lineTotal = parseFloat(it.totalLinea !== undefined ? it.totalLinea : it.subtotal) || parseFloat((qty * price).toFixed(2));
+          if (price <= 0 && lineTotal > 0 && qty > 0) {
+            price = parseFloat((lineTotal / qty).toFixed(2));
+          } else if (price <= 0 && cur.totalAmountUSD && cur.data?.items?.length > 0) {
+            price = parseFloat((parseFloat(cur.totalAmountUSD) / cur.data.items.length / qty).toFixed(2));
+            lineTotal = parseFloat((qty * price).toFixed(2));
+          }
+          const itemName = it.nombre || it.name || "Producto";
+          return {
+            name: itemName,
+            nombre: itemName,
+            qty: qty,
+            cantidad: qty,
+            price: price,
+            precioUnitario: price,
+            totalLinea: lineTotal,
+            subtotal: lineTotal
+          };
+        }),
     shipping: (cur.data?.hasShipping && cur.data?.shippingAmount > 0) ? parseFloat(cur.data.shippingAmount) : 0,
     totalUSD: parseFloat(cur.totalAmountUSD) || 0,
     bcvRate: parseFloat(cur.rateBCV) || 0,
@@ -7450,13 +7658,18 @@ function printInvoiceDoc() {
   doc.setTextColor(0, 0, 0);
   doc.setFont('helvetica', 'normal');
 
-  // Iterar productos del invoice
+  // Iterar productos del invoice leyendo directamente del objeto factura
   (invoice.items || []).forEach((item, i) => {
     if (i % 2 === 0) { doc.setFillColor(245, 245, 245); doc.rect(margin, y, pageW - margin * 2, 7, 'F'); }
-    doc.text(String(item.qty || 1), margin + 2, y + 5);
-    doc.text(String(item.name || ''), margin + 20, y + 5);
-    doc.text('$' + (item.price || 0).toFixed(2), margin + 110, y + 5);
-    doc.text('$' + ((item.qty || 1) * (item.price || 0)).toFixed(2), margin + 145, y + 5);
+    const iQty = item.cantidad !== undefined ? item.cantidad : (item.qty || 1);
+    const iPrice = item.precioUnitario !== undefined ? item.precioUnitario : (item.price || 0);
+    const iTotal = item.totalLinea !== undefined ? item.totalLinea : ((item.subtotal !== undefined) ? item.subtotal : (iQty * iPrice));
+    const iName = item.nombre || item.name || '';
+
+    doc.text(String(iQty), margin + 2, y + 5);
+    doc.text(String(iName), margin + 20, y + 5);
+    doc.text('$' + iPrice.toFixed(2), margin + 110, y + 5);
+    doc.text('$' + iTotal.toFixed(2), margin + 145, y + 5);
     y += 7;
   });
 
@@ -7979,7 +8192,12 @@ async function exportToGoogleSheets(isSilent = false) {
       ["ID", "Cliente", "Producto(s)", "Total USD", "Cuota Inicial", "Saldo", "Estado", "Fecha Creación"],
       ...credits.map((cr) => {
         const clientName = cr.client?.name || "Cliente";
-        const productsSummary = (cr.items || []).map((it) => `${it.name || "Producto"} (x${it.quantity || 1})`).join(", ");
+        const productsSummary = (cr.items || []).map((it) => {
+          const p = parseFloat(it.precioUnitario !== undefined ? it.precioUnitario : (it.price !== undefined ? it.price : it.priceUSD)) || 0;
+          const q = parseInt(it.cantidad !== undefined ? it.cantidad : (it.quantity !== undefined ? it.quantity : it.qty), 10) || 1;
+          const name = it.nombre || it.name || "Producto";
+          return p > 0 ? `${name} (x${q} @ $${p.toFixed(2)})` : `${name} (x${q})`;
+        }).join(", ");
         const dateStr = cr.createdAt ? formatDateDisplay(new Date(cr.createdAt)) : "";
         return [
           cr.id || "",
@@ -8020,7 +8238,12 @@ async function exportToGoogleSheets(isSilent = false) {
     const salesData = [
       ["ID", "Cliente", "Producto(s)", "Precio USD", "Método Pago", "Fecha"],
       ...sales.map((s) => {
-        const prods = (s.items || []).map((it) => `${it.name || "Producto"} (x${it.quantity || 1})`).join(", ");
+        const prods = (s.items || []).map((it) => {
+          const p = parseFloat(it.precioUnitario !== undefined ? it.precioUnitario : (it.price !== undefined ? it.price : it.priceUSD)) || 0;
+          const q = parseInt(it.cantidad !== undefined ? it.cantidad : (it.quantity !== undefined ? it.quantity : it.qty), 10) || 1;
+          const name = it.nombre || it.name || "Producto";
+          return p > 0 ? `${name} (x${q} @ $${p.toFixed(2)})` : `${name} (x${q})`;
+        }).join(", ");
         return [
           s.id || "",
           s.client?.name || "Cliente",
@@ -8050,7 +8273,12 @@ async function exportToGoogleSheets(isSilent = false) {
       ["ID Factura", "Cliente", "Productos", "Total USD", "Fecha", "Estado"],
       ...invoices.map((inv) => {
         const clientName = inv.client?.name || "Cliente";
-        const prods = (inv.data?.items || []).map((it) => `${it.name || "Producto"} (x${it.quantity || 1})`).join(", ");
+        const prods = (inv.data?.items || []).map((it) => {
+          const p = parseFloat(it.precioUnitario !== undefined ? it.precioUnitario : (it.price !== undefined ? it.price : it.priceUSD)) || 0;
+          const q = parseInt(it.cantidad !== undefined ? it.cantidad : (it.quantity !== undefined ? it.quantity : it.qty), 10) || 1;
+          const name = it.nombre || it.name || "Producto";
+          return p > 0 ? `${name} (x${q} @ $${p.toFixed(2)})` : `${name} (x${q})`;
+        }).join(", ");
         const dateStr = inv.date ? formatDateDisplay(new Date(inv.date)) : "";
         const status = inv.status || (inv.data?.remainingBalance <= 0 ? "Pagada" : "Emitida");
         return [
@@ -8613,6 +8841,42 @@ async function importFromGoogleSheets(isSilent = false) {
       const matchingClient = importedClients.find((c) => c.name.toLowerCase() === clientName.toLowerCase()) ||
         (existingInv ? existingInv.client : null) || { name: clientName, dni: "-", phone: "", address: "" };
 
+      let invDataItems = (existingInv && existingInv.data && Array.isArray(existingInv.data.items) && existingInv.data.items.length > 0)
+        ? existingInv.data.items
+        : parseProductsSummaryString(prodsSummary, totalUSD);
+
+      // Normalizar e incrustar precios reales en cada ítem de la factura importada
+      invDataItems = invDataItems.map((it, itIdx) => {
+        const qty = parseInt(it.cantidad !== undefined ? it.cantidad : (it.quantity !== undefined ? it.quantity : it.qty), 10) || 1;
+        let p = parseFloat(it.precioUnitario !== undefined ? it.precioUnitario : (it.price !== undefined ? it.price : (it.priceUSD !== undefined ? it.priceUSD : it.unitPrice))) || 0;
+        let tot = parseFloat(it.totalLinea !== undefined ? it.totalLinea : it.subtotal) || 0;
+
+        if (p <= 0) {
+          const cat = importedProducts.find(cp => (it.productId && String(cp.id) === String(it.productId)) || (cp.name && (it.name || it.nombre) && cp.name.trim().toLowerCase() === (it.name || it.nombre).trim().toLowerCase()));
+          if (cat && parseFloat(cat.price) > 0) p = parseFloat(cat.price);
+          else if (tot > 0) p = parseFloat((tot / qty).toFixed(2));
+          else if (totalUSD > 0) p = parseFloat((totalUSD / invDataItems.length / qty).toFixed(2));
+        }
+        if (tot <= 0) tot = parseFloat((qty * p).toFixed(2));
+
+        const n = it.nombre || it.name || "Producto";
+        return {
+          id: it.id || `item_inv_${invIdx}_${itIdx}`,
+          productId: it.productId || "",
+          name: n,
+          nombre: n,
+          quantity: qty,
+          qty: qty,
+          cantidad: qty,
+          price: p,
+          priceUSD: p,
+          precioUnitario: p,
+          unitPrice: p,
+          subtotal: tot,
+          totalLinea: tot
+        };
+      });
+
       importedInvoices.push({
         id: existingInv ? existingInv.id : `inv_fac_${Date.now()}_${invIdx}`,
         type: existingInv ? existingInv.type : "factura_credito",
@@ -8625,10 +8889,11 @@ async function importFromGoogleSheets(isSilent = false) {
         totalAmountBs: existingInv ? existingInv.totalAmountBs : null,
         rateBCV: existingInv ? existingInv.rateBCV : null,
         status: status,
-        data: existingInv && existingInv.data ? existingInv.data : {
-          items: parseProductsSummaryString(prodsSummary, totalUSD),
+        data: {
+          ...(existingInv && existingInv.data ? existingInv.data : {}),
+          items: invDataItems,
           totalSaleUSD: totalUSD,
-          remainingBalance: status.toLowerCase() === "pagada" ? 0 : totalUSD
+          remainingBalance: status.toLowerCase() === "pagada" ? 0 : (existingInv && existingInv.data && existingInv.data.remainingBalance !== undefined ? existingInv.data.remainingBalance : totalUSD)
         },
         createdAt: existingInv ? existingInv.createdAt : Date.now()
       });
@@ -8763,31 +9028,114 @@ async function importFromGoogleSheets(isSilent = false) {
   }
 }
 
-// Utilidad auxiliar para reconstruir array de items desde resumen de texto de Google Sheets
+// Utilidad auxiliar para reconstruir array de items desde resumen de texto de Google Sheets con precios reales
 function parseProductsSummaryString(summary, fallbackPrice = 0) {
+  const catalogProducts = typeof getStoredProducts === "function" ? getStoredProducts() : [];
+
   if (!summary || typeof summary !== "string" || !summary.trim()) {
-    return [{ id: "item_gen", name: "Producto", quantity: 1, priceUSD: fallbackPrice }];
+    const fPrice = parseFloat(fallbackPrice) || 0;
+    return [{
+      id: "item_gen",
+      productId: "",
+      name: "Producto",
+      nombre: "Producto",
+      quantity: 1,
+      qty: 1,
+      cantidad: 1,
+      price: fPrice,
+      priceUSD: fPrice,
+      precioUnitario: fPrice,
+      unitPrice: fPrice,
+      subtotal: fPrice,
+      totalLinea: fPrice
+    }];
   }
+
   const parts = summary.split(",");
   const items = [];
+
   parts.forEach((p, idx) => {
     const trimmed = p.trim();
     if (!trimmed) return;
-    const qtyMatch = trimmed.match(/\(x(\d+)\)/i);
+
     let qty = 1;
+    let explicitPrice = null;
     let name = trimmed;
-    if (qtyMatch) {
-      qty = parseInt(qtyMatch[1], 10) || 1;
-      name = trimmed.replace(/\(x\d+\)/i, "").trim();
+
+    // Detectar formato combinado: (x2 @ $350.00) o (x1 @ 350)
+    const combinedMatch = name.match(/\(x(\d+)\s*(?:@\s*\$?([0-9]+(?:\.[0-9]+)?))?\)/i);
+    if (combinedMatch) {
+      qty = parseInt(combinedMatch[1], 10) || 1;
+      if (combinedMatch[2]) explicitPrice = parseFloat(combinedMatch[2]);
+      name = name.replace(/\(x\d+\s*(?:@\s*\$?[0-9]+(?:\.[0-9]+)?)?\)/i, "").trim();
     }
+
+    // Detectar precio explícito standalone si aún no se extrajo: @ $XX.XX o @ XX.XX
+    if (explicitPrice === null) {
+      const atPriceMatch = name.match(/@\s*\$?([0-9]+(?:\.[0-9]+)?)/i);
+      if (atPriceMatch) {
+        explicitPrice = parseFloat(atPriceMatch[1]);
+        name = name.replace(/@\s*\$?[0-9]+(?:\.[0-9]+)?/i, "").trim();
+      }
+    }
+
+    // Detectar cantidad standalone si aún no se extrajo: (xN)
+    const qtyMatch = name.match(/\(x(\d+)\s*\)/i);
+    if (qtyMatch) {
+      qty = parseInt(qtyMatch[1], 10) || qty;
+      name = name.replace(/\(x\d+\s*\)/i, "").trim();
+    }
+
+    name = name.replace(/\(\s*\)/g, "").trim();
+
+    // Determinar precio unitario numérico
+    let unitPrice = 0;
+    if (explicitPrice !== null && !isNaN(explicitPrice) && explicitPrice > 0) {
+      unitPrice = explicitPrice;
+    } else {
+      // Buscar en el catálogo de productos por nombre
+      const catMatch = catalogProducts.find(cp => cp.name && name && cp.name.trim().toLowerCase() === name.toLowerCase());
+      if (catMatch && parseFloat(catMatch.price) > 0) {
+        unitPrice = parseFloat(catMatch.price);
+      } else if (fallbackPrice > 0) {
+        unitPrice = parseFloat((fallbackPrice / (parts.length || 1) / qty).toFixed(2));
+      }
+    }
+
+    const lineTotal = parseFloat((qty * unitPrice).toFixed(2));
+
     items.push({
-      id: "prod_import_" + idx,
+      id: "prod_import_" + idx + "_" + Date.now(),
+      productId: "",
       name: name || "Producto",
+      nombre: name || "Producto",
       quantity: qty,
-      priceUSD: (fallbackPrice / (parts.length || 1)) || 0
+      qty: qty,
+      cantidad: qty,
+      price: unitPrice,
+      priceUSD: unitPrice,
+      precioUnitario: unitPrice,
+      unitPrice: unitPrice,
+      subtotal: lineTotal,
+      totalLinea: lineTotal
     });
   });
-  return items.length > 0 ? items : [{ id: "item_gen", name: "Producto", quantity: 1, priceUSD: fallbackPrice }];
+
+  return items.length > 0 ? items : [{
+    id: "item_gen",
+    productId: "",
+    name: "Producto",
+    nombre: "Producto",
+    quantity: 1,
+    qty: 1,
+    cantidad: 1,
+    price: parseFloat(fallbackPrice) || 0,
+    priceUSD: parseFloat(fallbackPrice) || 0,
+    precioUnitario: parseFloat(fallbackPrice) || 0,
+    unitPrice: parseFloat(fallbackPrice) || 0,
+    subtotal: parseFloat(fallbackPrice) || 0,
+    totalLinea: parseFloat(fallbackPrice) || 0
+  }];
 }
 
 // Feedback visual de botones de nube (spinners y estados)
