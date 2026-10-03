@@ -6701,8 +6701,91 @@ let currentPreviewDoc = null;
 let currentInvoicesSearchQuery = "";
 let currentInvoicesTypeFilter = "all";
 
+// Saneamiento de facturas duplicadas en localStorage (se ejecuta una sola vez al iniciar)
+let hasSanitizedInvoices = false;
+
+function sanitizeStoredInvoices() {
+  if (hasSanitizedInvoices) return;
+  hasSanitizedInvoices = true;
+
+  try {
+    const rawData = localStorage.getItem(INVOICES_STORAGE_KEY);
+    if (!rawData) return;
+    const invoices = JSON.parse(rawData);
+    if (!Array.isArray(invoices) || invoices.length === 0) return;
+
+    // Helper para determinar antigüedad y preservar la factura más reciente
+    const getInvoiceSortValue = (inv) => {
+      if (inv.createdAt) {
+        const t = new Date(inv.createdAt).getTime();
+        if (!isNaN(t)) return t;
+      }
+      if (inv.date) {
+        const t = new Date(inv.date).getTime();
+        if (!isNaN(t)) return t;
+      }
+      if (inv.docNumber) {
+        const m = String(inv.docNumber).match(/\d+/);
+        if (m) return parseInt(m[0], 10);
+      }
+      return 0;
+    };
+
+    const creditInvoicesMap = new Map();
+    const otherInvoices = [];
+
+    invoices.forEach((inv) => {
+      if (!inv) return;
+
+      // Garantizar que no se almacene HTML dentro de los objetos de factura (Requisito 3)
+      if (inv.html) delete inv.html;
+      if (inv.renderedHTML) delete inv.renderedHTML;
+
+      if (inv.type === "factura_credito") {
+        const cId = String(inv.creditId !== undefined && inv.creditId !== null ? inv.creditId : (inv.data?.creditId || "")).trim();
+        if (cId) {
+          if (!creditInvoicesMap.has(cId)) {
+            creditInvoicesMap.set(cId, []);
+          }
+          creditInvoicesMap.get(cId).push(inv);
+          return;
+        }
+      }
+      otherInvoices.push(inv);
+    });
+
+    let removedCount = 0;
+    const preservedCreditInvoices = [];
+
+    creditInvoicesMap.forEach((group, cId) => {
+      if (group.length === 1) {
+        preservedCreditInvoices.push(group[0]);
+      } else {
+        // Ordenar de más reciente a más antigua
+        group.sort((a, b) => getInvoiceSortValue(b) - getInvoiceSortValue(a));
+        // Conservar solo la más reciente y descartar duplicados
+        preservedCreditInvoices.push(group[0]);
+        removedCount += (group.length - 1);
+        console.log(`[HogarFlex Saneamiento] Crédito ${cId}: conservada factura más reciente "${group[0].docNumber}" (${group[0].id}), eliminadas ${group.length - 1} facturas duplicadas.`);
+      }
+    });
+
+    if (removedCount > 0) {
+      const sanitized = [...preservedCreditInvoices, ...otherInvoices];
+      sanitized.sort((a, b) => getInvoiceSortValue(b) - getInvoiceSortValue(a));
+      localStorage.setItem(INVOICES_STORAGE_KEY, JSON.stringify(sanitized));
+      console.log(`[HogarFlex Saneamiento] ✅ Saneamiento exitoso al iniciar: se eliminaron ${removedCount} facturas duplicadas.`);
+    }
+  } catch (err) {
+    console.error("Error al sanear facturas en localStorage:", err);
+  }
+}
+
 // Obtener documentos de facturación guardados en localStorage con auto-recuperación de precios numéricos
 function getStoredInvoices() {
+  if (!hasSanitizedInvoices) {
+    sanitizeStoredInvoices();
+  }
   try {
     const data = localStorage.getItem(INVOICES_STORAGE_KEY);
     if (!data) return [];
@@ -6808,6 +6891,8 @@ function formatPhoneForWhatsApp(rawPhone) {
 
 // Inicializar módulo de Facturación
 function initFacturacionModule() {
+  sanitizeStoredInvoices();
+
   const btnRefresh = document.getElementById("btn-refresh-invoices");
   if (btnRefresh) {
     btnRefresh.addEventListener("click", () => {
@@ -6882,9 +6967,39 @@ function initFacturacionModule() {
 // Generar y abrir Factura de Crédito con precios numéricos incrustados de forma permanente
 function generateAndOpenCreditInvoice(creditId) {
   const credits = getStoredCredits();
-  const credit = credits.find((c) => String(c.id) === String(creditId));
+  const credit = credits.find((c) => String(c.id).trim() === String(creditId).trim());
   if (!credit) {
     alert("Crédito no encontrado.");
+    return;
+  }
+
+  const invoices = getStoredInvoices();
+  // 1. Verificar si ya existe una factura generada para este crédito
+  const targetCreditId = String(credit.id).trim();
+  const existingDoc = invoices.find((d) =>
+    d.type === "factura_credito" && (
+      (d.creditId !== undefined && d.creditId !== null && String(d.creditId).trim() === targetCreditId) ||
+      (d.data && d.data.creditId !== undefined && d.data.creditId !== null && String(d.data.creditId).trim() === targetCreditId)
+    )
+  );
+
+  // Si ya existe, abrir la que existe — NO crear una nueva (Requisito 1)
+  if (existingDoc) {
+    // Sincronizar el estado actual de cuotas y saldo pendiente por si hubo pagos posteriores
+    if (credit.installments && existingDoc.data) {
+      existingDoc.data.installments = (credit.installments || []).map((inst) => ({
+        number: inst.number,
+        dueDate: inst.dueDate,
+        amountUSD: inst.amountUSD,
+        amountBs: existingDoc.rateBCV ? inst.amountUSD * existingDoc.rateBCV : null,
+        status: inst.status || "Pendiente"
+      }));
+      if (credit.remainingBalance !== undefined) {
+        existingDoc.data.remainingBalance = credit.remainingBalance;
+      }
+      saveInvoicesToStorage(invoices);
+    }
+    openInvoicePreviewModal(existingDoc);
     return;
   }
 
@@ -6892,12 +7007,15 @@ function generateAndOpenCreditInvoice(creditId) {
   const clients = getStoredClients();
   const clientObj = clients.find((cl) => String(cl.id) === String(credit.clientId) || (cl.dni && credit.client && cl.dni === credit.client.dni)) || credit.client || {};
 
-  const invoices = getStoredInvoices();
-  // Verificar si ya existe una factura generada para este crédito
-  let existingDoc = invoices.find((d) => d.type === "factura_credito" && String(d.creditId) === String(credit.id));
-
-  const facturasCount = invoices.filter((d) => d.type === "factura_credito").length;
-  const docNumber = existingDoc ? existingDoc.docNumber : `FAC-${String(facturasCount + 1).padStart(4, "0")}`;
+  // Generar correlativo FAC-XXXX basándose en el máximo existente para evitar colisiones
+  let maxDocNum = 0;
+  invoices.forEach((d) => {
+    if (d.docNumber && String(d.docNumber).startsWith("FAC-")) {
+      const n = parseInt(String(d.docNumber).replace("FAC-", ""), 10);
+      if (!isNaN(n) && n > maxDocNum) maxDocNum = n;
+    }
+  });
+  const docNumber = `FAC-${String(maxDocNum + 1).padStart(4, "0")}`;
 
   const rate = getCreditExchangeRate(credit);
   const totalSaleUSD = credit.totalSaleUSD || 0;
@@ -6967,7 +7085,7 @@ function generateAndOpenCreditInvoice(creditId) {
   });
 
   const invoiceDoc = {
-    id: existingDoc ? existingDoc.id : `inv_fac_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+    id: `inv_fac_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
     type: "factura_credito",
     docNumber,
     date: credit.createdAt ? new Date(credit.createdAt).toISOString() : new Date().toISOString(),
@@ -7004,16 +7122,10 @@ function generateAndOpenCreditInvoice(creditId) {
         status: inst.status || "Pendiente"
       }))
     },
-    createdAt: existingDoc ? existingDoc.createdAt : Date.now()
+    createdAt: Date.now()
   };
 
-  if (existingDoc) {
-    const idx = invoices.findIndex((d) => d.id === existingDoc.id);
-    if (idx !== -1) invoices[idx] = invoiceDoc;
-  } else {
-    invoices.unshift(invoiceDoc);
-  }
-
+  invoices.unshift(invoiceDoc);
   saveInvoicesToStorage(invoices);
   renderFacturacionSection();
   openInvoicePreviewModal(invoiceDoc);
@@ -7022,21 +7134,33 @@ function generateAndOpenCreditInvoice(creditId) {
 // Generar y abrir Recibo de Pago
 function generateAndOpenPaymentReceipt(creditId, paymentId) {
   const credits = getStoredCredits();
-  const credit = credits.find((c) => String(c.id) === String(creditId));
+  const credit = credits.find((c) => String(c.id).trim() === String(creditId).trim());
   if (!credit) return;
 
   const payments = credit.payments || [];
-  const payment = payments.find((p) => String(p.id) === String(paymentId)) || payments[payments.length - 1];
+  const payment = payments.find((p) => String(p.id).trim() === String(paymentId).trim()) || payments[payments.length - 1];
   if (!payment) return;
 
   const clients = getStoredClients();
   const clientObj = clients.find((cl) => String(cl.id) === String(credit.clientId) || (cl.dni && credit.client && cl.dni === credit.client.dni)) || credit.client || {};
 
   const invoices = getStoredInvoices();
-  let existingDoc = invoices.find((d) => d.type === "recibo_pago" && String(d.paymentId) === String(payment.id));
+  let existingDoc = invoices.find((d) => d.type === "recibo_pago" && String(d.paymentId).trim() === String(payment.id).trim());
 
-  const receiptsCount = invoices.filter((d) => d.type === "recibo_pago").length;
-  const docNumber = existingDoc ? existingDoc.docNumber : `REC-${String(receiptsCount + 1).padStart(4, "0")}`;
+  if (existingDoc) {
+    openInvoicePreviewModal(existingDoc);
+    return;
+  }
+
+  // Generar correlativo REC-XXXX basándose en el máximo existente
+  let maxRecNum = 0;
+  invoices.forEach((d) => {
+    if (d.docNumber && String(d.docNumber).startsWith("REC-")) {
+      const n = parseInt(String(d.docNumber).replace("REC-", ""), 10);
+      if (!isNaN(n) && n > maxRecNum) maxRecNum = n;
+    }
+  });
+  const docNumber = `REC-${String(maxRecNum + 1).padStart(4, "0")}`;
 
   const pendingCount = (credit.installments || []).filter((inst) => inst.status !== "Pagada").length;
   const amountUSD = parseFloat(payment.amountUSD) || 0;
@@ -7044,7 +7168,7 @@ function generateAndOpenPaymentReceipt(creditId, paymentId) {
   const rateBCV = payment.rateBCVToday ? parseFloat(payment.rateBCVToday) : (payment.currency === "BS" && amountUSD > 0 && amountBs > 0 ? (amountBs / amountUSD) : null);
 
   const receiptDoc = {
-    id: existingDoc ? existingDoc.id : `inv_rec_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+    id: `inv_rec_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
     type: "recibo_pago",
     docNumber,
     date: payment.date || new Date().toISOString(),
