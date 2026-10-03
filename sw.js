@@ -1,11 +1,13 @@
-const CACHE_NAME = 'hogarflex-v7';
+const CACHE_NAME = 'hogarflex-v8';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
   './js/app.js',
   './css/styles.css',
   './js/jspdf.umd.min.js',
-  './assets/logo.jpg'
+  './js/qr-contrato-data.js',
+  './assets/logo.jpg',
+  './assets/qr-contrato.png'
 ];
 
 self.addEventListener('install', function(event) {

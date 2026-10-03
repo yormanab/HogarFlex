@@ -7166,22 +7166,34 @@ function renderInvoiceDocumentHTML(doc) {
       `;
     }).join("");
 
-    const installmentsRows = installments.map((inst) => {
+    const totalInstallmentsCount = installments.length;
+    const paidInstallmentsCount = installments.filter((inst) => inst.status === "Pagada").length;
+    const pendingInstallmentsCount = installments.filter((inst) => inst.status !== "Pagada").length;
+    const downpaymentPaidVal = parseFloat(
+      doc.data.downpaymentPaidUSD !== undefined && doc.data.downpaymentPaidUSD > 0
+        ? doc.data.downpaymentPaidUSD
+        : (doc.data.downpaymentAmount || 0)
+    ).toFixed(2);
+
+    const installmentsRows = installments.map((inst, index) => {
+      const num = inst.number !== undefined ? inst.number : (index + 1);
       const dueDateStr = inst.dueDate ? formatDateDisplay(new Date(inst.dueDate + "T00:00:00")) : "-";
-      const bsStr = inst.amountBs ? `Bs. ${formatBs(inst.amountBs)}` : (doc.rateBCV ? `Bs. ${formatBs(inst.amountUSD * doc.rateBCV)}` : "—");
-      const statusPill = inst.status === "Pagada"
-        ? '<span style="color:#15803d; font-weight:700; font-size:0.8rem;">✓ Pagada</span>'
-        : (inst.status === "Parcialmente pagada"
-          ? '<span style="color:#b45309; font-weight:700; font-size:0.8rem;">Parcial</span>'
-          : '<span style="color:#0369a1; font-weight:600; font-size:0.8rem;">Pendiente</span>');
+      const bsStr = inst.amountBs ? `Bs. ${formatBs(inst.amountBs)}` : (doc.rateBCV ? `Bs. ${formatBs(inst.amountUSD * doc.rateBCV)}` : "");
+      const bsSubtext = bsStr ? `<br><small style="color: #64748b; font-weight: normal;">${bsStr}</small>` : "";
+
+      let statusBadge = '<span class="status-badge-pending">Pendiente</span>';
+      if (inst.status === "Pagada") {
+        statusBadge = '<span class="status-badge-paid">Pagada</span>';
+      } else if (inst.status === "Parcialmente pagada") {
+        statusBadge = '<span class="status-badge-partial">Parcialmente pagada</span>';
+      }
 
       return `
         <tr>
-          <td style="font-weight: 700;">Cuota #${inst.number}</td>
+          <td style="text-align: center; font-weight: 700; width: 60px;">${num}</td>
           <td>${dueDateStr}</td>
-          <td style="text-align: right; font-weight: 700;">$${parseFloat(inst.amountUSD).toFixed(2)} USD</td>
-          <td style="text-align: right; color: #475569;">${bsStr}</td>
-          <td style="text-align: center;">${statusPill}</td>
+          <td style="text-align: right; font-weight: 700;">$${parseFloat(inst.amountUSD).toFixed(2)} USD${bsSubtext}</td>
+          <td style="text-align: center;">${statusBadge}</td>
         </tr>
       `;
     }).join("");
@@ -7211,7 +7223,7 @@ function renderInvoiceDocumentHTML(doc) {
           <div style="font-size: 0.8rem; color: #64748b; margin-top: 4px;">Atención al Cliente · Garantía y Calidad</div>
         </div>
         <div class="doc-number-box">
-          <span class="doc-type-badge">FACTURA DE CRÉDITO</span>
+          <span class="doc-type-badge">NOTA DE ENTREGA / FACTURA DE CRÉDITO</span>
           <div class="doc-number-text">${escapeHtml(doc.docNumber)}</div>
           <div class="doc-date-text">Fecha de emisión: <strong>${dateStr}${timeStr}</strong></div>
         </div>
@@ -7292,22 +7304,51 @@ function renderInvoiceDocumentHTML(doc) {
         <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="width:18px;height:18px;">
           <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
         </svg>
-        <span>Plan de Cuotas y Calendario de Pagos</span>
+        <span>PLAN DE CUOTAS</span>
       </div>
+
+      <div class="doc-plan-summary-grid">
+        <div class="doc-plan-stat-box highlight-green">
+          <span class="plan-stat-lbl">Cuota inicial pagada</span>
+          <span class="plan-stat-val text-green">$${downpaymentPaidVal} USD</span>
+        </div>
+        <div class="doc-plan-stat-box">
+          <span class="plan-stat-lbl">Total de cuotas</span>
+          <span class="plan-stat-val">${totalInstallmentsCount}</span>
+        </div>
+        <div class="doc-plan-stat-box highlight-primary">
+          <span class="plan-stat-lbl">Cuotas pagadas</span>
+          <span class="plan-stat-val text-primary">${paidInstallmentsCount}</span>
+        </div>
+        <div class="doc-plan-stat-box highlight-red">
+          <span class="plan-stat-lbl">Cuotas pendientes</span>
+          <span class="plan-stat-val text-red">${pendingInstallmentsCount}</span>
+        </div>
+      </div>
+
       <table class="doc-table">
         <thead>
           <tr>
-            <th>Cuota</th>
+            <th style="text-align: center; width: 60px;">N°</th>
             <th>Fecha de Vencimiento</th>
-            <th style="text-align: right;">Monto en USD</th>
-            <th style="text-align: right;">Monto en Bs. (Ref.)</th>
-            <th style="text-align: center;">Estado</th>
+            <th style="text-align: right; width: 140px;">Monto USD</th>
+            <th style="text-align: center; width: 160px;">Estado</th>
           </tr>
         </thead>
         <tbody>
-          ${installmentsRows || '<tr><td colspan="5" style="text-align:center;color:#94a3b8;">Sin cuotas programadas</td></tr>'}
+          ${installmentsRows || '<tr><td colspan="4" style="text-align:center;color:#94a3b8;">Sin cuotas programadas</td></tr>'}
         </tbody>
       </table>
+
+      <!-- Cláusula al pie de la factura, al lado del QR -->
+      <div class="doc-contract-clause-container">
+        <div class="doc-clause-qr-col">
+          <img src="assets/qr-contrato.png" alt="QR Contrato HogarFlex" class="doc-clause-qr-img" id="invoice-qr-contrato-img" width="80" height="80">
+        </div>
+        <div class="doc-clause-text-col">
+          <p class="doc-clause-text">Al recibir esta nota de entrega / factura, usted acepta los términos y condiciones del contrato de financiamiento. En caso de fallar en el pago de alguna de las cuotas acordadas, se pondrá en ejercicio dicho contrato.</p>
+        </div>
+      </div>
 
       <!-- Firmas y Compromiso -->
       <div class="doc-signatures">
@@ -7579,9 +7620,10 @@ function printInvoiceDoc() {
     shipping: (cur.data?.hasShipping && cur.data?.shippingAmount > 0) ? parseFloat(cur.data.shippingAmount) : 0,
     totalUSD: parseFloat(cur.totalAmountUSD) || 0,
     bcvRate: parseFloat(cur.rateBCV) || 0,
-    downPayment: parseFloat(cur.data?.downpaymentAmount) || 0,
+    downPayment: parseFloat(cur.data?.downpaymentPaidUSD !== undefined && cur.data?.downpaymentPaidUSD > 0 ? cur.data.downpaymentPaidUSD : (cur.data?.downpaymentAmount || 0)) || 0,
     balance: parseFloat(cur.data?.remainingBalance !== undefined ? cur.data.remainingBalance : cur.data?.remainingBalanceAfter) || 0,
-    installments: (cur.data?.installments || []).map((inst) => ({
+    installments: (cur.data?.installments || []).map((inst, idx) => ({
+      number: inst.number !== undefined ? inst.number : (idx + 1),
       dueDate: inst.dueDate ? formatDateDisplay(new Date(inst.dueDate + "T00:00:00")) : '',
       amountUSD: parseFloat(inst.amountUSD) || 0,
       status: inst.status || 'Pendiente'
@@ -7592,13 +7634,20 @@ function printInvoiceDoc() {
   doc.setFillColor(26, 58, 107); // #1a3a6b
   doc.rect(0, 0, pageW, 40, 'F');
 
-  // LOGO — si existe como base64 en la constante LOGO_BASE64:
+  // LOGO — si existe como base64 o elemento imagen
+  const headerLogoEl = document.querySelector('.header-logo') || document.querySelector('.login-logo');
   if (typeof LOGO_BASE64 !== 'undefined' && LOGO_BASE64) {
     try {
       const imgFormat = LOGO_BASE64.includes('image/png') ? 'PNG' : 'JPEG';
       doc.addImage(LOGO_BASE64, imgFormat, 10, 5, 25, 25);
     } catch (err) {
       console.warn("No se pudo cargar el logo en el PDF:", err);
+    }
+  } else if (headerLogoEl && headerLogoEl.complete && headerLogoEl.naturalWidth > 0) {
+    try {
+      doc.addImage(headerLogoEl, 'JPEG', 10, 5, 25, 25);
+    } catch (err) {
+      console.warn("No se pudo cargar headerLogoEl en el PDF:", err);
     }
   }
 
@@ -7708,34 +7757,178 @@ function printInvoiceDoc() {
 
   // PLAN DE CUOTAS
   if (invoice.installments && invoice.installments.length > 0) {
+    if (y + 45 > pageH - 30) {
+      doc.addPage();
+      y = 20;
+    }
+
     doc.setTextColor(26, 58, 107);
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(10);
     doc.text('PLAN DE CUOTAS', margin, y);
     y += 5;
+
+    // Resumen de cuotas encima de la tabla
+    const totalInst = invoice.installments.length;
+    const paidInst = invoice.installments.filter((i) => i.status === 'Pagada').length;
+    const pendingInst = invoice.installments.filter((i) => i.status !== 'Pagada').length;
+    const downPaymentFormatted = (invoice.downPayment || 0).toFixed(2);
+
+    doc.setFillColor(248, 250, 252);
+    doc.setDrawColor(203, 213, 225);
+    doc.setLineWidth(0.3);
+    doc.roundedRect(margin, y, pageW - margin * 2, 8, 1.5, 1.5, 'FD');
+
+    const statColW = (pageW - margin * 2) / 4;
+    doc.setFontSize(7.5);
+
+    // Cuota inicial pagada
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(71, 85, 105);
+    doc.text('Inicial pagada:', margin + 3, y + 5.2);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(21, 128, 61);
+    doc.text('$' + downPaymentFormatted + ' USD', margin + 22, y + 5.2);
+
+    // Total de cuotas
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(71, 85, 105);
+    doc.text('Total cuotas:', margin + statColW + 2, y + 5.2);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(15, 23, 42);
+    doc.text(String(totalInst), margin + statColW + 20, y + 5.2);
+
+    // Cuotas pagadas
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(71, 85, 105);
+    doc.text('Cuotas pagadas:', margin + statColW * 2 + 2, y + 5.2);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(26, 58, 107);
+    doc.text(String(paidInst), margin + statColW * 2 + 24, y + 5.2);
+
+    // Cuotas pendientes
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(71, 85, 105);
+    doc.text('Cuotas pendientes:', margin + statColW * 3 + 2, y + 5.2);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(180, 0, 0);
+    doc.text(String(pendingInst), margin + statColW * 3 + 28, y + 5.2);
+
+    y += 11;
+
+    // Tabla de cuotas
     doc.setFillColor(26, 58, 107);
     doc.rect(margin, y, pageW - margin * 2, 7, 'F');
     doc.setTextColor(255, 255, 255);
-    doc.setFontSize(9);
-    doc.text('N°', margin + 2, y + 5);
-    doc.text('Fecha Vencimiento', margin + 20, y + 5);
-    doc.text('Monto USD', margin + 100, y + 5);
-    doc.text('Estado', margin + 145, y + 5);
+    doc.setFontSize(8.5);
+    doc.setFont('helvetica', 'bold');
+    doc.text('N°', margin + 3, y + 5);
+    doc.text('Fecha de Vencimiento', margin + 20, y + 5);
+    doc.text('Monto USD', margin + 105, y + 5);
+    doc.text('Estado', margin + 148, y + 5);
     y += 7;
+
     doc.setTextColor(0, 0, 0);
     doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
     invoice.installments.forEach((inst, i) => {
-      if (i % 2 === 0) { doc.setFillColor(245, 245, 245); doc.rect(margin, y, pageW - margin * 2, 7, 'F'); }
-      doc.text(String(i + 1), margin + 2, y + 5);
-      doc.text(inst.dueDate || '', margin + 20, y + 5);
-      doc.text('$' + (inst.amountUSD || 0).toFixed(2), margin + 100, y + 5);
-      doc.text(inst.status || 'Pendiente', margin + 145, y + 5);
-      y += 7;
+      if (y > pageH - 60) {
+        doc.addPage();
+        y = 20;
+      }
+      if (i % 2 === 0) {
+        doc.setFillColor(245, 245, 245);
+        doc.rect(margin, y, pageW - margin * 2, 6.5, 'F');
+      }
+      doc.text(String(inst.number || (i + 1)), margin + 3, y + 4.5);
+      doc.text(inst.dueDate || '', margin + 20, y + 4.5);
+      doc.text('$' + (inst.amountUSD || 0).toFixed(2) + ' USD', margin + 105, y + 4.5);
+
+      const st = inst.status || 'Pendiente';
+      if (st === 'Pagada') {
+        doc.setTextColor(21, 128, 61);
+        doc.setFont('helvetica', 'bold');
+      } else if (st === 'Parcialmente pagada') {
+        doc.setTextColor(180, 83, 9);
+        doc.setFont('helvetica', 'bold');
+      } else {
+        doc.setTextColor(3, 105, 161);
+        doc.setFont('helvetica', 'normal');
+      }
+      doc.text(st, margin + 148, y + 4.5);
+      doc.setTextColor(0, 0, 0);
+      doc.setFont('helvetica', 'normal');
+      y += 6.5;
     });
-    y += 8;
+    y += 6;
+  }
+
+  // CLÁUSULA AL PIE CON QR (Antes de firmas)
+  if (cur.type !== 'recibo_pago') {
+    if (y + 55 > pageH - 20) {
+      doc.addPage();
+      y = 20;
+    }
+
+    const clauseBoxY = y;
+    const clauseBoxH = 26;
+    const clauseBoxW = pageW - margin * 2;
+
+    doc.setFillColor(248, 250, 252);
+    doc.setDrawColor(203, 213, 225);
+    doc.setLineWidth(0.4);
+    doc.roundedRect(margin, clauseBoxY, clauseBoxW, clauseBoxH, 1.5, 1.5, 'FD');
+
+    // Acento azul en borde izquierdo
+    doc.setFillColor(26, 58, 107);
+    doc.rect(margin, clauseBoxY, 1.5, clauseBoxH, 'F');
+
+    // Columna izquierda: QR (aprox. 80x80px -> 21x21 mm)
+    const qrSize = 21;
+    const qrX = margin + 3.5;
+    const qrY = clauseBoxY + (clauseBoxH - qrSize) / 2;
+
+    doc.setFillColor(255, 255, 255);
+    doc.rect(qrX - 0.5, qrY - 0.5, qrSize + 1, qrSize + 1, 'F');
+
+    const qrImgEl = document.querySelector('.doc-clause-qr-img') || document.getElementById('invoice-qr-contrato-img');
+    let qrRendered = false;
+    if (qrImgEl && qrImgEl.complete && qrImgEl.naturalWidth > 0) {
+      try {
+        doc.addImage(qrImgEl, 'PNG', qrX, qrY, qrSize, qrSize);
+        qrRendered = true;
+      } catch (err) {
+        console.warn("Error dibujando qrImgEl en PDF:", err);
+      }
+    }
+    if (!qrRendered && typeof QR_CONTRATO_BASE64 !== 'undefined' && QR_CONTRATO_BASE64) {
+      try {
+        doc.addImage(QR_CONTRATO_BASE64, 'PNG', qrX, qrY, qrSize, qrSize);
+        qrRendered = true;
+      } catch (err) {
+        console.warn("Error dibujando QR_CONTRATO_BASE64 en PDF:", err);
+      }
+    }
+
+    // Columna derecha: Texto de la cláusula
+    const textX = qrX + qrSize + 5;
+    const textW = (margin + clauseBoxW) - textX - 4;
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(30, 41, 59);
+
+    const clauseText = "Al recibir esta nota de entrega / factura, usted acepta los términos y condiciones del contrato de financiamiento. En caso de fallar en el pago de alguna de las cuotas acordadas, se pondrá en ejercicio dicho contrato.";
+    const splitClause = doc.splitTextToSize(clauseText, textW);
+    doc.text(splitClause, textX, clauseBoxY + 7);
+
+    y = clauseBoxY + clauseBoxH + 4;
   }
 
   // FIRMAS
+  if (y + 30 > pageH - 15) {
+    doc.addPage();
+    y = 20;
+  }
   doc.setDrawColor(100, 100, 100);
   doc.setLineWidth(0.4);
   doc.line(margin, y + 12, margin + 70, y + 12);
