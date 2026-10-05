@@ -6704,15 +6704,15 @@ let currentInvoicesTypeFilter = "all";
 // Saneamiento de facturas duplicadas en localStorage (se ejecuta una sola vez al iniciar)
 let hasSanitizedInvoices = false;
 
-function sanitizeStoredInvoices() {
-  if (hasSanitizedInvoices) return;
+function sanitizeStoredInvoices(force = false) {
+  if (hasSanitizedInvoices && !force) return 0;
   hasSanitizedInvoices = true;
 
   try {
     const rawData = localStorage.getItem(INVOICES_STORAGE_KEY);
-    if (!rawData) return;
+    if (!rawData) return 0;
     const invoices = JSON.parse(rawData);
-    if (!Array.isArray(invoices) || invoices.length === 0) return;
+    if (!Array.isArray(invoices) || invoices.length === 0) return 0;
 
     // Helper para determinar antigüedad y preservar la factura más reciente
     const getInvoiceSortValue = (inv) => {
@@ -6774,10 +6774,12 @@ function sanitizeStoredInvoices() {
       const sanitized = [...preservedCreditInvoices, ...otherInvoices];
       sanitized.sort((a, b) => getInvoiceSortValue(b) - getInvoiceSortValue(a));
       localStorage.setItem(INVOICES_STORAGE_KEY, JSON.stringify(sanitized));
-      console.log(`[HogarFlex Saneamiento] ✅ Saneamiento exitoso al iniciar: se eliminaron ${removedCount} facturas duplicadas.`);
+      console.log(`[HogarFlex Saneamiento] ✅ Saneamiento exitoso: se eliminaron ${removedCount} facturas duplicadas.`);
     }
+    return removedCount;
   } catch (err) {
     console.error("Error al sanear facturas en localStorage:", err);
+    return 0;
   }
 }
 
@@ -6889,6 +6891,126 @@ function formatPhoneForWhatsApp(rawPhone) {
   return digits;
 }
 
+// Variable de estado para el objetivo de eliminación de factura(s)
+let invoiceDeletionTarget = null;
+
+// Abrir modal de confirmación en dos pasos para eliminar factura(s)
+function openDeleteInvoiceModal(target) {
+  invoiceDeletionTarget = target;
+  const modal = document.getElementById("modal-confirm-delete-invoice");
+  const step1 = document.getElementById("delete-invoice-step-1");
+  const step2 = document.getElementById("delete-invoice-step-2");
+  const step1Msg = document.getElementById("delete-invoice-step-1-message");
+  const title = document.getElementById("modal-delete-invoice-title");
+  const input = document.getElementById("input-confirm-delete-word");
+  const btnFinal = document.getElementById("btn-confirm-delete-final");
+
+  if (!modal || !step1 || !step2 || !step1Msg) return;
+
+  // Restaurar estado inicial de los pasos
+  step1.classList.remove("hidden");
+  step2.classList.add("hidden");
+  if (input) input.value = "";
+  if (btnFinal) btnFinal.disabled = true;
+
+  if (target.mode === "single") {
+    const invoices = getStoredInvoices();
+    const doc = invoices.find((d) => String(d.id) === String(target.docId));
+    if (!doc) return;
+
+    if (title) title.textContent = "Confirmar Eliminación";
+    const docNum = doc.docNumber || (doc.type === "factura_credito" ? "FAC-0000" : "REC-0000");
+    const clientName = (doc.client && doc.client.name) ? doc.client.name : "Cliente";
+
+    step1Msg.innerHTML = `¿Seguro que quieres eliminar la factura <strong>${escapeHtml(docNum)}</strong> de <strong>${escapeHtml(clientName)}</strong>? Esta acción no se puede deshacer.`;
+  } else if (target.mode === "all") {
+    if (title) title.textContent = "Confirmar Eliminación de Facturas";
+    const count = target.count || 0;
+    step1Msg.innerHTML = `¿Seguro que quieres eliminar todas las facturas (<strong>${count}</strong> facturas en total)? Esta acción no se puede deshacer.`;
+  }
+
+  modal.classList.remove("hidden");
+}
+
+// Cerrar modal de confirmación de eliminación
+function closeDeleteInvoiceModal() {
+  const modal = document.getElementById("modal-confirm-delete-invoice");
+  if (modal) modal.classList.add("hidden");
+  const input = document.getElementById("input-confirm-delete-word");
+  if (input) input.value = "";
+  invoiceDeletionTarget = null;
+}
+
+// Avanzar al paso 2 dentro del modal
+function proceedToDeleteStep2() {
+  const step1 = document.getElementById("delete-invoice-step-1");
+  const step2 = document.getElementById("delete-invoice-step-2");
+  const input = document.getElementById("input-confirm-delete-word");
+  const btnFinal = document.getElementById("btn-confirm-delete-final");
+
+  if (step1) step1.classList.add("hidden");
+  if (step2) step2.classList.remove("hidden");
+  if (input) {
+    input.value = "";
+    input.focus();
+  }
+  if (btnFinal) btnFinal.disabled = true;
+}
+
+// Validar que el usuario haya escrito "borrar" sin importar mayúsculas o minúsculas
+function handleConfirmWordInput(e) {
+  const btnFinal = document.getElementById("btn-confirm-delete-final");
+  if (!btnFinal) return;
+  const val = (e.target.value || "").trim().toLowerCase();
+  btnFinal.disabled = (val !== "borrar");
+}
+
+// Ejecutar la eliminación definitiva tras superar los dos pasos
+function executeFinalInvoiceDeletion() {
+  const input = document.getElementById("input-confirm-delete-word");
+  if (!input || input.value.trim().toLowerCase() !== "borrar") {
+    return;
+  }
+
+  if (!invoiceDeletionTarget) return;
+
+  if (invoiceDeletionTarget.mode === "single") {
+    const docId = invoiceDeletionTarget.docId;
+    const invoices = getStoredInvoices();
+    const targetDoc = invoices.find((d) => String(d.id) === String(docId));
+    const docNum = targetDoc ? (targetDoc.docNumber || "Factura") : "Factura";
+
+    // 1. Remover la factura de hogarflex_invoices en localStorage
+    const updated = invoices.filter((d) => String(d.id) !== String(docId));
+    saveInvoicesToStorage(updated);
+
+    // 2. Disparar triggerAutoCloudBackup("facturación") para sincronizar con Sheets
+    triggerAutoCloudBackup("facturación");
+
+    // 3. Actualizar la vista sin recargar la página
+    renderFacturacionSection();
+    closeDeleteInvoiceModal();
+
+    if (typeof showCloudSyncToast === "function") {
+      showCloudSyncToast(`Factura ${docNum} eliminada correctamente`, "success");
+    }
+  } else if (invoiceDeletionTarget.mode === "all") {
+    // 1. Remover todas las facturas de hogarflex_invoices en localStorage
+    saveInvoicesToStorage([]);
+
+    // 2. Disparar triggerAutoCloudBackup("facturación") para sincronizar con Sheets
+    triggerAutoCloudBackup("facturación");
+
+    // 3. Actualizar la vista sin recargar la página
+    renderFacturacionSection();
+    closeDeleteInvoiceModal();
+
+    if (typeof showCloudSyncToast === "function") {
+      showCloudSyncToast("Todas las facturas han sido eliminadas", "success");
+    }
+  }
+}
+
 // Inicializar módulo de Facturación
 function initFacturacionModule() {
   sanitizeStoredInvoices();
@@ -6897,6 +7019,64 @@ function initFacturacionModule() {
   if (btnRefresh) {
     btnRefresh.addEventListener("click", () => {
       renderFacturacionSection();
+    });
+  }
+
+  const btnCleanDuplicates = document.getElementById("btn-clean-duplicates-invoices");
+  if (btnCleanDuplicates) {
+    btnCleanDuplicates.addEventListener("click", () => {
+      const removed = sanitizeStoredInvoices(true);
+      renderFacturacionSection();
+      if (removed > 0) {
+        alert(`✅ Se eliminaron ${removed} facturas duplicadas. El historial ha sido saneado exitosamente.`);
+      } else {
+        alert("✨ No se encontraron facturas duplicadas. El historial ya está limpio.");
+      }
+    });
+  }
+
+  const btnDeleteAll = document.getElementById("btn-delete-all-invoices");
+  if (btnDeleteAll) {
+    btnDeleteAll.addEventListener("click", () => {
+      const invoices = getStoredInvoices();
+      if (!invoices || invoices.length === 0) {
+        alert("No hay facturas registradas para eliminar.");
+        return;
+      }
+      openDeleteInvoiceModal({ mode: "all", count: invoices.length });
+    });
+  }
+
+  // Eventos del modal de confirmación en dos pasos
+  const btnCloseDelModal = document.getElementById("btn-close-delete-invoice-modal");
+  const btnCancelStep1 = document.getElementById("btn-cancel-delete-step-1");
+  const btnContinueStep1 = document.getElementById("btn-continue-delete-step-1");
+  const btnCancelStep2 = document.getElementById("btn-cancel-delete-step-2");
+  const btnConfirmFinal = document.getElementById("btn-confirm-delete-final");
+  const inputDeleteWord = document.getElementById("input-confirm-delete-word");
+  const modalDelete = document.getElementById("modal-confirm-delete-invoice");
+
+  if (btnCloseDelModal) btnCloseDelModal.addEventListener("click", closeDeleteInvoiceModal);
+  if (btnCancelStep1) btnCancelStep1.addEventListener("click", closeDeleteInvoiceModal);
+  if (btnContinueStep1) btnContinueStep1.addEventListener("click", proceedToDeleteStep2);
+  if (btnCancelStep2) btnCancelStep2.addEventListener("click", closeDeleteInvoiceModal);
+  if (btnConfirmFinal) btnConfirmFinal.addEventListener("click", executeFinalInvoiceDeletion);
+
+  if (inputDeleteWord) {
+    inputDeleteWord.addEventListener("input", handleConfirmWordInput);
+    inputDeleteWord.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && inputDeleteWord.value.trim().toLowerCase() === "borrar") {
+        e.preventDefault();
+        executeFinalInvoiceDeletion();
+      }
+    });
+  }
+
+  if (modalDelete) {
+    modalDelete.addEventListener("click", (e) => {
+      if (e.target === modalDelete) {
+        closeDeleteInvoiceModal();
+      }
     });
   }
 
@@ -6958,6 +7138,14 @@ function initFacturacionModule() {
         const invoices = getStoredInvoices();
         const doc = invoices.find((d) => String(d.id) === String(docId));
         if (doc) shareDocViaWhatsApp(doc);
+        return;
+      }
+
+      const delBtn = e.target.closest(".btn-action-delete-inv");
+      if (delBtn) {
+        e.preventDefault();
+        const docId = delBtn.getAttribute("data-id");
+        openDeleteInvoiceModal({ mode: "single", docId });
         return;
       }
     });
@@ -8139,11 +8327,16 @@ function renderFacturacionSection() {
     tbody.innerHTML = "";
     table.classList.add("hidden");
     emptyMsg.classList.remove("hidden");
+    const btnDeleteAll = document.getElementById("btn-delete-all-invoices");
+    if (btnDeleteAll) btnDeleteAll.disabled = (invoices.length === 0);
     return;
   }
 
   emptyMsg.classList.add("hidden");
   table.classList.remove("hidden");
+
+  const btnDeleteAll = document.getElementById("btn-delete-all-invoices");
+  if (btnDeleteAll) btnDeleteAll.disabled = (invoices.length === 0);
 
   tbody.innerHTML = filtered.map((doc) => {
     const dateObj = new Date(doc.date || doc.createdAt || Date.now());
@@ -8184,6 +8377,7 @@ function renderFacturacionSection() {
           <div style="display: flex; gap: 6px; justify-content: flex-end; flex-wrap: wrap;">
             <button type="button" class="btn-action-view btn-action-view-inv" data-id="${doc.id}" title="Ver documento">👁️ Ver</button>
             <button type="button" class="btn-action-receipt btn-action-wa-inv" data-id="${doc.id}" style="background: #25d366;" title="Compartir por WhatsApp">📲 WhatsApp</button>
+            <button type="button" class="btn-action-delete-inv" data-id="${doc.id}" title="Eliminar factura">🗑️ Eliminar</button>
           </div>
         </td>
       </tr>
@@ -8200,6 +8394,9 @@ window.openInvoicePreviewModal = openInvoicePreviewModal;
 window.closeInvoicePreviewModal = closeInvoicePreviewModal;
 window.shareDocViaWhatsApp = shareDocViaWhatsApp;
 window.printInvoiceDoc = printInvoiceDoc;
+window.openDeleteInvoiceModal = openDeleteInvoiceModal;
+window.closeDeleteInvoiceModal = closeDeleteInvoiceModal;
+window.executeFinalInvoiceDeletion = executeFinalInvoiceDeletion;
 
 function testJsPDF() {
   if (!window.jspdf || !window.jspdf.jsPDF) {

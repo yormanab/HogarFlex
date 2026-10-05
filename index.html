@@ -2359,6 +2359,9 @@
             <p class="module-subtitle">Historial de facturas de créditos y recibos de pagos emitidos</p>
           </div>
           <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+            <button type="button" id="btn-clean-duplicates-invoices" class="btn-refresh-dashboard" style="border-color: #cbd5e1; color: #475569;" title="Depurar y limpiar facturas duplicadas">
+              <span>🧹 Limpiar Duplicados</span>
+            </button>
             <button type="button" id="btn-refresh-invoices" class="btn-refresh-dashboard" title="Actualizar historial">
               <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="width:16px;height:16px;">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
@@ -2448,6 +2451,21 @@
           <p style="color: var(--color-text-muted); max-width: 500px; margin: 0 auto 16px;">
             Los documentos generados desde la sección <strong>Créditos</strong> (botón "Generar factura") o desde la sección <strong>Pagos</strong> (botón "Generar recibo") quedarán guardados aquí automáticamente.
           </p>
+        </div>
+
+        <!-- Zona de eliminación masiva de facturas al final de la sección -->
+        <div id="invoices-danger-zone" style="margin-top: 32px; padding: 18px 20px; background: #fff5f5; border: 1px dashed #fca5a5; border-radius: 10px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px;">
+          <div>
+            <h4 style="margin: 0 0 4px 0; color: #991b1b; font-size: 0.95rem; font-weight: 700; display: flex; align-items: center; gap: 6px;">
+              <span>⚠️</span> Zona de peligro / Depuración
+            </h4>
+            <p style="margin: 0; color: #7f1d1d; font-size: 0.84rem;">
+              Eliminar todas las facturas y comprobantes emitidos. Esta acción requiere confirmación de seguridad y no se puede deshacer.
+            </p>
+          </div>
+          <button type="button" id="btn-delete-all-invoices" class="btn-danger-action" title="Eliminar todo el historial de facturas">
+            <span>🗑️</span> Eliminar todas las facturas
+          </button>
         </div>
       </section>
 
@@ -2624,6 +2642,53 @@
               </svg>
               <span>Descargar PDF</span>
             </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal de Confirmación de Eliminación en Dos Pasos (Facturas) -->
+      <div id="modal-confirm-delete-invoice" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="modal-delete-invoice-title">
+        <div class="modal-card" style="max-width: 480px; width: 92%;">
+          <div class="modal-header" style="border-bottom: 1px solid #fee2e2; background: #fff5f5;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 1.3rem;">⚠️</span>
+              <h3 id="modal-delete-invoice-title" class="modal-title" style="color: #991b1b; font-size: 1.1rem; font-weight: 700;">Confirmar Eliminación</h3>
+            </div>
+            <button type="button" id="btn-close-delete-invoice-modal" class="modal-close" aria-label="Cerrar modal">&times;</button>
+          </div>
+
+          <!-- PASO 1 -->
+          <div id="delete-invoice-step-1" class="modal-body" style="padding: 22px;">
+            <p id="delete-invoice-step-1-message" style="margin: 0 0 20px 0; font-size: 0.95rem; color: #1e293b; line-height: 1.55;">
+              <!-- Se llena dinámicamente -->
+            </p>
+            <div class="modal-footer-actions" style="margin-top: 10px; padding: 0; display: flex; justify-content: flex-end; gap: 10px;">
+              <button type="button" id="btn-cancel-delete-step-1" class="btn-modal-cancel">Cancelar</button>
+              <button type="button" id="btn-continue-delete-step-1" class="btn-modal-save btn-modal-danger">Continuar</button>
+            </div>
+          </div>
+
+          <!-- PASO 2 -->
+          <div id="delete-invoice-step-2" class="modal-body hidden" style="padding: 22px;">
+            <p style="margin: 0 0 14px 0; font-size: 0.95rem; color: #1e293b; line-height: 1.5;">
+              Por motivos de seguridad, escribe la palabra <strong>borrar</strong> para confirmar.
+            </p>
+            <div style="margin-bottom: 20px;">
+              <input 
+                type="text" 
+                id="input-confirm-delete-word" 
+                class="form-input" 
+                placeholder="Escribe 'borrar' aquí..." 
+                autocomplete="off" 
+                autocapitalize="off" 
+                spellcheck="false"
+                style="width: 100%; border: 1.5px solid #cbd5e1; font-weight: 600; font-size: 1rem; padding: 10px 12px; border-radius: 8px;"
+              >
+            </div>
+            <div class="modal-footer-actions" style="margin-top: 10px; padding: 0; display: flex; justify-content: flex-end; gap: 10px;">
+              <button type="button" id="btn-cancel-delete-step-2" class="btn-modal-cancel">Cancelar</button>
+              <button type="button" id="btn-confirm-delete-final" class="btn-modal-save btn-modal-danger" disabled>Eliminar definitivamente</button>
+            </div>
           </div>
         </div>
       </div>
