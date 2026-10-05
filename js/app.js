@@ -117,6 +117,7 @@ document.addEventListener("DOMContentLoaded", () => {
   initProveedoresModule();
   initFacturacionModule();
   initBackupModule();
+  auditCreditStatuses();
 });
 
 // Comprobar si ya existe sesión iniciada
@@ -201,6 +202,7 @@ function showApp() {
   appView.classList.remove("hidden");
   // Iniciar por defecto en el primer módulo (Dashboard)
   switchSection("dashboard");
+  auditCreditStatuses();
 }
 
 // Cambiar de sección activa
@@ -1438,6 +1440,7 @@ function initCreditsModule() {
     });
   }
 
+  setupOverdueActionModalEvents();
   renderCredits();
 }
 
@@ -1987,50 +1990,427 @@ function handleCreditFormSubmit(e) {
   renderCredits();
 }
 
-// Calcular estado del crédito según las cuotas pendientes
+// ============================================================
+// AUDITORÍA DE ESTADOS DE CRÉDITO Y NOTIFICACIONES NATIVAS
+// ============================================================
+
+let overdueActionQueue = [];
+let isOverdueModalOpen = false;
+let currentOverdueItem = null;
+
+// Envío de notificaciones nativas del navegador con Notification API y fallback
+function sendNativeNotification(title, body) {
+  if (!("Notification" in window)) {
+    alert(`${title}\n\n${body}`);
+    return;
+  }
+
+  if (Notification.permission === "granted") {
+    try {
+      new Notification(title, {
+        body: body,
+        icon: "icon-192.png"
+      });
+      return;
+    } catch (e) {
+      alert(`${title}\n\n${body}`);
+      return;
+    }
+  }
+
+  if (Notification.permission !== "denied") {
+    Notification.requestPermission().then((permission) => {
+      if (permission === "granted") {
+        try {
+          new Notification(title, {
+            body: body,
+            icon: "icon-192.png"
+          });
+        } catch (e) {
+          alert(`${title}\n\n${body}`);
+        }
+      } else {
+        alert(`${title}\n\n${body}`);
+      }
+    }).catch(() => {
+      alert(`${title}\n\n${body}`);
+    });
+    return;
+  }
+
+  // Si el permiso fue denegado explícitamente
+  alert(`${title}\n\n${body}`);
+}
+
+// PARTE 1 & PARTE 2: Auditoría automática de estados de crédito
+function auditCreditStatuses() {
+  const credits = getStoredCredits();
+  if (!credits || credits.length === 0) return;
+
+  const now = new Date();
+  const yyyy = now.getFullYear();
+  const mm = String(now.getMonth() + 1).padStart(2, "0");
+  const dd = String(now.getDate()).padStart(2, "0");
+  const todayStr = `${yyyy}-${mm}-${dd}`;
+
+  let hasChanges = false;
+  const newlyCortadoCredits = [];
+
+  credits.forEach((credit) => {
+    // Si ya está pagado por completo, no auditar
+    if (credit.status === "pagado" || (credit.remainingBalance !== undefined && credit.remainingBalance <= 0)) {
+      return;
+    }
+
+    const installments = Array.isArray(credit.installments) ? credit.installments : [];
+    // Busca la próxima cuota sin pagar (installments donde paid === false)
+    const nextUnpaid = installments.find(
+      (inst) => !inst.paid && inst.status !== "Pagada" && !inst.merged && inst.status !== "Fusionada"
+    );
+
+    if (!nextUnpaid) {
+      if (credit.status !== "pagado") {
+        credit.status = "pagado";
+        hasChanges = true;
+      }
+      return;
+    }
+
+    const dueStr = String(nextUnpaid.dueDate || "").substring(0, 10);
+    if (!dueStr) return;
+
+    // Regla de estados:
+    // Si hoy < dueDate → estado "Solvente"
+    // Si hoy === dueDate (mismo día calendario) → estado "Pendiente"
+    // Si hoy > dueDate → estado "Cortado"
+    let newStatus = "Solvente";
+    if (todayStr < dueStr) {
+      newStatus = "Solvente";
+    } else if (todayStr === dueStr) {
+      newStatus = "Pendiente";
+    } else {
+      newStatus = "Cortado";
+    }
+
+    const previousStatus = credit.status;
+
+    if (newStatus !== previousStatus) {
+      credit.status = newStatus;
+      hasChanges = true;
+
+      const clientName = credit.client ? (credit.client.name || "Cliente") : "Cliente";
+      const instAmount = nextUnpaid.amountUSD !== undefined
+        ? parseFloat(nextUnpaid.amountUSD)
+        : (parseFloat(nextUnpaid.amount) || 0);
+
+      // PARTE 2 — Notificaciones por Notification API (sin backend)
+      if (newStatus === "Pendiente") {
+        sendNativeNotification(
+          "📋 Pago pendiente hoy",
+          `Hoy le toca pagar a ${clientName} — $${instAmount.toFixed(2)} USD`
+        );
+      } else if (newStatus === "Cortado") {
+        sendNativeNotification(
+          "⚠️ Cuota vencida",
+          `La cuota de ${clientName} venció hoy. Abre HogarFlex para gestionar.`
+        );
+
+        // PARTE 3 — Encolar para modal de acciones cuando un crédito pasa a "Cortado"
+        newlyCortadoCredits.push({
+          credit,
+          installment: nextUnpaid,
+          clientName,
+          amount: instAmount
+        });
+      }
+    }
+  });
+
+  if (hasChanges) {
+    try {
+      localStorage.setItem(CREDITS_STORAGE_KEY, JSON.stringify(credits));
+    } catch (err) {
+      console.error("Error al persistir créditos tras auditoría:", err);
+    }
+    // Si el estado cambió respecto al anterior, llama a triggerAutoCloudBackup("creditos")
+    if (typeof triggerAutoCloudBackup === "function") {
+      triggerAutoCloudBackup("creditos");
+    }
+    // Actualizar visualización en tabla si ya está montada
+    if (typeof renderCredits === "function") {
+      renderCredits();
+    }
+  }
+
+  // PARTE 3: Si hay varios créditos cortados, el modal se muestra uno por uno en secuencia
+  if (newlyCortadoCredits.length > 0) {
+    initOverdueActionQueue(newlyCortadoCredits);
+  }
+}
+
+// Iniciar cola de modales de acciones para créditos cortados
+function initOverdueActionQueue(items) {
+  overdueActionQueue = [...overdueActionQueue, ...items];
+  if (!isOverdueModalOpen) {
+    showNextOverdueActionModal();
+  }
+}
+
+// Mostrar el siguiente modal en la secuencia
+function showNextOverdueActionModal() {
+  const modal = document.getElementById("modal-credit-overdue-action");
+  if (!modal) return;
+
+  if (overdueActionQueue.length === 0) {
+    modal.classList.add("hidden");
+    isOverdueModalOpen = false;
+    currentOverdueItem = null;
+    return;
+  }
+
+  isOverdueModalOpen = true;
+  currentOverdueItem = overdueActionQueue.shift();
+
+  const { credit, installment, clientName, amount } = currentOverdueItem;
+
+  // Título: "⚠️ Cuota vencida — [nombre del cliente]"
+  const titleEl = document.getElementById("modal-overdue-action-title");
+  if (titleEl) {
+    titleEl.textContent = `⚠️ Cuota vencida — ${clientName}`;
+  }
+
+  // Mensaje: "La cuota de $[monto] USD venció hoy. ¿Qué acción deseas tomar?"
+  const msgEl = document.getElementById("modal-overdue-action-msg");
+  if (msgEl) {
+    msgEl.textContent = `La cuota de $${amount.toFixed(2)} USD venció hoy. ¿Qué acción deseas tomar?`;
+  }
+
+  // Contador opcional si quedan más en cola
+  const badgeCounter = document.getElementById("modal-overdue-action-badge-counter");
+  if (badgeCounter) {
+    if (overdueActionQueue.length > 0) {
+      badgeCounter.textContent = `Pendientes en revisión: ${overdueActionQueue.length + 1}`;
+      badgeCounter.style.display = "inline-block";
+    } else {
+      badgeCounter.style.display = "none";
+    }
+  }
+
+  // Input de días por defecto (1-30 días)
+  const daysInput = document.getElementById("input-flexibility-days");
+  if (daysInput) {
+    daysInput.value = "5";
+  }
+
+  modal.classList.remove("hidden");
+}
+
+// Opción 1 — Dar días de flexibilidad: desplaza la dueDate N días hacia adelante y cambia a "Solvente"
+function applyFlexibilityAction() {
+  if (!currentOverdueItem) return;
+
+  const daysInput = document.getElementById("input-flexibility-days");
+  const days = parseInt(daysInput ? daysInput.value : 5, 10);
+  if (isNaN(days) || days < 1 || days > 30) {
+    alert("Por favor ingresa un número de días válido entre 1 y 30.");
+    return;
+  }
+
+  const { credit, installment } = currentOverdueItem;
+  const credits = getStoredCredits();
+  const targetCredit = credits.find((c) => String(c.id) === String(credit.id));
+
+  if (targetCredit && Array.isArray(targetCredit.installments)) {
+    const targetInst = targetCredit.installments.find(
+      (inst) => inst.number === installment.number || inst.dueDate === installment.dueDate
+    );
+
+    const targetDate = new Date();
+    targetDate.setDate(targetDate.getDate() + days);
+    const yyyy = targetDate.getFullYear();
+    const mm = String(targetDate.getMonth() + 1).padStart(2, "0");
+    const dd = String(targetDate.getDate()).padStart(2, "0");
+    const newDueDateStr = `${yyyy}-${mm}-${dd}`;
+
+    if (targetInst) {
+      targetInst.dueDate = newDueDateStr;
+    }
+    targetCredit.status = "Solvente";
+
+    saveCreditsToStorage(credits);
+    triggerAutoCloudBackup("creditos");
+    renderCredits();
+  }
+
+  showNextOverdueActionModal();
+}
+
+// Opción 2 — Unir con siguiente cuota: marca merged: true, suma a installments[i+1].amount y queda "Fusionada"
+function mergeWithNextInstallmentAction() {
+  if (!currentOverdueItem) return;
+
+  const { credit, installment } = currentOverdueItem;
+  const credits = getStoredCredits();
+  const targetCredit = credits.find((c) => String(c.id) === String(credit.id));
+
+  if (!targetCredit || !Array.isArray(targetCredit.installments)) {
+    showNextOverdueActionModal();
+    return;
+  }
+
+  const instIdx = targetCredit.installments.findIndex(
+    (inst) => inst.number === installment.number || (inst.dueDate === installment.dueDate && !inst.merged && inst.status !== "Pagada")
+  );
+
+  if (instIdx === -1) {
+    showNextOverdueActionModal();
+    return;
+  }
+
+  if (instIdx >= targetCredit.installments.length - 1) {
+    alert("Esta es la última cuota del crédito, no hay una cuota siguiente con la cual unirla. Puedes aplicar días de flexibilidad (Opción 1).");
+    return;
+  }
+
+  const currentInst = targetCredit.installments[instIdx];
+  const nextInst = targetCredit.installments[instIdx + 1];
+
+  const currentAmt = parseFloat(currentInst.amountUSD !== undefined ? currentInst.amountUSD : (currentInst.amount || 0)) || 0;
+  const nextAmt = parseFloat(nextInst.amountUSD !== undefined ? nextInst.amountUSD : (nextInst.amount || 0)) || 0;
+  const combinedAmt = Math.round((nextAmt + currentAmt) * 100) / 100;
+
+  currentInst.merged = true;
+  currentInst.status = "Fusionada";
+  currentInst.amountUSD = 0;
+  currentInst.amount = 0;
+
+  nextInst.amount = combinedAmt;
+  nextInst.amountUSD = combinedAmt;
+  if (nextInst.originalAmountUSD !== undefined) {
+    nextInst.originalAmountUSD = Math.round(((parseFloat(nextInst.originalAmountUSD) || nextAmt) + currentAmt) * 100) / 100;
+  }
+
+  // Recalcular estado del crédito tras fusionar cuota
+  const nextUnpaidAfter = targetCredit.installments.find(
+    (i) => !i.paid && i.status !== "Pagada" && !i.merged && i.status !== "Fusionada"
+  );
+
+  if (nextUnpaidAfter) {
+    const now = new Date();
+    const yyyy = now.getFullYear();
+    const mm = String(now.getMonth() + 1).padStart(2, "0");
+    const dd = String(now.getDate()).padStart(2, "0");
+    const todayStr = `${yyyy}-${mm}-${dd}`;
+    const dueStr = String(nextUnpaidAfter.dueDate || "").substring(0, 10);
+
+    if (todayStr < dueStr) {
+      targetCredit.status = "Solvente";
+    } else if (todayStr === dueStr) {
+      targetCredit.status = "Pendiente";
+    } else {
+      targetCredit.status = "Cortado";
+    }
+  } else {
+    targetCredit.status = "Solvente";
+  }
+
+  saveCreditsToStorage(credits);
+  triggerAutoCloudBackup("creditos");
+  renderCredits();
+
+  showNextOverdueActionModal();
+}
+
+// Opción 3 — Cerrar sin acción: deja el crédito en Cortado y pasa al siguiente en la secuencia
+function closeOverdueActionModal() {
+  showNextOverdueActionModal();
+}
+
+// Configurar eventos del modal de acciones de flexibilidad
+function setupOverdueActionModalEvents() {
+  const btnFlex = document.getElementById("btn-action-apply-flexibility");
+  if (btnFlex && !btnFlex.dataset.bound) {
+    btnFlex.dataset.bound = "true";
+    btnFlex.addEventListener("click", applyFlexibilityAction);
+  }
+
+  const btnMerge = document.getElementById("btn-action-merge-next");
+  if (btnMerge && !btnMerge.dataset.bound) {
+    btnMerge.dataset.bound = "true";
+    btnMerge.addEventListener("click", mergeWithNextInstallmentAction);
+  }
+
+  const btnClose = document.getElementById("btn-action-close-overdue");
+  if (btnClose && !btnClose.dataset.bound) {
+    btnClose.dataset.bound = "true";
+    btnClose.addEventListener("click", closeOverdueActionModal);
+  }
+
+  const btnCloseX = document.getElementById("btn-close-overdue-modal-x");
+  if (btnCloseX && !btnCloseX.dataset.bound) {
+    btnCloseX.dataset.bound = "true";
+    btnCloseX.addEventListener("click", closeOverdueActionModal);
+  }
+}
+
+// PARTE 4 — Visual en lista de créditos
+// "Solvente" → badge verde
+// "Pendiente" → badge amarillo/naranja
+// "Cortado" → badge rojo con animación de pulso suave
 function getCreditStatus(credit) {
   const installments = Array.isArray(credit.installments) ? credit.installments : [];
-  const unpaidInstallment = installments.find((inst) => inst.status !== "Pagada");
+  const unpaidInstallment = installments.find(
+    (inst) => !inst.paid && inst.status !== "Pagada" && !inst.merged && inst.status !== "Fusionada"
+  );
 
   if (!unpaidInstallment) {
     return {
-      statusText: "Al día",
-      statusClass: "status-ok",
+      statusText: "Pagado",
+      statusClass: "status-solvente status-ok",
       nextAmount: "$0.00",
       nextDueDate: "Completado"
     };
   }
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  let statusText = credit.status;
+  if (!statusText || !["Solvente", "Pendiente", "Cortado", "Pagado"].includes(statusText)) {
+    const now = new Date();
+    const yyyy = now.getFullYear();
+    const mm = String(now.getMonth() + 1).padStart(2, "0");
+    const dd = String(now.getDate()).padStart(2, "0");
+    const todayStr = `${yyyy}-${mm}-${dd}`;
+    const dueStr = String(unpaidInstallment.dueDate || "").substring(0, 10);
 
-  const dueDate = unpaidInstallment.dueDate ? new Date(unpaidInstallment.dueDate + "T00:00:00") : null;
-  const diffTime = dueDate ? (dueDate.getTime() - today.getTime()) : 0;
-  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-  let statusText = "Al día";
-  let statusClass = "status-ok";
-
-  if (diffDays < 0) {
-    statusText = "Vencido";
-    statusClass = "status-danger";
-  } else if (diffDays <= 3) {
-    statusText = "Vence en 3 días o menos";
-    statusClass = "status-warning";
-  } else {
-    statusText = "Al día";
-    statusClass = "status-ok";
+    if (!dueStr || todayStr < dueStr) {
+      statusText = "Solvente";
+    } else if (todayStr === dueStr) {
+      statusText = "Pendiente";
+    } else {
+      statusText = "Cortado";
+    }
   }
 
-  const nextAmountUSD = unpaidInstallment.amountUSD !== undefined
-    ? `$${parseFloat(unpaidInstallment.amountUSD).toFixed(2)} USD`
-    : "$0.00";
+  let statusClass = "status-solvente";
+  if (statusText === "Pendiente") {
+    statusClass = "status-pendiente";
+  } else if (statusText === "Cortado") {
+    statusClass = "status-cortado";
+  } else if (statusText === "Pagado") {
+    statusClass = "status-solvente status-ok";
+  }
+
+  const amt = unpaidInstallment.amountUSD !== undefined
+    ? parseFloat(unpaidInstallment.amountUSD)
+    : (parseFloat(unpaidInstallment.amount) || 0);
+
+  const nextAmountUSD = `$${amt.toFixed(2)} USD`;
+  const dueDateObj = unpaidInstallment.dueDate ? new Date(unpaidInstallment.dueDate + "T00:00:00") : null;
 
   return {
     statusText,
     statusClass,
     nextAmount: nextAmountUSD,
-    nextDueDate: dueDate ? formatDateDisplay(dueDate) : "-"
+    nextDueDate: dueDateObj ? formatDateDisplay(dueDateObj) : "-"
   };
 }
 
@@ -2238,7 +2618,10 @@ function openCreditDetailModal(creditId) {
       let instStatusBadge = '<span class="status-pill status-ok">Pagada</span>';
       let bcvNote = '<span style="color: #0284c7; font-size: 0.78rem;">Oficial del día al pagar</span>';
 
-      if (inst.status !== "Pagada") {
+      if (inst.merged || inst.status === "Fusionada") {
+        instStatusBadge = '<span class="status-pill" style="background:#f1f5f9; color:#475569; border:1px solid #cbd5e1;">Fusionada</span>';
+        bcvNote = '<span style="color: #64748b; font-size: 0.8rem;">Unida a sig. cuota</span>';
+      } else if (inst.status !== "Pagada") {
         const dueDate = new Date(inst.dueDate + "T00:00:00");
         const diffDays = Math.ceil((dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
 
@@ -2256,9 +2639,11 @@ function openCreditDetailModal(creditId) {
       }
 
       const formattedDueDate = formatDateDisplay(new Date(inst.dueDate + "T00:00:00"));
-      const amountDetailDisplay = (inst.status === "Parcialmente pagada" && inst.originalAmountUSD && inst.originalAmountUSD > inst.amountUSD)
-        ? `<strong>$${inst.amountUSD.toFixed(2)} USD</strong> <small style="color: var(--color-text-muted); display: block;">(Resta de $${inst.originalAmountUSD.toFixed(2)})</small>`
-        : `<strong>$${inst.amountUSD.toFixed(2)} USD</strong>`;
+      const amountDetailDisplay = (inst.merged || inst.status === "Fusionada")
+        ? `<strong style="color: #94a3b8; text-decoration: line-through;">$${(parseFloat(inst.amountUSD) || 0).toFixed(2)} USD</strong> <small style="color: var(--color-text-muted); display: block;">(Fusionada con sig. cuota)</small>`
+        : (inst.status === "Parcialmente pagada" && inst.originalAmountUSD && inst.originalAmountUSD > inst.amountUSD)
+          ? `<strong>$${inst.amountUSD.toFixed(2)} USD</strong> <small style="color: var(--color-text-muted); display: block;">(Resta de $${inst.originalAmountUSD.toFixed(2)})</small>`
+          : `<strong>$${(parseFloat(inst.amountUSD !== undefined ? inst.amountUSD : inst.amount) || 0).toFixed(2)} USD</strong>`;
 
       return `
         <tr>
@@ -9902,3 +10287,4 @@ window.exportProductImagesToGoogleDrive = exportProductImagesToGoogleDrive;
 window.getAppsScriptUrl = getAppsScriptUrl;
 window.setAppsScriptUrl = setAppsScriptUrl;
 window.updateBackendStatusUI = updateBackendStatusUI;
+window.auditCreditStatuses = auditCreditStatuses;

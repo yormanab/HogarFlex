@@ -989,7 +989,66 @@
           </div>
         </div>
 
-              </section>
+        <!-- Modal Acciones de Flexibilidad para Créditos Cortados (Auditoría) -->
+        <div id="modal-credit-overdue-action" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="modal-overdue-action-title">
+          <div class="modal-card" style="max-width: 520px; border-top: 5px solid #ef4444; border-radius: var(--radius-lg); box-shadow: var(--shadow-lg);">
+            <div class="modal-header" style="background: #fef2f2; border-bottom: 1px solid #fee2e2; padding: 16px 20px;">
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <span style="font-size: 1.4rem;">⚠️</span>
+                <h3 id="modal-overdue-action-title" class="modal-title" style="color: #991b1b; font-size: 1.1rem; font-weight: 700;">Cuota vencida — Cliente</h3>
+              </div>
+              <button type="button" id="btn-close-overdue-modal-x" class="modal-close" aria-label="Cerrar modal" style="color: #991b1b;">&times;</button>
+            </div>
+
+            <div class="modal-body" style="padding: 20px; display: flex; flex-direction: column; gap: 18px;">
+              <div id="modal-overdue-action-badge-counter" style="display: none; background: #fee2e2; color: #b91c1c; font-size: 0.78rem; font-weight: 700; padding: 4px 10px; border-radius: 20px; align-self: flex-start;">
+                Pendientes en revisión: 1
+              </div>
+
+              <p id="modal-overdue-action-msg" style="font-size: 1rem; color: #1e293b; margin: 0; line-height: 1.5; font-weight: 500;">
+                La cuota de $0.00 USD venció hoy. ¿Qué acción deseas tomar?
+              </p>
+
+              <!-- Opción 1: Dar días de flexibilidad -->
+              <div class="overdue-option-card" style="background: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 10px; padding: 14px 16px;">
+                <div style="font-weight: 700; font-size: 0.92rem; color: #1e293b; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
+                  <span>⏱️</span> Opción 1 — Dar días de flexibilidad
+                </div>
+                <p style="font-size: 0.82rem; color: #64748b; margin: 0 0 10px 0;">
+                  Desplaza la fecha de vencimiento de esta cuota y restaura el estado a <strong>Solvente</strong>.
+                </p>
+                <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                  <div style="display: flex; align-items: center; gap: 6px;">
+                    <input type="number" id="input-flexibility-days" class="form-input" min="1" max="30" value="5" style="width: 80px; text-align: center; font-weight: 700;" required>
+                    <span style="font-size: 0.85rem; color: #475569; font-weight: 600;">días</span>
+                  </div>
+                  <button type="button" id="btn-action-apply-flexibility" class="btn-primary-action" style="background: #16a34a; padding: 8px 16px; font-size: 0.85rem; flex: 1;">
+                    ✓ Confirmar flexibilidad
+                  </button>
+                </div>
+              </div>
+
+              <!-- Opción 2: Unir con siguiente cuota -->
+              <div class="overdue-option-card" style="background: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 10px; padding: 14px 16px;">
+                <div style="font-weight: 700; font-size: 0.92rem; color: #1e293b; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
+                  <span>🔗</span> Opción 2 — Unir con siguiente cuota
+                </div>
+                <p style="font-size: 0.82rem; color: #64748b; margin: 0 0 10px 0;">
+                  Fusiona el saldo de esta cuota con la siguiente. Esta cuota quedará como <strong>Fusionada</strong> en el historial.
+                </p>
+                <button type="button" id="btn-action-merge-next" class="btn-primary-action" style="background: #2563eb; width: 100%; justify-content: center; padding: 9px 16px; font-size: 0.85rem;">
+                  🔗 Unir con siguiente cuota
+                </button>
+              </div>
+            </div>
+
+            <div class="modal-footer-actions" style="padding: 14px 20px; background: #f8fafc; border-top: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
+              <span style="font-size: 0.8rem; color: #64748b;">Opción 3 — Dejar en mora</span>
+              <button type="button" id="btn-action-close-overdue" class="btn-modal-cancel" style="padding: 8px 20px;">Cerrar</button>
+            </div>
+          </div>
+        </div>
+      </section>
 
 
 
