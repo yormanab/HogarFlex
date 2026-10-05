@@ -793,6 +793,7 @@ function initClientsModule() {
     });
   }
 
+  setupDuplicateClientModalEvents();
   renderClients();
 }
 
@@ -859,6 +860,108 @@ function closeClientModal() {
   }
 }
 
+// ============================================================
+// MODAL DE ADVERTENCIA: CÉDULA/RIF DUPLICADA AL CREAR CLIENTE
+// ============================================================
+let pendingDuplicateClientCallback = null;
+
+function showDuplicateClientModal(existingClientName, onConfirm) {
+  const modal = document.getElementById("modal-duplicate-client-confirm");
+  const msgEl = document.getElementById("duplicate-client-message");
+  const inputEl = document.getElementById("input-duplicate-client-word");
+  const btnConfirm = document.getElementById("btn-confirm-duplicate-client");
+
+  if (!modal) {
+    if (confirm(`⚠️ Esta cédula/RIF ya existe. Pertenece al cliente: ${existingClientName}. ¿Deseas continuar de todas formas?`)) {
+      if (typeof onConfirm === "function") onConfirm();
+    }
+    return;
+  }
+
+  pendingDuplicateClientCallback = onConfirm;
+
+  if (msgEl) {
+    msgEl.textContent = `⚠️ Esta cédula/RIF ya existe. Pertenece al cliente: ${existingClientName}. ¿Deseas continuar de todas formas?`;
+  }
+
+  if (inputEl) {
+    inputEl.value = "";
+  }
+
+  if (btnConfirm) {
+    btnConfirm.disabled = true;
+  }
+
+  modal.classList.remove("hidden");
+  if (inputEl) {
+    inputEl.focus();
+  }
+}
+
+function closeDuplicateClientModal() {
+  const modal = document.getElementById("modal-duplicate-client-confirm");
+  const inputEl = document.getElementById("input-duplicate-client-word");
+  const btnConfirm = document.getElementById("btn-confirm-duplicate-client");
+
+  if (modal) modal.classList.add("hidden");
+  if (inputEl) inputEl.value = "";
+  if (btnConfirm) btnConfirm.disabled = true;
+  pendingDuplicateClientCallback = null;
+}
+
+function setupDuplicateClientModalEvents() {
+  const inputEl = document.getElementById("input-duplicate-client-word");
+  const btnConfirm = document.getElementById("btn-confirm-duplicate-client");
+  const btnCancel = document.getElementById("btn-cancel-duplicate-client");
+  const btnCloseX = document.getElementById("btn-close-duplicate-client-x");
+  const modal = document.getElementById("modal-duplicate-client-confirm");
+
+  if (inputEl && !inputEl.dataset.bound) {
+    inputEl.dataset.bound = "true";
+    inputEl.addEventListener("input", () => {
+      const isAccepted = inputEl.value.trim().toLowerCase() === "acepto";
+      if (btnConfirm) btnConfirm.disabled = !isAccepted;
+    });
+    inputEl.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        if (btnConfirm && !btnConfirm.disabled) {
+          btnConfirm.click();
+        }
+      }
+    });
+  }
+
+  if (btnConfirm && !btnConfirm.dataset.bound) {
+    btnConfirm.dataset.bound = "true";
+    btnConfirm.addEventListener("click", () => {
+      if (inputEl && inputEl.value.trim().toLowerCase() !== "acepto") return;
+      const callback = pendingDuplicateClientCallback;
+      closeDuplicateClientModal();
+      if (typeof callback === "function") {
+        callback();
+      }
+    });
+  }
+
+  if (btnCancel && !btnCancel.dataset.bound) {
+    btnCancel.dataset.bound = "true";
+    btnCancel.addEventListener("click", closeDuplicateClientModal);
+  }
+
+  if (btnCloseX && !btnCloseX.dataset.bound) {
+    btnCloseX.dataset.bound = "true";
+    btnCloseX.addEventListener("click", closeDuplicateClientModal);
+  }
+
+  if (modal && !modal.dataset.bound) {
+    modal.dataset.bound = "true";
+    modal.addEventListener("click", (e) => {
+      if (e.target === modal) closeDuplicateClientModal();
+    });
+  }
+}
+
 function handleClientFormSubmit(e) {
   e.preventDefault();
 
@@ -885,47 +988,49 @@ function handleClientFormSubmit(e) {
   const clients = getStoredClients();
   const isEditing = idInput.value !== "";
 
-  // Validar unicidad de la Cédula (no puede repetirse)
-  const isDniDuplicate = clients.some((c) => {
+  // PARTE 1: Validar si ya existe un cliente con la misma cédula o RIF
+  const existingClient = clients.find((c) => {
     if (isEditing && String(c.id) === String(idInput.value)) {
       return false;
     }
-    return c.dni.trim().toLowerCase() === dniVal.toLowerCase();
+    const cDni = String(c.dni || c.cedula || c.rif || "").trim().toLowerCase();
+    return cDni === dniVal.toLowerCase();
   });
 
-  if (isDniDuplicate) {
-    if (errorMsg) {
-      errorMsg.textContent = "Ya existe un cliente registrado con esta cédula.";
-      errorMsg.style.display = "block";
+  const saveClientAction = () => {
+    const currentClients = getStoredClients();
+    if (isEditing) {
+      const index = currentClients.findIndex((c) => String(c.id) === String(idInput.value));
+      if (index !== -1) {
+        currentClients[index].dni = dniVal;
+        currentClients[index].name = nameVal;
+        currentClients[index].phone = phoneVal;
+        currentClients[index].address = addressVal;
+        currentClients[index].updatedAt = Date.now();
+      }
+    } else {
+      const newClient = {
+        id: "client_" + Date.now(),
+        dni: dniVal,
+        name: nameVal,
+        phone: phoneVal,
+        address: addressVal,
+        createdAt: Date.now()
+      };
+      currentClients.push(newClient);
     }
-    dniInput.focus();
+
+    saveClientsToStorage(currentClients);
+    closeClientModal();
+    renderClients();
+  };
+
+  if (existingClient && !isEditing) {
+    showDuplicateClientModal(existingClient.name || "Cliente existente", saveClientAction);
     return;
   }
 
-  if (isEditing) {
-    const index = clients.findIndex((c) => String(c.id) === String(idInput.value));
-    if (index !== -1) {
-      clients[index].dni = dniVal;
-      clients[index].name = nameVal;
-      clients[index].phone = phoneVal;
-      clients[index].address = addressVal;
-      clients[index].updatedAt = Date.now();
-    }
-  } else {
-    const newClient = {
-      id: "client_" + Date.now(),
-      dni: dniVal,
-      name: nameVal,
-      phone: phoneVal,
-      address: addressVal,
-      createdAt: Date.now()
-    };
-    clients.push(newClient);
-  }
-
-  saveClientsToStorage(clients);
-  closeClientModal();
-  renderClients();
+  saveClientAction();
 }
 
 function openClientProfileModal(clientId) {
@@ -1441,6 +1546,7 @@ function initCreditsModule() {
   }
 
   setupOverdueActionModalEvents();
+  setupActiveCreditsModalEvents();
   renderCredits();
 }
 
@@ -1969,25 +2075,149 @@ function handleCreditFormSubmit(e) {
     });
   }
 
-  // Restar automáticamente la cantidad de cada producto usado si tiene cantidad definida
-  const storedProducts = getStoredProducts();
-  currentCreditItems.forEach((item) => {
-    const prod = storedProducts.find((p) => String(p.id) === String(item.productId));
-    if (prod && prod.quantity !== null && prod.quantity !== undefined && prod.quantity !== "") {
-      const currentStock = parseInt(prod.quantity, 10) || 0;
-      prod.quantity = currentStock - item.quantity;
-    }
+  const performSaveCredit = () => {
+    // Restar automáticamente la cantidad de cada producto usado si tiene cantidad definida
+    const storedProducts = getStoredProducts();
+    currentCreditItems.forEach((item) => {
+      const prod = storedProducts.find((p) => String(p.id) === String(item.productId));
+      if (prod && prod.quantity !== null && prod.quantity !== undefined && prod.quantity !== "") {
+        const currentStock = parseInt(prod.quantity, 10) || 0;
+        prod.quantity = currentStock - item.quantity;
+      }
+    });
+    saveProductsToStorage(storedProducts);
+    renderProducts();
+
+    // Guardar crédito en historial
+    const currentCredits = getStoredCredits();
+    currentCredits.unshift(newCredit);
+    saveCreditsToStorage(currentCredits);
+
+    closeCreditModal();
+    renderCredits();
+  };
+
+  // PARTE 2 — Alerta de múltiples créditos activos al crear crédito
+  const allCredits = getStoredCredits();
+  const activeCredits = allCredits.filter((c) => {
+    const isThisClient = String(c.clientId) === String(clientId) ||
+                         (c.client && String(c.client.id) === String(clientId)) ||
+                         (c.client && c.client.dni && clientObj.dni && String(c.client.dni).trim().toLowerCase() === String(clientObj.dni).trim().toLowerCase());
+    if (!isThisClient) return false;
+    const st = String(c.status || "").trim().toLowerCase();
+    return st !== "pagado" && st !== "cancelado";
   });
-  saveProductsToStorage(storedProducts);
-  renderProducts();
 
-  // Guardar crédito en historial
-  const credits = getStoredCredits();
-  credits.unshift(newCredit);
-  saveCreditsToStorage(credits);
+  const activeCount = activeCredits.length;
 
-  closeCreditModal();
-  renderCredits();
+  if (activeCount >= 1) {
+    showActiveCreditsWarningModal(activeCount, performSaveCredit);
+    return;
+  }
+
+  performSaveCredit();
+}
+
+// ============================================================
+// MODAL DE ADVERTENCIA: MÚLTIPLES CRÉDITOS ACTIVOS AL CREAR
+// ============================================================
+let pendingActiveCreditsCallback = null;
+
+function showActiveCreditsWarningModal(activeCount, onConfirm) {
+  const modal = document.getElementById("modal-active-credits-confirm");
+  const msgEl = document.getElementById("active-credits-message");
+  const inputEl = document.getElementById("input-active-credits-word");
+  const btnConfirm = document.getElementById("btn-confirm-active-credits");
+
+  if (!modal) {
+    if (confirm(`⚠️ Este cliente ya tiene ${activeCount} crédito(s) activo(s). ¿Deseas crear uno adicional?`)) {
+      if (typeof onConfirm === "function") onConfirm();
+    }
+    return;
+  }
+
+  pendingActiveCreditsCallback = onConfirm;
+
+  if (msgEl) {
+    msgEl.textContent = `⚠️ Este cliente ya tiene ${activeCount} crédito(s) activo(s). ¿Deseas crear uno adicional?`;
+  }
+
+  if (inputEl) {
+    inputEl.value = "";
+  }
+
+  if (btnConfirm) {
+    btnConfirm.disabled = true;
+  }
+
+  modal.classList.remove("hidden");
+  if (inputEl) {
+    inputEl.focus();
+  }
+}
+
+function closeActiveCreditsWarningModal() {
+  const modal = document.getElementById("modal-active-credits-confirm");
+  const inputEl = document.getElementById("input-active-credits-word");
+  const btnConfirm = document.getElementById("btn-confirm-active-credits");
+
+  if (modal) modal.classList.add("hidden");
+  if (inputEl) inputEl.value = "";
+  if (btnConfirm) btnConfirm.disabled = true;
+  pendingActiveCreditsCallback = null;
+}
+
+function setupActiveCreditsModalEvents() {
+  const inputEl = document.getElementById("input-active-credits-word");
+  const btnConfirm = document.getElementById("btn-confirm-active-credits");
+  const btnCancel = document.getElementById("btn-cancel-active-credits");
+  const btnCloseX = document.getElementById("btn-close-active-credits-x");
+  const modal = document.getElementById("modal-active-credits-confirm");
+
+  if (inputEl && !inputEl.dataset.bound) {
+    inputEl.dataset.bound = "true";
+    inputEl.addEventListener("input", () => {
+      const isAccepted = inputEl.value.trim().toLowerCase() === "acepto";
+      if (btnConfirm) btnConfirm.disabled = !isAccepted;
+    });
+    inputEl.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        if (btnConfirm && !btnConfirm.disabled) {
+          btnConfirm.click();
+        }
+      }
+    });
+  }
+
+  if (btnConfirm && !btnConfirm.dataset.bound) {
+    btnConfirm.dataset.bound = "true";
+    btnConfirm.addEventListener("click", () => {
+      if (inputEl && inputEl.value.trim().toLowerCase() !== "acepto") return;
+      const callback = pendingActiveCreditsCallback;
+      closeActiveCreditsWarningModal();
+      if (typeof callback === "function") {
+        callback();
+      }
+    });
+  }
+
+  if (btnCancel && !btnCancel.dataset.bound) {
+    btnCancel.dataset.bound = "true";
+    btnCancel.addEventListener("click", closeActiveCreditsWarningModal);
+  }
+
+  if (btnCloseX && !btnCloseX.dataset.bound) {
+    btnCloseX.dataset.bound = "true";
+    btnCloseX.addEventListener("click", closeActiveCreditsWarningModal);
+  }
+
+  if (modal && !modal.dataset.bound) {
+    modal.dataset.bound = "true";
+    modal.addEventListener("click", (e) => {
+      if (e.target === modal) closeActiveCreditsWarningModal();
+    });
+  }
 }
 
 // ============================================================

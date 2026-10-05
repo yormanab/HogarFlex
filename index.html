@@ -2759,6 +2759,80 @@
           </div>
         </div>
       </div>
+
+      <!-- Modal de Advertencia Cédula/RIF Duplicada al Crear Cliente -->
+      <div id="modal-duplicate-client-confirm" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="modal-duplicate-client-title">
+        <div class="modal-card" style="max-width: 480px; width: 92%;">
+          <div class="modal-header" style="border-bottom: 1px solid #fed7aa; background: #fff7ed;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 1.3rem;">⚠️</span>
+              <h3 id="modal-duplicate-client-title" class="modal-title" style="color: #9a3412; font-size: 1.1rem; font-weight: 700;">Cédula/RIF Duplicada</h3>
+            </div>
+            <button type="button" id="btn-close-duplicate-client-x" class="modal-close" aria-label="Cerrar modal">&times;</button>
+          </div>
+          <div class="modal-body" style="padding: 22px;">
+            <p id="duplicate-client-message" style="margin: 0 0 16px 0; font-size: 0.95rem; color: #1e293b; line-height: 1.55; font-weight: 500;">
+              ⚠️ Esta cédula/RIF ya existe. Pertenece al cliente: [nombre del cliente existente]. ¿Deseas continuar de todas formas?
+            </p>
+            <p style="margin: 0 0 10px 0; font-size: 0.85rem; color: #64748b;">
+              Para confirmar, escribe la palabra <strong>acepto</strong>:
+            </p>
+            <div style="margin-bottom: 20px;">
+              <input 
+                type="text" 
+                id="input-duplicate-client-word" 
+                class="form-input" 
+                placeholder="Escribe 'acepto' aquí..." 
+                autocomplete="off" 
+                autocapitalize="off" 
+                spellcheck="false"
+                style="width: 100%; border: 1.5px solid #cbd5e1; font-weight: 600; font-size: 1rem; padding: 10px 12px; border-radius: 8px;"
+              >
+            </div>
+            <div class="modal-footer-actions" style="margin-top: 10px; padding: 0; display: flex; justify-content: flex-end; gap: 10px;">
+              <button type="button" id="btn-cancel-duplicate-client" class="btn-modal-cancel">Cancelar</button>
+              <button type="button" id="btn-confirm-duplicate-client" class="btn-modal-save" style="background: #ea580c;" disabled>Confirmar</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal de Advertencia Múltiples Créditos Activos al Crear Crédito -->
+      <div id="modal-active-credits-confirm" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="modal-active-credits-title">
+        <div class="modal-card" style="max-width: 480px; width: 92%;">
+          <div class="modal-header" style="border-bottom: 1px solid #fed7aa; background: #fff7ed;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 1.3rem;">⚠️</span>
+              <h3 id="modal-active-credits-title" class="modal-title" style="color: #9a3412; font-size: 1.1rem; font-weight: 700;">Créditos Activos Existentes</h3>
+            </div>
+            <button type="button" id="btn-close-active-credits-x" class="modal-close" aria-label="Cerrar modal">&times;</button>
+          </div>
+          <div class="modal-body" style="padding: 22px;">
+            <p id="active-credits-message" style="margin: 0 0 16px 0; font-size: 0.95rem; color: #1e293b; line-height: 1.55; font-weight: 500;">
+              ⚠️ Este cliente ya tiene [N] crédito(s) activo(s). ¿Deseas crear uno adicional?
+            </p>
+            <p style="margin: 0 0 10px 0; font-size: 0.85rem; color: #64748b;">
+              Para confirmar, escribe la palabra <strong>acepto</strong>:
+            </p>
+            <div style="margin-bottom: 20px;">
+              <input 
+                type="text" 
+                id="input-active-credits-word" 
+                class="form-input" 
+                placeholder="Escribe 'acepto' aquí..." 
+                autocomplete="off" 
+                autocapitalize="off" 
+                spellcheck="false"
+                style="width: 100%; border: 1.5px solid #cbd5e1; font-weight: 600; font-size: 1rem; padding: 10px 12px; border-radius: 8px;"
+              >
+            </div>
+            <div class="modal-footer-actions" style="margin-top: 10px; padding: 0; display: flex; justify-content: flex-end; gap: 10px;">
+              <button type="button" id="btn-cancel-active-credits" class="btn-modal-cancel">Cancelar</button>
+              <button type="button" id="btn-confirm-active-credits" class="btn-modal-save" style="background: #ea580c;" disabled>Confirmar</button>
+            </div>
+          </div>
+        </div>
+      </div>
     </main>
   </div>
 
