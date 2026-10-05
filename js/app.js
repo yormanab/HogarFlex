@@ -866,6 +866,7 @@ function closeClientModal() {
 let pendingDuplicateClientCallback = null;
 
 function showDuplicateClientModal(existingClientName, onConfirm) {
+  setupDuplicateClientModalEvents();
   const modal = document.getElementById("modal-duplicate-client-confirm");
   const msgEl = document.getElementById("duplicate-client-message");
   const inputEl = document.getElementById("input-duplicate-client-word");
@@ -2099,10 +2100,14 @@ function handleCreditFormSubmit(e) {
 
   // PARTE 2 — Alerta de múltiples créditos activos al crear crédito
   const allCredits = getStoredCredits();
+  const targetDni = clientObj && clientObj.dni ? String(clientObj.dni).trim().toLowerCase() : "";
+  const targetName = clientObj && clientObj.name ? String(clientObj.name).trim().toLowerCase() : "";
   const activeCredits = allCredits.filter((c) => {
-    const isThisClient = String(c.clientId) === String(clientId) ||
-                         (c.client && String(c.client.id) === String(clientId)) ||
-                         (c.client && c.client.dni && clientObj.dni && String(c.client.dni).trim().toLowerCase() === String(clientObj.dni).trim().toLowerCase());
+    const isThisClient = (clientId && (String(c.clientId) === String(clientId) || (c.client && String(c.client.id) === String(clientId)))) ||
+                         (targetDni && c.client && c.client.dni && String(c.client.dni).trim().toLowerCase() === targetDni) ||
+                         (targetDni && c.clientCedula && String(c.clientCedula).trim().toLowerCase() === targetDni) ||
+                         (targetName && c.client && c.client.name && String(c.client.name).trim().toLowerCase() === targetName) ||
+                         (targetName && c.clientName && String(c.clientName).trim().toLowerCase() === targetName);
     if (!isThisClient) return false;
     const st = String(c.status || "").trim().toLowerCase();
     return st !== "pagado" && st !== "cancelado";
@@ -2124,6 +2129,7 @@ function handleCreditFormSubmit(e) {
 let pendingActiveCreditsCallback = null;
 
 function showActiveCreditsWarningModal(activeCount, onConfirm) {
+  setupActiveCreditsModalEvents();
   const modal = document.getElementById("modal-active-credits-confirm");
   const msgEl = document.getElementById("active-credits-message");
   const inputEl = document.getElementById("input-active-credits-word");
