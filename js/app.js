@@ -6316,7 +6316,7 @@ function generateBarChartSVG(items, options = {}) {
   `;
 }
 
-// Render principal de la sección Dashboard Financiero
+// Render principal de la sección Dashboard Financiero (4 tarjetas métricas + 2 gráficas de ingresos)
 function renderDashboardSection() {
   const credits = getStoredCredits();
   const sales = getStoredSales();
