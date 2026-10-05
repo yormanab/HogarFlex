@@ -27,7 +27,7 @@ var SHEET_NAMES = {
 // Encabezados por defecto para crear pestañas si están vacías
 var DEFAULT_HEADERS = {
   Clientes: ["Cédula", "Nombre", "Teléfono", "Dirección"],
-  Créditos: ["ID", "Cliente", "Producto(s)", "Total USD", "Cuota Inicial", "Saldo", "Estado", "Fecha Creación"],
+  Créditos: ["ID", "Cliente", "Producto(s)", "Total USD", "Cuota Inicial", "Saldo", "Estado", "Fecha Creación", "CantidadCuotas"],
   Pagos: ["ID Pago", "ID Crédito", "Cliente", "Tipo", "Monto USD", "Moneda", "Tasa BCV", "Monto Bs", "Fecha", "Referencia"],
   Ventas_Directas: ["ID", "Cliente", "Producto(s)", "Precio USD", "Método Pago", "Fecha"],
   Proveedores: ["ID", "Nombre", "Teléfono", "Dirección", "Categoría", "Notas"],
@@ -49,6 +49,98 @@ function getOrCreateSheet_(ss, name) {
     }
   }
   return sheet;
+}
+
+/**
+ * Escribir la hoja Créditos en Google Sheets garantizando la columna CantidadCuotas
+ */
+function writeCreditosSheet_(ss, rows) {
+  var sheet = getOrCreateSheet_(ss, SHEET_NAMES.CREDITOS);
+  sheet.clearContents();
+
+  if (!rows || rows.length === 0) {
+    var defHeader = DEFAULT_HEADERS.Créditos;
+    sheet.getRange(1, 1, 1, defHeader.length).setValues([defHeader]);
+    return;
+  }
+
+  // Asegurar que la primera fila (encabezado) incluya CantidadCuotas
+  if (Array.isArray(rows[0])) {
+    var header = rows[0];
+    var colIdx = -1;
+    for (var i = 0; i < header.length; i++) {
+      var h = String(header[i] || "").trim().toLowerCase();
+      if (h === "cantidadcuotas" || h === "cantidad cuotas" || h === "cuotas") {
+        colIdx = i;
+        break;
+      }
+    }
+    if (colIdx === -1) {
+      header.push("CantidadCuotas");
+    }
+  }
+
+  var maxCols = 0;
+  rows.forEach(function(r) {
+    if (Array.isArray(r) && r.length > maxCols) maxCols = r.length;
+  });
+
+  if (maxCols > 0 && rows.length > 0) {
+    var normalizedRows = rows.map(function(r) {
+      var rowArr = Array.isArray(r) ? r.slice() : [r];
+      while (rowArr.length < maxCols) {
+        rowArr.push("");
+      }
+      return rowArr.map(function(val) {
+        return (val === null || val === undefined) ? "" : val;
+      });
+    });
+
+    sheet.getRange(1, 1, normalizedRows.length, maxCols).setValues(normalizedRows);
+  }
+}
+
+/**
+ * Leer la hoja Créditos desde Google Sheets devolviendo los valores con CantidadCuotas
+ */
+function readCreditosSheet_(ss) {
+  var sheet = getOrCreateSheet_(ss, SHEET_NAMES.CREDITOS);
+  var values = sheet.getDataRange().getValues();
+  return values || [];
+}
+
+/**
+ * Convierte una fila de la hoja Créditos a un objeto crédito restaurando CantidadCuotas
+ */
+function parseCreditoRowToObject_(row, header) {
+  if (!row || row.length === 0) return null;
+  var colIdx = -1;
+  if (Array.isArray(header)) {
+    for (var i = 0; i < header.length; i++) {
+      var h = String(header[i] || "").trim().toLowerCase();
+      if (h === "cantidadcuotas" || h === "cantidad cuotas" || h === "cuotas") {
+        colIdx = i;
+        break;
+      }
+    }
+  }
+  if (colIdx === -1) colIdx = 8;
+  var cuotasVal = (colIdx < row.length && row[colIdx] !== "" && row[colIdx] !== null && row[colIdx] !== undefined)
+    ? parseInt(row[colIdx], 10)
+    : 1;
+
+  return {
+    id: String(row[0] || ""),
+    clientName: String(row[1] || ""),
+    productsSummary: String(row[2] || ""),
+    totalSaleUSD: parseFloat(row[3]) || 0,
+    downpaymentAmount: parseFloat(row[4]) || 0,
+    remainingBalance: parseFloat(row[5]) || 0,
+    status: String(row[6] || "Al día"),
+    createdAt: String(row[7] || ""),
+    installmentsCount: (!isNaN(cuotasVal) && cuotasVal > 0) ? cuotasVal : 1,
+    cantidadCuotas: (!isNaN(cuotasVal) && cuotasVal > 0) ? cuotasVal : 1
+  };
 }
 
 /**
@@ -86,9 +178,13 @@ function doGet(e) {
     ];
 
     targetSheets.forEach(function(sheetName) {
-      var sheet = getOrCreateSheet_(ss, sheetName);
-      var values = sheet.getDataRange().getValues();
-      resultData[sheetName] = values || [];
+      if (sheetName === SHEET_NAMES.CREDITOS) {
+        resultData[sheetName] = readCreditosSheet_(ss);
+      } else {
+        var sheet = getOrCreateSheet_(ss, sheetName);
+        var values = sheet.getDataRange().getValues();
+        resultData[sheetName] = values || [];
+      }
     });
 
     return jsonResponse_({
@@ -138,6 +234,11 @@ function doPost(e) {
 
         var rows = dataObj[sheetKey];
         if (!Array.isArray(rows) || rows.length === 0) continue;
+
+        if (sheetKey === SHEET_NAMES.CREDITOS) {
+          writeCreditosSheet_(ss, rows);
+          continue;
+        }
 
         var sheet = getOrCreateSheet_(ss, sheetKey);
         sheet.clearContents();
