@@ -1078,8 +1078,41 @@ body {
   text-transform: uppercase;
   color: var(--color-text-muted);
   letter-spacing: 0.5px;
+}
 
-  9 FASE 4: MÓDULO DE CRÉDITOS Y CUOTAS==========================================================*/ .credits-table-card {
+.profile-value {
+  font-size: 0.95rem;
+  color: var(--color-text);
+  font-weight: 500;
+  word-break: break-word;
+}
+
+.profile-section-divider {
+  border-top: 1px dashed var(--color-border);
+  padding-top: 14px;
+}
+
+.profile-section-title {
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: var(--color-primary);
+  margin-bottom: 10px;
+}
+
+.empty-history {
+  background: #fafbfc;
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 18px;
+  text-align: center;
+  color: var(--color-text-muted);
+  font-size: 0.88rem;
+}
+
+/* ==========================================================
+   FASE 4: MÓDULO DE CRÉDITOS Y CUOTAS
+   ========================================================== */
+.credits-table-card {
     background: var(--color-surface);
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-sm);
