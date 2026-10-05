@@ -192,50 +192,50 @@
         <div class="dashboard-kpi-grid">
           <!-- KPI 1: Total cobrado este mes -->
           <div class="kpi-card kpi-card-collected">
-            <div class="kpi-icon-wrap" style="background: rgba(245, 196, 0, 0.18); color: #b45309;">
-              💵
-            </div>
-            <div class="kpi-content">
+            <div class="kpi-card-header">
               <span class="kpi-label">Total cobrado este mes</span>
-              <h3 class="kpi-value" id="kpi-total-cobrado-mes">$0.00 USD</h3>
-              <small class="kpi-subtext" id="kpi-sub-cobrado">0 transacciones registradas</small>
+              <div class="kpi-icon-wrap" style="background: rgba(245, 196, 0, 0.18); color: #b45309;">
+                💵
+              </div>
             </div>
+            <h3 class="kpi-value" id="kpi-total-cobrado-mes">$0.00 USD</h3>
+            <small class="kpi-subtext" id="kpi-sub-cobrado">0 transacciones registradas</small>
           </div>
 
           <!-- KPI 2: Total pendiente por cobrar -->
           <div class="kpi-card kpi-card-pending">
-            <div class="kpi-icon-wrap" style="background: rgba(26, 58, 107, 0.12); color: #1a3a6b;">
-              ⏳
-            </div>
-            <div class="kpi-content">
+            <div class="kpi-card-header">
               <span class="kpi-label">Total pendiente por cobrar</span>
-              <h3 class="kpi-value" id="kpi-total-pendiente">$0.00 USD</h3>
-              <small class="kpi-subtext" id="kpi-sub-pendiente">En créditos activos</small>
+              <div class="kpi-icon-wrap" style="background: rgba(26, 58, 107, 0.12); color: #1a3a6b;">
+                ⏳
+              </div>
             </div>
+            <h3 class="kpi-value" id="kpi-total-pendiente">$0.00 USD</h3>
+            <small class="kpi-subtext" id="kpi-sub-pendiente">En créditos activos</small>
           </div>
 
           <!-- KPI 3: Clientes activos con crédito -->
           <div class="kpi-card kpi-card-clients">
-            <div class="kpi-icon-wrap" style="background: rgba(16, 185, 129, 0.15); color: #047857;">
-              👥
-            </div>
-            <div class="kpi-content">
+            <div class="kpi-card-header">
               <span class="kpi-label">Clientes activos con crédito</span>
-              <h3 class="kpi-value" id="kpi-clientes-activos">0</h3>
-              <small class="kpi-subtext" id="kpi-sub-clientes">Con saldo pendiente</small>
+              <div class="kpi-icon-wrap" style="background: rgba(16, 185, 129, 0.15); color: #047857;">
+                👥
+              </div>
             </div>
+            <h3 class="kpi-value" id="kpi-clientes-activos">0</h3>
+            <small class="kpi-subtext" id="kpi-sub-clientes">Con saldo pendiente</small>
           </div>
 
           <!-- KPI 4: Créditos vencidos -->
           <div class="kpi-card kpi-card-overdue">
-            <div class="kpi-icon-wrap" style="background: rgba(239, 68, 68, 0.15); color: #dc2626;">
-              ⚠️
-            </div>
-            <div class="kpi-content">
+            <div class="kpi-card-header">
               <span class="kpi-label">Créditos vencidos</span>
-              <h3 class="kpi-value" id="kpi-creditos-vencidos" style="color: #dc2626;">0</h3>
-              <small class="kpi-subtext" id="kpi-sub-vencidos" style="color: #b91c1c;">Con cuotas en mora</small>
+              <div class="kpi-icon-wrap" style="background: rgba(239, 68, 68, 0.15); color: #dc2626;">
+                ⚠️
+              </div>
             </div>
+            <h3 class="kpi-value" id="kpi-creditos-vencidos" style="color: #dc2626;">0</h3>
+            <small class="kpi-subtext" id="kpi-sub-vencidos" style="color: #b91c1c;">Con cuotas en mora</small>
           </div>
         </div>
 
@@ -743,8 +743,8 @@
 
               <!-- 4. Número de cuotas -->
               <div class="form-group">
-                <label for="credit-installments-count" class="form-label">4. Número de cuotas (1 a 12)</label>
-                <input type="number" id="credit-installments-count" class="form-input" min="1" max="12" step="1" value="3" required>
+                <label for="credit-installments-count" class="form-label">4. Número de cuotas (1 a 24)</label>
+                <input type="number" id="credit-installments-count" class="form-input" min="1" max="24" step="1" value="3" required>
                 <small class="field-hint">Cantidad total de cuotas</small>
               </div>
 

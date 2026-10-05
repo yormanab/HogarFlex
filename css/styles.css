@@ -2167,22 +2167,27 @@ body {
   /* ==========================================================
    FASE 8: DASHBOARD FINANCIERO
    ========================================================== */
-  .dashboard-kpi-grid {
+  .dashboard-kpi-grid,
+  #panel-dashboard .dashboard-kpi-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+    grid-template-columns: repeat(4, 1fr);
     gap: 16px;
-    margin-bottom: 8px;
+    margin-bottom: 24px;
+  }
+
+  #panel-facturacion .dashboard-kpi-grid {
+    grid-template-columns: repeat(3, 1fr);
   }
 
   .kpi-card {
-    background: var(--color-surface);
+    background: #ffffff;
     border: 1px solid var(--color-border);
     border-radius: var(--radius-md);
-    padding: 18px 20px;
+    padding: 16px 18px;
     display: flex;
-    align-items: center;
-    gap: 16px;
-    box-shadow: var(--shadow-sm);
+    flex-direction: column;
+    justify-content: space-between;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.07), 0 1px 2px rgba(0, 0, 0, 0.04);
     transition: transform 0.2s ease, box-shadow 0.2s ease;
     position: relative;
     overflow: hidden;
@@ -2190,7 +2195,7 @@ body {
 
   .kpi-card:hover {
     transform: translateY(-2px);
-    box-shadow: var(--shadow-md);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
   }
 
   .kpi-card::before {
@@ -2203,7 +2208,7 @@ body {
   }
 
   .kpi-card-collected::before {
-    background: var(--color-accent);
+    background: #f59e0b;
   }
 
   .kpi-card-pending::before {
@@ -2218,14 +2223,22 @@ body {
     background: #ef4444;
   }
 
+  .kpi-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+
   .kpi-icon-wrap {
-    width: 52px;
-    height: 52px;
-    border-radius: 12px;
+    width: 38px;
+    height: 38px;
+    border-radius: 8px;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 1.55rem;
+    font-size: 1.2rem;
     flex-shrink: 0;
   }
 
@@ -2241,25 +2254,28 @@ body {
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.5px;
-    margin-bottom: 2px;
+    line-height: 1.3;
   }
 
   .kpi-value {
-    font-size: 1.45rem;
+    font-size: 1.55rem;
     font-weight: 800;
     color: var(--color-primary);
     line-height: 1.2;
+    margin: 4px 0 6px 0;
   }
 
   .kpi-subtext {
     font-size: 0.78rem;
     color: var(--color-text-muted);
-    margin-top: 3px;
+    line-height: 1.3;
+    display: block;
   }
 
-  .dashboard-charts-grid {
+  .dashboard-charts-grid,
+  #panel-dashboard .dashboard-charts-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+    grid-template-columns: repeat(2, 1fr);
     gap: 20px;
   }
 
@@ -2361,23 +2377,59 @@ body {
     margin-right: 4px;
   }
 
-  @media (max-width: 640px) {
+  @media (max-width: 768px) {
+    #panel-dashboard .dashboard-kpi-grid,
     .dashboard-kpi-grid {
-      grid-template-columns: 1fr;
+      grid-template-columns: repeat(2, 1fr) !important;
       gap: 12px;
     }
 
-    .dashboard-charts-grid {
-      grid-template-columns: 1fr;
+    #panel-facturacion .dashboard-kpi-grid {
+      grid-template-columns: 1fr !important;
+    }
+
+    .dashboard-charts-grid,
+    #panel-dashboard .dashboard-charts-grid {
+      grid-template-columns: 1fr !important;
       gap: 16px;
     }
 
     .kpi-card {
-      padding: 14px 16px;
+      padding: 12px 14px;
     }
 
     .kpi-value {
-      font-size: 1.3rem;
+      font-size: 1.25rem;
+    }
+
+    .kpi-icon-wrap {
+      width: 32px;
+      height: 32px;
+      font-size: 1.05rem;
+    }
+  }
+
+  @media (max-width: 480px) {
+    #panel-dashboard .dashboard-kpi-grid,
+    .dashboard-kpi-grid {
+      grid-template-columns: repeat(2, 1fr) !important;
+      gap: 8px;
+    }
+
+    .kpi-card {
+      padding: 10px 12px;
+    }
+
+    .kpi-value {
+      font-size: 1.15rem;
+    }
+
+    .kpi-label {
+      font-size: 0.72rem;
+    }
+
+    .kpi-subtext {
+      font-size: 0.72rem;
     }
   }
 

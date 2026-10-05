@@ -1651,7 +1651,7 @@ function handleDownpaymentPercentInput() {
 function updateCreditCalculations(options = {}) {
   const hasShipping = document.getElementById("credit-has-shipping").checked;
   const shippingAmount = hasShipping ? (parseFloat(document.getElementById("credit-shipping-amount").value) || 0) : 0;
-  const installmentsCount = Math.min(12, Math.max(1, parseInt(document.getElementById("credit-installments-count").value, 10) || 1));
+  const installmentsCount = Math.min(24, Math.max(1, parseInt(document.getElementById("credit-installments-count").value, 10) || 1));
   
   // 1. Total productos y Total venta (en USD)
   const productsTotal = currentCreditItems.reduce((acc, item) => acc + item.subtotal, 0);
@@ -1807,7 +1807,7 @@ function handleCreditFormSubmit(e) {
 
   const hasShipping = document.getElementById("credit-has-shipping").checked;
   const shippingAmount = hasShipping ? (parseFloat(document.getElementById("credit-shipping-amount").value) || 0) : 0;
-  const installmentsCount = Math.min(12, Math.max(1, parseInt(document.getElementById("credit-installments-count").value, 10) || 1));
+  const installmentsCount = Math.min(24, Math.max(1, parseInt(document.getElementById("credit-installments-count").value, 10) || 1));
 
   const productsTotal = currentCreditItems.reduce((acc, item) => acc + item.subtotal, 0);
   const totalSaleUSD = productsTotal + shippingAmount;
