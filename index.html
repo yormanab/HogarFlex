@@ -2423,6 +2423,11 @@
               <option value="recibo_pago">Recibos de Pago</option>
             </select>
           </div>
+          <div id="invoices-bulk-actions-wrap" style="display: flex; gap: 10px; align-items: center;">
+            <button type="button" id="btn-delete-selected-invoices" class="btn-danger-action hidden" style="display: none; background: #dc2626; color: #ffffff; padding: 8px 16px; border-radius: 8px; font-weight: 600; font-size: 0.85rem; border: none; cursor: pointer; align-items: center; gap: 6px; box-shadow: 0 2px 4px rgba(220, 38, 38, 0.25);" title="Eliminar las facturas marcadas con casilla">
+              <span>🗑️ Eliminar seleccionadas (0)</span>
+            </button>
+          </div>
         </div>
 
         <!-- Tabla de Historial de Facturas y Recibos -->
@@ -2430,6 +2435,9 @@
           <table class="data-table" id="invoices-table">
             <thead>
               <tr>
+                <th style="width: 44px; text-align: center;">
+                  <input type="checkbox" id="check-all-invoices" title="Seleccionar todas las facturas" style="width: 17px; height: 17px; cursor: pointer;">
+                </th>
                 <th>Fecha</th>
                 <th>Nº Documento</th>
                 <th>Cliente</th>

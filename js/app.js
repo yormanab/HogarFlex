@@ -6894,6 +6894,32 @@ function formatPhoneForWhatsApp(rawPhone) {
 // Variable de estado para el objetivo de eliminación de factura(s)
 let invoiceDeletionTarget = null;
 
+// Actualizar visibilidad y contador del botón "Eliminar seleccionadas (N)"
+function updateSelectedInvoicesButton() {
+  const tbody = document.getElementById("invoices-tbody");
+  const btnDeleteSelected = document.getElementById("btn-delete-selected-invoices");
+  const checkAll = document.getElementById("check-all-invoices");
+  if (!tbody || !btnDeleteSelected) return;
+
+  const checkedBoxes = tbody.querySelectorAll(".invoice-row-checkbox:checked");
+  const allBoxes = tbody.querySelectorAll(".invoice-row-checkbox");
+  const count = checkedBoxes.length;
+
+  if (count > 0) {
+    btnDeleteSelected.classList.remove("hidden");
+    btnDeleteSelected.style.display = "inline-flex";
+    btnDeleteSelected.innerHTML = `<span>🗑️ Eliminar seleccionadas (${count})</span>`;
+  } else {
+    btnDeleteSelected.classList.add("hidden");
+    btnDeleteSelected.style.display = "none";
+  }
+
+  if (checkAll) {
+    checkAll.checked = (allBoxes.length > 0 && count === allBoxes.length);
+    checkAll.indeterminate = (count > 0 && count < allBoxes.length);
+  }
+}
+
 // Abrir modal de confirmación en dos pasos para eliminar factura(s)
 function openDeleteInvoiceModal(target) {
   invoiceDeletionTarget = target;
@@ -6923,6 +6949,10 @@ function openDeleteInvoiceModal(target) {
     const clientName = (doc.client && doc.client.name) ? doc.client.name : "Cliente";
 
     step1Msg.innerHTML = `¿Seguro que quieres eliminar la factura <strong>${escapeHtml(docNum)}</strong> de <strong>${escapeHtml(clientName)}</strong>? Esta acción no se puede deshacer.`;
+  } else if (target.mode === "selected") {
+    if (title) title.textContent = "Confirmar Eliminación de Facturas Seleccionadas";
+    const count = (target.docIds && target.docIds.length) || 0;
+    step1Msg.innerHTML = `¿Seguro que quieres eliminar las <strong>${count}</strong> facturas seleccionadas? Esta acción no se puede deshacer.`;
   } else if (target.mode === "all") {
     if (title) title.textContent = "Confirmar Eliminación de Facturas";
     const count = target.count || 0;
@@ -6994,6 +7024,25 @@ function executeFinalInvoiceDeletion() {
     if (typeof showCloudSyncToast === "function") {
       showCloudSyncToast(`Factura ${docNum} eliminada correctamente`, "success");
     }
+  } else if (invoiceDeletionTarget.mode === "selected") {
+    const targetIdsSet = new Set((invoiceDeletionTarget.docIds || []).map((id) => String(id)));
+    const invoices = getStoredInvoices();
+    const count = targetIdsSet.size;
+
+    // 1. Remover solo las facturas seleccionadas de hogarflex_invoices en localStorage
+    const updated = invoices.filter((d) => !targetIdsSet.has(String(d.id)));
+    saveInvoicesToStorage(updated);
+
+    // 2. Disparar triggerAutoCloudBackup("facturación") para sincronizar con Sheets
+    triggerAutoCloudBackup("facturación");
+
+    // 3. Actualizar la vista sin recargar la página
+    renderFacturacionSection();
+    closeDeleteInvoiceModal();
+
+    if (typeof showCloudSyncToast === "function") {
+      showCloudSyncToast(`Se eliminaron ${count} facturas seleccionadas correctamente`, "success");
+    }
   } else if (invoiceDeletionTarget.mode === "all") {
     // 1. Remover todas las facturas de hogarflex_invoices en localStorage
     saveInvoicesToStorage([]);
@@ -7032,6 +7081,33 @@ function initFacturacionModule() {
       } else {
         alert("✨ No se encontraron facturas duplicadas. El historial ya está limpio.");
       }
+    });
+  }
+
+  // Control de checkboxes para selección múltiple
+  const checkAll = document.getElementById("check-all-invoices");
+  if (checkAll) {
+    checkAll.addEventListener("change", () => {
+      const tbody = document.getElementById("invoices-tbody");
+      if (!tbody) return;
+      const checkboxes = tbody.querySelectorAll(".invoice-row-checkbox");
+      checkboxes.forEach((cb) => {
+        cb.checked = checkAll.checked;
+      });
+      updateSelectedInvoicesButton();
+    });
+  }
+
+  const btnDeleteSelected = document.getElementById("btn-delete-selected-invoices");
+  if (btnDeleteSelected) {
+    btnDeleteSelected.addEventListener("click", () => {
+      const tbody = document.getElementById("invoices-tbody");
+      if (!tbody) return;
+      const checkedBoxes = tbody.querySelectorAll(".invoice-row-checkbox:checked");
+      const selectedIds = Array.from(checkedBoxes).map((cb) => cb.getAttribute("data-id"));
+      if (selectedIds.length === 0) return;
+
+      openDeleteInvoiceModal({ mode: "selected", docIds: selectedIds });
     });
   }
 
@@ -7120,6 +7196,12 @@ function initFacturacionModule() {
   // Delegación de eventos para la tabla de facturación
   const tbody = document.getElementById("invoices-tbody");
   if (tbody) {
+    tbody.addEventListener("change", (e) => {
+      if (e.target.classList.contains("invoice-row-checkbox")) {
+        updateSelectedInvoicesButton();
+      }
+    });
+
     tbody.addEventListener("click", (e) => {
       const viewBtn = e.target.closest(".btn-action-view-inv");
       if (viewBtn) {
@@ -8329,6 +8411,7 @@ function renderFacturacionSection() {
     emptyMsg.classList.remove("hidden");
     const btnDeleteAll = document.getElementById("btn-delete-all-invoices");
     if (btnDeleteAll) btnDeleteAll.disabled = (invoices.length === 0);
+    updateSelectedInvoicesButton();
     return;
   }
 
@@ -8355,6 +8438,9 @@ function renderFacturacionSection() {
 
     return `
       <tr>
+        <td style="width: 44px; text-align: center;">
+          <input type="checkbox" class="invoice-row-checkbox" data-id="${doc.id}" style="width: 17px; height: 17px; cursor: pointer;">
+        </td>
         <td>
           <strong>${dateStr}</strong>
           ${timeStr ? `<small style="color: var(--color-text-muted); display: block;">${timeStr}</small>` : ''}
@@ -8377,12 +8463,14 @@ function renderFacturacionSection() {
           <div style="display: flex; gap: 6px; justify-content: flex-end; flex-wrap: wrap;">
             <button type="button" class="btn-action-view btn-action-view-inv" data-id="${doc.id}" title="Ver documento">👁️ Ver</button>
             <button type="button" class="btn-action-receipt btn-action-wa-inv" data-id="${doc.id}" style="background: #25d366;" title="Compartir por WhatsApp">📲 WhatsApp</button>
-            <button type="button" class="btn-action-delete-inv" data-id="${doc.id}" title="Eliminar factura">🗑️ Eliminar</button>
+            <button type="button" class="btn-action-delete-inv" data-id="${doc.id}" title="Eliminar factura" style="background: #fee2e2; color: #dc2626; border: 1px solid #fca5a5; padding: 5px 10px; border-radius: 6px; font-size: 0.8rem; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">🗑️ Eliminar</button>
           </div>
         </td>
       </tr>
     `;
   }).join("");
+
+  updateSelectedInvoicesButton();
 }
 
 // Exportar al objeto window
@@ -8397,6 +8485,7 @@ window.printInvoiceDoc = printInvoiceDoc;
 window.openDeleteInvoiceModal = openDeleteInvoiceModal;
 window.closeDeleteInvoiceModal = closeDeleteInvoiceModal;
 window.executeFinalInvoiceDeletion = executeFinalInvoiceDeletion;
+window.updateSelectedInvoicesButton = updateSelectedInvoicesButton;
 
 function testJsPDF() {
   if (!window.jspdf || !window.jspdf.jsPDF) {
