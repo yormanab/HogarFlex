@@ -1658,42 +1658,6 @@
           </div>
         </div>
 
-        <!-- Modal Confirmar Eliminación de Pago -->
-        <div id="modal-confirm-delete-payment" class="modal-backdrop hidden" style="z-index: 2500;" role="dialog" aria-modal="true" aria-labelledby="delete-payment-modal-title">
-          <div class="modal-card" style="max-width: 480px; width: 92%;">
-            <div class="modal-header" style="border-bottom: 1px solid #fee2e2; background: #fff5f5;">
-              <div style="display: flex; align-items: center; gap: 8px;">
-                <span style="font-size: 1.3rem;">⚠️</span>
-                <h3 id="delete-payment-modal-title" class="modal-title" style="color: #991b1b; font-size: 1.1rem; font-weight: 700;">Confirmar Eliminación de Pago</h3>
-              </div>
-              <button type="button" id="btn-close-delete-payment-modal" class="modal-close" aria-label="Cerrar modal">&times;</button>
-            </div>
-            <div class="modal-body" style="padding: 22px;">
-              <p id="delete-payment-modal-msg" style="margin: 0 0 16px 0; font-size: 0.95rem; color: #1e293b; line-height: 1.55;">
-                ¿Estás seguro de que deseas eliminar este registro de pago? Esta acción revertirá el monto en el saldo y cronograma de cuotas del crédito.
-              </p>
-              <p style="margin: 0 0 10px 0; font-size: 0.85rem; color: #64748b;">
-                Por motivos de seguridad, escribe la palabra <strong>borrar</strong> para confirmar:
-              </p>
-              <div style="margin-bottom: 20px;">
-                <input 
-                  type="text" 
-                  id="input-confirm-delete-payment-word" 
-                  class="form-input" 
-                  placeholder="Escribe 'borrar' aquí..." 
-                  autocomplete="off" 
-                  autocapitalize="off" 
-                  spellcheck="false"
-                  style="width: 100%; border: 1.5px solid #cbd5e1; font-weight: 600; font-size: 1rem; padding: 10px 12px; border-radius: 8px;"
-                >
-              </div>
-              <div class="modal-footer-actions" style="margin-top: 10px; padding: 0; display: flex; justify-content: flex-end; gap: 10px;">
-                <button type="button" id="btn-cancel-delete-payment" class="btn-modal-cancel">Cancelar</button>
-                <button type="button" id="btn-confirm-delete-payment" class="btn-modal-save btn-modal-danger" disabled>Eliminar Pago</button>
-              </div>
-            </div>
-          </div>
-        </div>
 
         <!-- Modal Visor de Comprobante (Lightbox) -->
         <div id="receipt-lightbox-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true">
@@ -3001,6 +2965,43 @@
             <div class="modal-footer-actions" style="margin-top: 10px; padding: 0; display: flex; justify-content: flex-end; gap: 10px;">
               <button type="button" id="btn-cancel-active-credits" class="btn-modal-cancel">Cancelar</button>
               <button type="button" id="btn-confirm-active-credits" class="btn-modal-save" style="background: #ea580c;" disabled>Confirmar</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal Confirmar Eliminación de Pago -->
+      <div id="modal-confirm-delete-payment" class="modal-backdrop hidden" style="z-index: 2500;" role="dialog" aria-modal="true" aria-labelledby="delete-payment-modal-title">
+        <div class="modal-card" style="max-width: 480px; width: 92%;">
+          <div class="modal-header" style="border-bottom: 1px solid #fee2e2; background: #fff5f5;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 1.3rem;">⚠️</span>
+              <h3 id="delete-payment-modal-title" class="modal-title" style="color: #991b1b; font-size: 1.1rem; font-weight: 700;">Confirmar Eliminación de Pago</h3>
+            </div>
+            <button type="button" id="btn-close-delete-payment-modal" class="modal-close" aria-label="Cerrar modal">&times;</button>
+          </div>
+          <div class="modal-body" style="padding: 22px;">
+            <p id="delete-payment-modal-msg" style="margin: 0 0 16px 0; font-size: 0.95rem; color: #1e293b; line-height: 1.55;">
+              ¿Estás seguro de que deseas eliminar este registro de pago? Esta acción revertirá el monto en el saldo y cronograma de cuotas del crédito.
+            </p>
+            <p style="margin: 0 0 10px 0; font-size: 0.85rem; color: #64748b;">
+              Por motivos de seguridad, escribe la palabra <strong>borrar</strong> para confirmar:
+            </p>
+            <div style="margin-bottom: 20px;">
+              <input 
+                type="text" 
+                id="input-confirm-delete-payment-word" 
+                class="form-input" 
+                placeholder="Escribe 'borrar' aquí..." 
+                autocomplete="off" 
+                autocapitalize="off" 
+                spellcheck="false"
+                style="width: 100%; border: 1.5px solid #cbd5e1; font-weight: 600; font-size: 1rem; padding: 10px 12px; border-radius: 8px;"
+              >
+            </div>
+            <div class="modal-footer-actions" style="margin-top: 10px; padding: 0; display: flex; justify-content: flex-end; gap: 10px;">
+              <button type="button" id="btn-cancel-delete-payment" class="btn-modal-cancel">Cancelar</button>
+              <button type="button" id="btn-confirm-delete-payment" class="btn-modal-save btn-modal-danger" disabled>Eliminar Pago</button>
             </div>
           </div>
         </div>
