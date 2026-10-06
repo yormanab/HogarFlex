@@ -729,13 +729,85 @@ function initClientsModule() {
     });
   }
 
-  // Cerrar modal eliminar
-  if (btnCloseClientDeleteModal) btnCloseClientDeleteModal.addEventListener("click", closeDeleteClientModal);
-  if (btnCancelClientDelete) btnCancelClientDelete.addEventListener("click", closeDeleteClientModal);
-  if (btnConfirmClientDelete) btnConfirmClientDelete.addEventListener("click", executeDeleteClient);
-  if (deleteClientModal) {
-    deleteClientModal.addEventListener("click", (e) => {
-      if (e.target === deleteClientModal) closeDeleteClientModal();
+  // Control de checkboxes para selección múltiple de clientes
+  const checkAllClients = document.getElementById("check-all-clients");
+  if (checkAllClients) {
+    checkAllClients.addEventListener("change", () => {
+      const tbody = document.getElementById("clients-tbody");
+      if (!tbody) return;
+      const checkboxes = tbody.querySelectorAll(".client-row-checkbox");
+      checkboxes.forEach((cb) => {
+        cb.checked = checkAllClients.checked;
+      });
+      updateSelectedClientsButton();
+    });
+  }
+
+  if (clientsTbody) {
+    clientsTbody.addEventListener("change", (e) => {
+      if (e.target.classList.contains("client-row-checkbox")) {
+        updateSelectedClientsButton();
+      }
+    });
+  }
+
+  const btnDeleteSelectedClients = document.getElementById("btn-delete-selected-clients");
+  if (btnDeleteSelectedClients) {
+    btnDeleteSelectedClients.addEventListener("click", () => {
+      const tbody = document.getElementById("clients-tbody");
+      if (!tbody) return;
+      const checkedBoxes = tbody.querySelectorAll(".client-row-checkbox:checked");
+      const selectedIds = Array.from(checkedBoxes).map((cb) => cb.getAttribute("data-id"));
+      if (selectedIds.length === 0) return;
+      openDeleteClientModal({ mode: "selected", clientIds: selectedIds });
+    });
+  }
+
+  // Eventos del modal de confirmación en dos pasos (Clientes)
+  const btnCloseDelClientModal = document.getElementById("btn-close-delete-client-modal");
+  const btnCancelClientStep1 = document.getElementById("btn-cancel-delete-client-step-1");
+  const btnContinueClientStep1 = document.getElementById("btn-continue-delete-client-step-1");
+  const btnCancelClientStep2 = document.getElementById("btn-cancel-delete-client-step-2");
+  const btnConfirmClientCascade = document.getElementById("btn-confirm-delete-client-cascade");
+  const inputDeleteClientWord = document.getElementById("input-confirm-delete-client-word");
+  const inputDeleteClientCascadeWord = document.getElementById("input-confirm-delete-client-cascade-word");
+  const modalDelClient = document.getElementById("modal-confirm-delete-client");
+
+  if (btnCloseDelClientModal) btnCloseDelClientModal.addEventListener("click", closeDeleteClientModal);
+  if (btnCancelClientStep1) btnCancelClientStep1.addEventListener("click", closeDeleteClientModal);
+  if (btnContinueClientStep1) btnContinueClientStep1.addEventListener("click", proceedDeleteClientStep1);
+  if (btnCancelClientStep2) btnCancelClientStep2.addEventListener("click", executeClientOnlyDeletion);
+  if (btnConfirmClientCascade) btnConfirmClientCascade.addEventListener("click", executeClientCascadeDeletion);
+
+  if (inputDeleteClientWord) {
+    inputDeleteClientWord.addEventListener("input", (e) => {
+      const isBorrar = e.target.value.trim().toLowerCase() === "borrar";
+      if (btnContinueClientStep1) btnContinueClientStep1.disabled = !isBorrar;
+    });
+    inputDeleteClientWord.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && btnContinueClientStep1 && !btnContinueClientStep1.disabled) {
+        e.preventDefault();
+        proceedDeleteClientStep1();
+      }
+    });
+  }
+
+  if (inputDeleteClientCascadeWord) {
+    inputDeleteClientCascadeWord.addEventListener("input", (e) => {
+      const isBorrar = e.target.value.trim().toLowerCase() === "borrar";
+      if (btnConfirmClientCascade) btnConfirmClientCascade.disabled = !isBorrar;
+    });
+    inputDeleteClientCascadeWord.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && btnConfirmClientCascade && !btnConfirmClientCascade.disabled) {
+        e.preventDefault();
+        executeClientCascadeDeletion();
+      }
+    });
+  }
+
+  if (modalDelClient) {
+    modalDelClient.addEventListener("click", (e) => {
+      if (e.target === modalDelClient) closeDeleteClientModal();
     });
   }
 
@@ -1124,36 +1196,156 @@ function closeClientProfileModal() {
   if (modal) modal.classList.add("hidden");
 }
 
-function openDeleteClientModal(clientId) {
-  clientPendingDeleteId = clientId;
-  const clients = getStoredClients();
-  const client = clients.find((c) => String(c.id) === String(clientId));
-  const deleteModal = document.getElementById("client-delete-modal");
-  const msgEl = document.getElementById("client-delete-modal-msg");
+let clientDeletionTarget = null;
 
-  if (client && msgEl) {
-    msgEl.textContent = `¿Estás seguro de que deseas eliminar al cliente "${client.name}" (${client.dni})?`;
-  } else if (msgEl) {
-    msgEl.textContent = "¿Estás seguro de que deseas eliminar este cliente?";
+function updateSelectedClientsButton() {
+  const tbody = document.getElementById("clients-tbody");
+  const btnDeleteSelected = document.getElementById("btn-delete-selected-clients");
+  const checkAll = document.getElementById("check-all-clients");
+  if (!tbody || !btnDeleteSelected) return;
+
+  const checkedBoxes = tbody.querySelectorAll(".client-row-checkbox:checked");
+  const allBoxes = tbody.querySelectorAll(".client-row-checkbox");
+  const count = checkedBoxes.length;
+
+  if (count > 0) {
+    btnDeleteSelected.classList.remove("hidden");
+    btnDeleteSelected.style.display = "inline-flex";
+    btnDeleteSelected.innerHTML = `<span>🗑️ Eliminar seleccionados (${count})</span>`;
+  } else {
+    btnDeleteSelected.classList.add("hidden");
+    btnDeleteSelected.style.display = "none";
   }
 
-  if (deleteModal) deleteModal.classList.remove("hidden");
+  if (checkAll) {
+    checkAll.checked = (allBoxes.length > 0 && count === allBoxes.length);
+    checkAll.indeterminate = (count > 0 && count < allBoxes.length);
+  }
+}
+
+function openDeleteClientModal(target) {
+  if (typeof target === "string") {
+    target = { mode: "single", clientId: target };
+  }
+  clientDeletionTarget = target;
+  const modal = document.getElementById("modal-confirm-delete-client");
+  const step1 = document.getElementById("delete-client-step-1");
+  const step2 = document.getElementById("delete-client-step-2");
+  const step1Msg = document.getElementById("delete-client-step-1-message");
+  const input1 = document.getElementById("input-confirm-delete-client-word");
+  const btnContinue = document.getElementById("btn-continue-delete-client-step-1");
+  const input2 = document.getElementById("input-confirm-delete-client-cascade-word");
+  const btnCascade = document.getElementById("btn-confirm-delete-client-cascade");
+
+  if (!modal || !step1 || !step2) return;
+
+  step1.classList.remove("hidden");
+  step2.classList.add("hidden");
+  if (input1) input1.value = "";
+  if (btnContinue) btnContinue.disabled = true;
+  if (input2) input2.value = "";
+  if (btnCascade) btnCascade.disabled = true;
+
+  if (target.mode === "single") {
+    const clients = getStoredClients();
+    const client = clients.find((c) => String(c.id) === String(target.clientId));
+    const clientName = client ? client.name : "este cliente";
+    const clientDni = client ? client.dni : "";
+    if (step1Msg) {
+      step1Msg.innerHTML = `¿Seguro que deseas eliminar al cliente <strong>${escapeHtml(clientName)}</strong>${clientDni ? ` (${escapeHtml(clientDni)})` : ""}? Esta acción no se puede deshacer.`;
+    }
+  } else if (target.mode === "selected") {
+    const count = (target.clientIds && target.clientIds.length) || 0;
+    if (step1Msg) {
+      step1Msg.innerHTML = `¿Seguro que deseas eliminar los <strong>${count}</strong> clientes seleccionados? Esta acción no se puede deshacer.`;
+    }
+  }
+
+  modal.classList.remove("hidden");
+  if (input1) input1.focus();
 }
 
 function closeDeleteClientModal() {
-  const deleteModal = document.getElementById("client-delete-modal");
-  if (deleteModal) deleteModal.classList.add("hidden");
-  clientPendingDeleteId = null;
+  const modal = document.getElementById("modal-confirm-delete-client");
+  if (modal) modal.classList.add("hidden");
+  const input1 = document.getElementById("input-confirm-delete-client-word");
+  const input2 = document.getElementById("input-confirm-delete-client-cascade-word");
+  if (input1) input1.value = "";
+  if (input2) input2.value = "";
+  clientDeletionTarget = null;
 }
 
-function executeDeleteClient() {
-  if (!clientPendingDeleteId) return;
+function proceedDeleteClientStep1() {
+  const input1 = document.getElementById("input-confirm-delete-client-word");
+  if (!input1 || input1.value.trim().toLowerCase() !== "borrar") return;
+  if (!clientDeletionTarget) return;
 
+  const targetIds = clientDeletionTarget.mode === "single" ? [String(clientDeletionTarget.clientId)] : clientDeletionTarget.clientIds.map(String);
+  const allCredits = getStoredCredits();
+  const hasCredits = allCredits.some((c) =>
+    targetIds.includes(String(c.clientId)) ||
+    (c.client && targetIds.includes(String(c.client.id)))
+  );
+
+  if (hasCredits) {
+    const step1 = document.getElementById("delete-client-step-1");
+    const step2 = document.getElementById("delete-client-step-2");
+    const input2 = document.getElementById("input-confirm-delete-client-cascade-word");
+    const btnCascade = document.getElementById("btn-confirm-delete-client-cascade");
+    if (step1) step1.classList.add("hidden");
+    if (step2) step2.classList.remove("hidden");
+    if (input2) {
+      input2.value = "";
+      input2.focus();
+    }
+    if (btnCascade) btnCascade.disabled = true;
+  } else {
+    executeClientOnlyDeletion();
+  }
+}
+
+function executeClientOnlyDeletion() {
+  if (!clientDeletionTarget) return;
+  const targetIds = clientDeletionTarget.mode === "single" ? [String(clientDeletionTarget.clientId)] : clientDeletionTarget.clientIds.map(String);
   const clients = getStoredClients();
-  const updatedClients = clients.filter((c) => String(c.id) !== String(clientPendingDeleteId));
+  const updatedClients = clients.filter((c) => !targetIds.includes(String(c.id)));
   saveClientsToStorage(updatedClients);
   closeDeleteClientModal();
   renderClients();
+}
+
+function executeClientCascadeDeletion() {
+  const input2 = document.getElementById("input-confirm-delete-client-cascade-word");
+  if (!input2 || input2.value.trim().toLowerCase() !== "borrar") return;
+  if (!clientDeletionTarget) return;
+
+  const targetIds = clientDeletionTarget.mode === "single" ? [String(clientDeletionTarget.clientId)] : clientDeletionTarget.clientIds.map(String);
+  const clients = getStoredClients();
+  const updatedClients = clients.filter((c) => !targetIds.includes(String(c.id)));
+  saveClientsToStorage(updatedClients);
+
+  // Eliminar todos los créditos y pagos asociados a estos clientes
+  const credits = getStoredCredits();
+  const remainingCredits = credits.filter((c) =>
+    !targetIds.includes(String(c.clientId)) &&
+    !(c.client && targetIds.includes(String(c.client.id)))
+  );
+  saveCreditsToStorage(remainingCredits);
+
+  // Limpiar facturas y comprobantes asociados
+  const invoices = getStoredInvoices();
+  const remainingInvoices = invoices.filter((inv) => {
+    const credId = String(inv.creditId || (inv.data && inv.data.creditId) || "");
+    const belongsToDeletedClient = targetIds.includes(String(inv.clientId || (inv.client && inv.client.id) || ""));
+    const creditWasDeleted = credId && !remainingCredits.some((c) => String(c.id) === credId);
+    return !belongsToDeletedClient && !creditWasDeleted;
+  });
+  saveInvoicesToStorage(remainingInvoices);
+
+  closeDeleteClientModal();
+  renderClients();
+  renderCredits();
+  renderPagosSection();
 }
 
 function renderClients() {
@@ -1180,6 +1372,7 @@ function renderClients() {
     noClientsMsg.classList.remove("hidden");
     noClientsMsg.querySelector("p").textContent = "No hay clientes registrados.";
     tbody.innerHTML = "";
+    updateSelectedClientsButton();
     return;
   }
 
@@ -1188,6 +1381,7 @@ function renderClients() {
     noClientsMsg.classList.remove("hidden");
     noClientsMsg.querySelector("p").textContent = "No se encontraron clientes coincidentes.";
     tbody.innerHTML = "";
+    updateSelectedClientsButton();
     return;
   }
 
@@ -1198,6 +1392,9 @@ function renderClients() {
     .map((client) => {
       return `
         <tr>
+          <td style="width: 44px; text-align: center;">
+            <input type="checkbox" class="client-row-checkbox" data-id="${client.id}" style="width: 17px; height: 17px; cursor: pointer;">
+          </td>
           <td>
             <span class="client-dni-badge">${escapeHtml(client.dni)}</span>
           </td>
@@ -1207,7 +1404,7 @@ function renderClients() {
           <td class="actions-cell">
             <button type="button" class="btn-action-view" data-id="${client.id}">Ver</button>
             <button type="button" class="btn-action-edit" data-id="${client.id}">Editar</button>
-            <button type="button" class="btn-action-delete" data-id="${client.id}">Eliminar</button>
+            <button type="button" class="btn-action-delete" data-id="${client.id}" title="Eliminar cliente">🗑️ Eliminar</button>
           </td>
         </tr>
       `;
@@ -1238,6 +1435,8 @@ function renderClients() {
       openDeleteClientModal(id);
     };
   });
+
+  updateSelectedClientsButton();
 }
 
 // ============================================================
@@ -1270,6 +1469,157 @@ function saveCreditsToStorage(credits) {
 
 let currentDetailCreditId = null;
 let currentPaymentCreditId = null;
+let creditDeletionTarget = null;
+
+function updateSelectedCreditsButton() {
+  const tbody = document.getElementById("credits-tbody");
+  const btnDeleteSelected = document.getElementById("btn-delete-selected-credits");
+  const checkAll = document.getElementById("check-all-credits");
+  if (!tbody || !btnDeleteSelected) return;
+
+  const checkedBoxes = tbody.querySelectorAll(".credit-row-checkbox:checked");
+  const allBoxes = tbody.querySelectorAll(".credit-row-checkbox");
+  const count = checkedBoxes.length;
+
+  if (count > 0) {
+    btnDeleteSelected.classList.remove("hidden");
+    btnDeleteSelected.style.display = "inline-flex";
+    btnDeleteSelected.innerHTML = `<span>🗑️ Eliminar seleccionados (${count})</span>`;
+  } else {
+    btnDeleteSelected.classList.add("hidden");
+    btnDeleteSelected.style.display = "none";
+  }
+
+  if (checkAll) {
+    checkAll.checked = (allBoxes.length > 0 && count === allBoxes.length);
+    checkAll.indeterminate = (count > 0 && count < allBoxes.length);
+  }
+}
+
+function openDeleteCreditModal(target) {
+  if (typeof target === "string") {
+    target = { mode: "single", creditId: target };
+  }
+  creditDeletionTarget = target;
+
+  const modal = document.getElementById("modal-confirm-delete-credit");
+  const step1 = document.getElementById("delete-credit-step-1");
+  const step2 = document.getElementById("delete-credit-step-2");
+  const step1Msg = document.getElementById("delete-credit-step-1-message");
+  const input1 = document.getElementById("input-confirm-delete-credit-word");
+  const btnContinue = document.getElementById("btn-continue-delete-credit-step-1");
+  const input2 = document.getElementById("input-confirm-delete-credit-cascade-word");
+  const btnCascade = document.getElementById("btn-confirm-delete-credit-cascade");
+
+  if (!modal || !step1 || !step2) return;
+
+  step1.classList.remove("hidden");
+  step2.classList.add("hidden");
+  if (input1) input1.value = "";
+  if (btnContinue) btnContinue.disabled = true;
+  if (input2) input2.value = "";
+  if (btnCascade) btnCascade.disabled = true;
+
+  if (target.mode === "single") {
+    const credits = getStoredCredits();
+    const credit = credits.find((c) => String(c.id) === String(target.creditId));
+    const clientName = credit && credit.client && credit.client.name ? credit.client.name : "este crédito";
+    const totalSale = credit ? `$${(parseFloat(credit.totalSaleUSD) || 0).toFixed(2)} USD` : "";
+    if (step1Msg) {
+      step1Msg.innerHTML = `¿Seguro que deseas eliminar el crédito de <strong>${escapeHtml(clientName)}</strong>${totalSale ? ` por <strong>${totalSale}</strong>` : ""}? Esta acción no se puede deshacer.`;
+    }
+  } else if (target.mode === "selected") {
+    const count = (target.creditIds && target.creditIds.length) || 0;
+    if (step1Msg) {
+      step1Msg.innerHTML = `¿Seguro que deseas eliminar los <strong>${count}</strong> créditos seleccionados? Esta acción no se puede deshacer.`;
+    }
+  }
+
+  modal.classList.remove("hidden");
+  if (input1) input1.focus();
+}
+
+function closeDeleteCreditModal() {
+  const modal = document.getElementById("modal-confirm-delete-credit");
+  if (modal) modal.classList.add("hidden");
+  const input1 = document.getElementById("input-confirm-delete-credit-word");
+  const input2 = document.getElementById("input-confirm-delete-credit-cascade-word");
+  if (input1) input1.value = "";
+  if (input2) input2.value = "";
+  creditDeletionTarget = null;
+}
+
+function proceedDeleteCreditStep1() {
+  const input1 = document.getElementById("input-confirm-delete-credit-word");
+  if (!input1 || input1.value.trim().toLowerCase() !== "borrar") return;
+  if (!creditDeletionTarget) return;
+
+  const targetIds = creditDeletionTarget.mode === "single"
+    ? [String(creditDeletionTarget.creditId)]
+    : creditDeletionTarget.creditIds.map(String);
+
+  const credits = getStoredCredits();
+  const targetCredits = credits.filter((c) => targetIds.includes(String(c.id)));
+  const hasPayments = targetCredits.some((c) => Array.isArray(c.payments) && c.payments.length > 0);
+
+  if (hasPayments) {
+    const step1 = document.getElementById("delete-credit-step-1");
+    const step2 = document.getElementById("delete-credit-step-2");
+    const input2 = document.getElementById("input-confirm-delete-credit-cascade-word");
+    const btnCascade = document.getElementById("btn-confirm-delete-credit-cascade");
+
+    if (step1) step1.classList.add("hidden");
+    if (step2) step2.classList.remove("hidden");
+    if (input2) {
+      input2.value = "";
+      input2.focus();
+    }
+    if (btnCascade) btnCascade.disabled = true;
+  } else {
+    executeCreditOnlyDeletion();
+  }
+}
+
+function executeCreditOnlyDeletion() {
+  if (!creditDeletionTarget) return;
+  const targetIds = creditDeletionTarget.mode === "single"
+    ? [String(creditDeletionTarget.creditId)]
+    : creditDeletionTarget.creditIds.map(String);
+
+  const credits = getStoredCredits();
+  const remainingCredits = credits.filter((c) => !targetIds.includes(String(c.id)));
+  saveCreditsToStorage(remainingCredits);
+
+  closeDeleteCreditModal();
+  renderCredits();
+  renderPagosSection();
+}
+
+function executeCreditCascadeDeletion() {
+  const input2 = document.getElementById("input-confirm-delete-credit-cascade-word");
+  if (!input2 || input2.value.trim().toLowerCase() !== "borrar") return;
+  if (!creditDeletionTarget) return;
+
+  const targetIds = creditDeletionTarget.mode === "single"
+    ? [String(creditDeletionTarget.creditId)]
+    : creditDeletionTarget.creditIds.map(String);
+
+  const credits = getStoredCredits();
+  const remainingCredits = credits.filter((c) => !targetIds.includes(String(c.id)));
+  saveCreditsToStorage(remainingCredits);
+
+  // Limpiar facturas asociadas
+  const invoices = getStoredInvoices();
+  const remainingInvoices = invoices.filter((inv) => {
+    const credId = String(inv.creditId || (inv.data && inv.data.creditId) || "");
+    return !targetIds.includes(credId);
+  });
+  saveInvoicesToStorage(remainingInvoices);
+
+  closeDeleteCreditModal();
+  renderCredits();
+  renderPagosSection();
+}
 
 function initCreditsModule() {
   const btnOpenCreateCredit = document.getElementById("btn-open-create-credit");
@@ -1542,7 +1892,97 @@ function initCreditsModule() {
         e.preventDefault();
         const id = viewBtn.getAttribute("data-id");
         openCreditDetailModal(id);
+        return;
       }
+      const deleteBtn = e.target.closest(".btn-action-delete-credit");
+      if (deleteBtn) {
+        e.preventDefault();
+        const id = deleteBtn.getAttribute("data-id");
+        if (id) openDeleteCreditModal(id);
+        return;
+      }
+    });
+  }
+
+  // Control de checkboxes para selección múltiple de créditos
+  const checkAllCredits = document.getElementById("check-all-credits");
+  if (checkAllCredits) {
+    checkAllCredits.addEventListener("change", () => {
+      const tbody = document.getElementById("credits-tbody");
+      if (!tbody) return;
+      const checkboxes = tbody.querySelectorAll(".credit-row-checkbox");
+      checkboxes.forEach((cb) => {
+        cb.checked = checkAllCredits.checked;
+      });
+      updateSelectedCreditsButton();
+    });
+  }
+
+  if (creditsTbody) {
+    creditsTbody.addEventListener("change", (e) => {
+      if (e.target.classList.contains("credit-row-checkbox")) {
+        updateSelectedCreditsButton();
+      }
+    });
+  }
+
+  const btnDeleteSelectedCredits = document.getElementById("btn-delete-selected-credits");
+  if (btnDeleteSelectedCredits) {
+    btnDeleteSelectedCredits.addEventListener("click", () => {
+      const tbody = document.getElementById("credits-tbody");
+      if (!tbody) return;
+      const checkedBoxes = tbody.querySelectorAll(".credit-row-checkbox:checked");
+      const selectedIds = Array.from(checkedBoxes).map((cb) => cb.getAttribute("data-id"));
+      if (selectedIds.length === 0) return;
+      openDeleteCreditModal({ mode: "selected", creditIds: selectedIds });
+    });
+  }
+
+  // Eventos del modal de confirmación en dos pasos (Créditos)
+  const btnCloseDelCreditModal = document.getElementById("btn-close-delete-credit-modal");
+  const btnCancelCreditStep1 = document.getElementById("btn-cancel-delete-credit-step-1");
+  const btnContinueCreditStep1 = document.getElementById("btn-continue-delete-credit-step-1");
+  const btnCancelCreditStep2 = document.getElementById("btn-cancel-delete-credit-step-2");
+  const btnConfirmCreditCascade = document.getElementById("btn-confirm-delete-credit-cascade");
+  const inputDeleteCreditWord = document.getElementById("input-confirm-delete-credit-word");
+  const inputDeleteCreditCascadeWord = document.getElementById("input-confirm-delete-credit-cascade-word");
+  const modalDelCredit = document.getElementById("modal-confirm-delete-credit");
+
+  if (btnCloseDelCreditModal) btnCloseDelCreditModal.addEventListener("click", closeDeleteCreditModal);
+  if (btnCancelCreditStep1) btnCancelCreditStep1.addEventListener("click", closeDeleteCreditModal);
+  if (btnContinueCreditStep1) btnContinueCreditStep1.addEventListener("click", proceedDeleteCreditStep1);
+  if (btnCancelCreditStep2) btnCancelCreditStep2.addEventListener("click", executeCreditOnlyDeletion);
+  if (btnConfirmCreditCascade) btnConfirmCreditCascade.addEventListener("click", executeCreditCascadeDeletion);
+
+  if (inputDeleteCreditWord) {
+    inputDeleteCreditWord.addEventListener("input", (e) => {
+      const isBorrar = e.target.value.trim().toLowerCase() === "borrar";
+      if (btnContinueCreditStep1) btnContinueCreditStep1.disabled = !isBorrar;
+    });
+    inputDeleteCreditWord.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && btnContinueCreditStep1 && !btnContinueCreditStep1.disabled) {
+        e.preventDefault();
+        proceedDeleteCreditStep1();
+      }
+    });
+  }
+
+  if (inputDeleteCreditCascadeWord) {
+    inputDeleteCreditCascadeWord.addEventListener("input", (e) => {
+      const isBorrar = e.target.value.trim().toLowerCase() === "borrar";
+      if (btnConfirmCreditCascade) btnConfirmCreditCascade.disabled = !isBorrar;
+    });
+    inputDeleteCreditCascadeWord.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && btnConfirmCreditCascade && !btnConfirmCreditCascade.disabled) {
+        e.preventDefault();
+        executeCreditCascadeDeletion();
+      }
+    });
+  }
+
+  if (modalDelCredit) {
+    modalDelCredit.addEventListener("click", (e) => {
+      if (e.target === modalDelCredit) closeDeleteCreditModal();
     });
   }
 
@@ -2665,6 +3105,7 @@ function renderCredits() {
     table.classList.add("hidden");
     noCreditsMsg.classList.remove("hidden");
     tbody.innerHTML = "";
+    updateSelectedCreditsButton();
     return;
   }
 
@@ -2713,6 +3154,9 @@ function renderCredits() {
 
       return `
         <tr>
+          <td style="width: 44px; text-align: center;">
+            <input type="checkbox" class="credit-row-checkbox" data-id="${credit.id}" style="width: 17px; height: 17px; cursor: pointer;">
+          </td>
           <td>
             <strong>${escapeHtml(clientName)}</strong><br>
             <span class="client-dni-badge" style="font-size: 0.76rem; padding: 2px 6px;">${escapeHtml(clientDni)}</span>
@@ -2744,13 +3188,14 @@ function renderCredits() {
               ? `<button type="button" class="btn-action-abonar" data-id="${credit.id}">💳 Abonar</button>`
               : `<button type="button" class="btn-action-abonar" disabled>Saldado</button>`}
             <button type="button" class="btn-action-view" data-id="${credit.id}">Ver detalle</button>
+            <button type="button" class="btn-action-delete-credit btn-action-delete" data-id="${credit.id}" title="Eliminar crédito">🗑️ Eliminar</button>
           </td>
         </tr>
       `;
     })
     .join("");
 
-  // Conectar botones Factura, Pagar Cuota, Abonar y Ver Detalle
+  // Conectar botones Factura, Pagar Cuota, Abonar, Ver Detalle y Eliminar
   tbody.querySelectorAll(".btn-action-invoice").forEach((btn) => {
     btn.onclick = (e) => {
       e.preventDefault();
@@ -2782,6 +3227,16 @@ function renderCredits() {
       if (id) openCreditDetailModal(id);
     };
   });
+
+  tbody.querySelectorAll(".btn-action-delete-credit").forEach((btn) => {
+    btn.onclick = (e) => {
+      e.preventDefault();
+      const id = btn.getAttribute("data-id");
+      if (id) openDeleteCreditModal(id);
+    };
+  });
+
+  updateSelectedCreditsButton();
 }
 
 // Abrir modal de detalle completo del crédito con monedas separadas
@@ -3636,10 +4091,60 @@ let currentPaymentHistoryCreditId = null;
 let currentEditPaymentCreditId = null;
 let currentEditPaymentId = null;
 let currentDeletePaymentCreditId = null;
-let currentDeletePaymentId = null;
+let currentDeletePaymentIds = [];
 let currentPayInstReceiptBase64 = null;
 let currentPaymentReceiptBase64 = null;
 let currentEditPayReceiptBase64 = null;
+
+function updateSelectedPagosButton() {
+  const tbody = document.getElementById("pagos-tbody");
+  const btnDeleteSelected = document.getElementById("btn-delete-selected-pagos");
+  const checkAll = document.getElementById("check-all-pagos");
+  if (!tbody || !btnDeleteSelected) return;
+
+  const checkedBoxes = tbody.querySelectorAll(".pagos-row-checkbox:checked");
+  const allBoxes = tbody.querySelectorAll(".pagos-row-checkbox");
+  const count = checkedBoxes.length;
+
+  if (count > 0) {
+    btnDeleteSelected.classList.remove("hidden");
+    btnDeleteSelected.style.display = "inline-flex";
+    btnDeleteSelected.innerHTML = `<span>🗑️ Eliminar seleccionados (${count})</span>`;
+  } else {
+    btnDeleteSelected.classList.add("hidden");
+    btnDeleteSelected.style.display = "none";
+  }
+
+  if (checkAll) {
+    checkAll.checked = (allBoxes.length > 0 && count === allBoxes.length);
+    checkAll.indeterminate = (count > 0 && count < allBoxes.length);
+  }
+}
+
+function updateSelectedHistoryPaymentsButton() {
+  const tbody = document.getElementById("payments-history-tbody");
+  const btnDeleteSelected = document.getElementById("btn-delete-selected-history-payments");
+  const checkAll = document.getElementById("check-all-history-payments");
+  if (!tbody || !btnDeleteSelected) return;
+
+  const checkedBoxes = tbody.querySelectorAll(".payment-row-checkbox:checked");
+  const allBoxes = tbody.querySelectorAll(".payment-row-checkbox");
+  const count = checkedBoxes.length;
+
+  if (count > 0) {
+    btnDeleteSelected.classList.remove("hidden");
+    btnDeleteSelected.style.display = "inline-flex";
+    btnDeleteSelected.innerHTML = `<span>🗑️ Eliminar seleccionados (${count})</span>`;
+  } else {
+    btnDeleteSelected.classList.add("hidden");
+    btnDeleteSelected.style.display = "none";
+  }
+
+  if (checkAll) {
+    checkAll.checked = (allBoxes.length > 0 && count === allBoxes.length);
+    checkAll.indeterminate = (count > 0 && count < allBoxes.length);
+  }
+}
 
 // Inicialización del Módulo de Pagos
 function initPagosModule() {
@@ -3651,6 +4156,76 @@ function initPagosModule() {
     searchInput.addEventListener("input", (e) => {
       currentPagosSearchQuery = e.target.value.trim().toLowerCase();
       renderPagosSection();
+    });
+  }
+
+  // Control de checkboxes para selección múltiple en tabla de pagos
+  const checkAllPagos = document.getElementById("check-all-pagos");
+  if (checkAllPagos) {
+    checkAllPagos.addEventListener("change", () => {
+      const tbody = document.getElementById("pagos-tbody");
+      if (!tbody) return;
+      const checkboxes = tbody.querySelectorAll(".pagos-row-checkbox");
+      checkboxes.forEach((cb) => {
+        cb.checked = checkAllPagos.checked;
+      });
+      updateSelectedPagosButton();
+    });
+  }
+
+  if (pagosTbody) {
+    pagosTbody.addEventListener("change", (e) => {
+      if (e.target.classList.contains("pagos-row-checkbox")) {
+        updateSelectedPagosButton();
+      }
+    });
+  }
+
+  const btnDeleteSelectedPagos = document.getElementById("btn-delete-selected-pagos");
+  if (btnDeleteSelectedPagos) {
+    btnDeleteSelectedPagos.addEventListener("click", () => {
+      const tbody = document.getElementById("pagos-tbody");
+      if (!tbody) return;
+      const checkedBoxes = tbody.querySelectorAll(".pagos-row-checkbox:checked");
+      const selectedIds = Array.from(checkedBoxes).map((cb) => cb.getAttribute("data-id"));
+      if (selectedIds.length === 0) return;
+      openDeleteCreditModal({ mode: "selected", creditIds: selectedIds });
+    });
+  }
+
+  // Control de checkboxes para selección múltiple en historial de pagos
+  const checkAllHistoryPayments = document.getElementById("check-all-history-payments");
+  if (checkAllHistoryPayments) {
+    checkAllHistoryPayments.addEventListener("change", () => {
+      const tbody = document.getElementById("payments-history-tbody");
+      if (!tbody) return;
+      const checkboxes = tbody.querySelectorAll(".payment-row-checkbox");
+      checkboxes.forEach((cb) => {
+        cb.checked = checkAllHistoryPayments.checked;
+      });
+      updateSelectedHistoryPaymentsButton();
+    });
+  }
+
+  const historyTbody = document.getElementById("payments-history-tbody");
+  if (historyTbody) {
+    historyTbody.addEventListener("change", (e) => {
+      if (e.target.classList.contains("payment-row-checkbox")) {
+        updateSelectedHistoryPaymentsButton();
+      }
+    });
+  }
+
+  const btnDeleteSelectedHistoryPayments = document.getElementById("btn-delete-selected-history-payments");
+  if (btnDeleteSelectedHistoryPayments) {
+    btnDeleteSelectedHistoryPayments.addEventListener("click", () => {
+      if (!currentPaymentHistoryCreditId) return;
+      const tbody = document.getElementById("payments-history-tbody");
+      if (!tbody) return;
+      const checkedBoxes = tbody.querySelectorAll(".payment-row-checkbox:checked");
+      const selectedIds = Array.from(checkedBoxes).map((cb) => cb.getAttribute("data-payment-id"));
+      if (selectedIds.length === 0) return;
+      openDeletePaymentModal(currentPaymentHistoryCreditId, selectedIds);
     });
   }
 
@@ -3894,9 +4469,31 @@ function initPagosModule() {
   const btnCloseDeletePay = document.getElementById("btn-close-delete-payment-modal");
   const btnCancelDeletePay = document.getElementById("btn-cancel-delete-payment");
   const btnConfirmDeletePay = document.getElementById("btn-confirm-delete-payment");
+  const inputConfirmDeletePaymentWord = document.getElementById("input-confirm-delete-payment-word");
+  const modalDelPayment = document.getElementById("modal-confirm-delete-payment");
+
   if (btnCloseDeletePay) btnCloseDeletePay.addEventListener("click", closeDeletePaymentModal);
   if (btnCancelDeletePay) btnCancelDeletePay.addEventListener("click", closeDeletePaymentModal);
   if (btnConfirmDeletePay) btnConfirmDeletePay.addEventListener("click", executeDeletePayment);
+
+  if (inputConfirmDeletePaymentWord) {
+    inputConfirmDeletePaymentWord.addEventListener("input", (e) => {
+      const isBorrar = e.target.value.trim().toLowerCase() === "borrar";
+      if (btnConfirmDeletePay) btnConfirmDeletePay.disabled = !isBorrar;
+    });
+    inputConfirmDeletePaymentWord.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && btnConfirmDeletePay && !btnConfirmDeletePay.disabled) {
+        e.preventDefault();
+        executeDeletePayment();
+      }
+    });
+  }
+
+  if (modalDelPayment) {
+    modalDelPayment.addEventListener("click", (e) => {
+      if (e.target === modalDelPayment) closeDeletePaymentModal();
+    });
+  }
 
   // Modal Lightbox Visor de Comprobante
   const btnCloseLightbox = document.getElementById("btn-close-receipt-lightbox");
@@ -3946,6 +4543,7 @@ function renderPagosSection() {
   if (filteredCredits.length === 0) {
     tbody.innerHTML = "";
     emptyMsg.classList.remove("hidden");
+    updateSelectedPagosButton();
     return;
   }
 
@@ -3973,6 +4571,9 @@ function renderPagosSection() {
 
     return `
       <tr>
+        <td style="width: 44px; text-align: center;">
+          <input type="checkbox" class="pagos-row-checkbox" data-id="${c.id}" style="width: 17px; height: 17px; cursor: pointer;">
+        </td>
         <td>
           <div style="font-weight: 700; color: var(--color-primary);">${clientName}</div>
           <small style="color: var(--color-text-muted);">C.I: ${clientDni}</small>
@@ -4001,11 +4602,14 @@ function renderPagosSection() {
             <button type="button" class="btn-action-pay-installment btn-pagos-pay-inst" data-id="${c.id}" onclick="openPayInstallmentModal('${c.id}')" title="Pagar la cuota correspondiente">✓ Pagar cuota</button>
             <button type="button" class="btn-action-abonar btn-pagos-abonar" data-id="${c.id}" onclick="openCreditPaymentModal('${c.id}')" title="Abonar monto libre y redistribuir">💳 Abonar</button>
             <button type="button" class="btn-action-history btn-pagos-history" data-id="${c.id}" onclick="openCreditPaymentsHistoryModal('${c.id}')" title="Ver historial de pagos">📜 Historial</button>
+            <button type="button" class="btn-action-delete-credit-pagos btn-action-delete" data-id="${c.id}" onclick="openDeleteCreditModal('${c.id}')" title="Eliminar crédito">🗑️</button>
           </div>
         </td>
       </tr>
     `;
   }).join("");
+
+  updateSelectedPagosButton();
 }
 
 // Renderizar filas de la tabla de historial de pagos (usado por modal de detalle y modal de historial)
@@ -4040,6 +4644,9 @@ function renderPaymentHistoryRows(credit, payments) {
 
     return `
       <tr>
+        <td style="width: 44px; text-align: center;">
+          <input type="checkbox" class="payment-row-checkbox" data-credit-id="${credit.id}" data-payment-id="${p.id}" style="width: 17px; height: 17px; cursor: pointer;">
+        </td>
         <td>${dateStr} <small style="color: var(--color-text-muted); display: block;">${timeStr}</small></td>
         <td>${typeBadge}</td>
         <td><strong>$${parseFloat(p.amountUSD).toFixed(2)} USD</strong></td>
@@ -4093,6 +4700,8 @@ function openCreditPaymentsHistoryModal(creditId) {
       tbody.innerHTML = renderPaymentHistoryRows(credit, payments);
     }
   }
+
+  updateSelectedHistoryPaymentsButton();
 
   if (modal) modal.classList.remove("hidden");
 }
@@ -4382,36 +4991,64 @@ function handleEditPaymentSubmit(e) {
 }
 
 // Abrir modal de confirmación para eliminar pago
-function openDeletePaymentModal(creditId, paymentId) {
+function openDeletePaymentModal(creditId, paymentIdOrIds) {
   currentDeletePaymentCreditId = creditId;
-  currentDeletePaymentId = paymentId;
+  currentDeletePaymentIds = Array.isArray(paymentIdOrIds) ? paymentIdOrIds : [paymentIdOrIds];
+
   const modal = document.getElementById("modal-confirm-delete-payment");
+  const input = document.getElementById("input-confirm-delete-payment-word");
+  const btnConfirm = document.getElementById("btn-confirm-delete-payment");
+  const msg = document.getElementById("delete-payment-modal-msg");
+
+  if (input) input.value = "";
+  if (btnConfirm) btnConfirm.disabled = true;
+
+  if (msg) {
+    if (currentDeletePaymentIds.length > 1) {
+      msg.textContent = `¿Estás seguro de que deseas eliminar los ${currentDeletePaymentIds.length} registros de pago seleccionados? Esta acción revertirá los montos en el saldo y cronograma de cuotas del crédito.`;
+    } else {
+      msg.textContent = "¿Estás seguro de que deseas eliminar este registro de pago? Esta acción revertirá el monto en el saldo y cronograma de cuotas del crédito.";
+    }
+  }
+
   if (modal) modal.classList.remove("hidden");
+  if (input) input.focus();
 }
 
 function closeDeletePaymentModal() {
   const modal = document.getElementById("modal-confirm-delete-payment");
   if (modal) modal.classList.add("hidden");
+  const input = document.getElementById("input-confirm-delete-payment-word");
+  if (input) input.value = "";
   currentDeletePaymentCreditId = null;
-  currentDeletePaymentId = null;
+  currentDeletePaymentIds = [];
 }
 
 // Ejecutar eliminación del pago
 function executeDeletePayment() {
-  if (!currentDeletePaymentCreditId || !currentDeletePaymentId) return;
+  const input = document.getElementById("input-confirm-delete-payment-word");
+  if (!input || input.value.trim().toLowerCase() !== "borrar") return;
+  if (!currentDeletePaymentCreditId || !currentDeletePaymentIds || currentDeletePaymentIds.length === 0) return;
 
   const credits = getStoredCredits();
   const credit = credits.find((c) => String(c.id) === String(currentDeletePaymentCreditId));
   if (!credit) return;
 
-  // Eliminar el pago
-  credit.payments = (credit.payments || []).filter((p) => String(p.id) !== String(currentDeletePaymentId));
+  const targetIds = currentDeletePaymentIds.map(String);
+
+  // Eliminar el/los pagos
+  credit.payments = (credit.payments || []).filter((p) => !targetIds.includes(String(p.id)));
 
   // Recalcular integralmente las finanzas y cuotas del crédito
   recalculateCreditFinances(credit);
 
   // Guardar en localStorage
   saveCreditsToStorage(credits);
+
+  // triggerAutoCloudBackup("creditos") explícito al terminar
+  if (typeof triggerAutoCloudBackup === "function") {
+    triggerAutoCloudBackup("creditos");
+  }
 
   closeDeletePaymentModal();
   renderCredits();
@@ -4433,7 +5070,9 @@ function executeDeletePayment() {
     openClientProfileModal(credit.clientId);
   }
 
-  alert("¡Pago eliminado correctamente! Se recalculó el saldo y cronograma de cuotas.");
+  if (typeof showCloudSyncToast === "function") {
+    showCloudSyncToast("Pago eliminado y saldo recalculado correctamente", "success");
+  }
 }
 
 // Visor Lightbox para comprobantes
@@ -7261,6 +7900,23 @@ function renderDashboardSection() {
 // ============================================================
 // EXPORTACIÓN AL ÁMBITO GLOBAL (WINDOW) PARA DISPARADORES ONCLICK
 // ============================================================
+// Clientes Deletion
+window.openDeleteClientModal = openDeleteClientModal;
+window.closeDeleteClientModal = closeDeleteClientModal;
+window.proceedDeleteClientStep1 = proceedDeleteClientStep1;
+window.executeClientOnlyDeletion = executeClientOnlyDeletion;
+window.executeClientCascadeDeletion = executeClientCascadeDeletion;
+window.updateSelectedClientsButton = updateSelectedClientsButton;
+
+// Créditos Deletion
+window.openDeleteCreditModal = openDeleteCreditModal;
+window.closeDeleteCreditModal = closeDeleteCreditModal;
+window.proceedDeleteCreditStep1 = proceedDeleteCreditStep1;
+window.executeCreditOnlyDeletion = executeCreditOnlyDeletion;
+window.executeCreditCascadeDeletion = executeCreditCascadeDeletion;
+window.updateSelectedCreditsButton = updateSelectedCreditsButton;
+
+// Pagos
 window.openPayInstallmentModal = openPayInstallmentModal;
 window.closePayInstallmentModal = closePayInstallmentModal;
 window.openCreditPaymentModal = openCreditPaymentModal;
@@ -7272,6 +7928,8 @@ window.closeEditPaymentModal = closeEditPaymentModal;
 window.openDeletePaymentModal = openDeletePaymentModal;
 window.closeDeletePaymentModal = closeDeletePaymentModal;
 window.executeDeletePayment = executeDeletePayment;
+window.updateSelectedPagosButton = updateSelectedPagosButton;
+window.updateSelectedHistoryPaymentsButton = updateSelectedHistoryPaymentsButton;
 window.openReceiptLightbox = openReceiptLightbox;
 window.closeReceiptLightbox = closeReceiptLightbox;
 window.renderPagosSection = renderPagosSection;

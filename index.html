@@ -319,9 +319,9 @@
           </button>
         </div>
 
-        <!-- Barra de Búsqueda -->
-        <div class="search-bar-container">
-          <div class="search-input-wrapper">
+        <!-- Barra de Búsqueda y Acciones Múltiples -->
+        <div class="search-bar-container" style="display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap;">
+          <div class="search-input-wrapper" style="flex: 1; max-width: 500px;">
             <svg class="search-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
             </svg>
@@ -334,6 +334,11 @@
             >
             <button type="button" id="btn-clear-search-client" class="btn-clear-search hidden" title="Limpiar búsqueda">&times;</button>
           </div>
+          <div id="clients-bulk-actions-wrap" style="display: flex; gap: 10px; align-items: center;">
+            <button type="button" id="btn-delete-selected-clients" class="btn-danger-action hidden" style="display: none; background: #dc2626; color: #ffffff; padding: 8px 16px; border-radius: 8px; font-weight: 600; font-size: 0.85rem; border: none; cursor: pointer; align-items: center; gap: 6px; box-shadow: 0 2px 4px rgba(220, 38, 38, 0.25);" title="Eliminar los clientes marcados con casilla">
+              <span>🗑️ Eliminar seleccionados (0)</span>
+            </button>
+          </div>
         </div>
 
         <!-- Contenedor y tabla de clientes -->
@@ -342,6 +347,9 @@
             <table class="clients-table" id="clients-table">
               <thead>
                 <tr>
+                  <th style="width: 44px; text-align: center;">
+                    <input type="checkbox" id="check-all-clients" title="Seleccionar todos los clientes" style="width: 17px; height: 17px; cursor: pointer;">
+                  </th>
                   <th scope="col">Cédula</th>
                   <th scope="col">Nombre completo</th>
                   <th scope="col">Teléfono</th>
@@ -473,19 +481,67 @@
           </div>
         </div>
 
-        <!-- Modal de Confirmación para Eliminar Cliente -->
-        <div id="client-delete-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="client-delete-modal-title">
-          <div class="modal-card confirm-modal-card">
-            <div class="modal-header">
-              <h3 id="client-delete-modal-title" class="modal-title">Confirmar Eliminación</h3>
-              <button type="button" id="btn-close-client-delete-modal" class="modal-close" aria-label="Cerrar modal">&times;</button>
+        <!-- Modal de Confirmación de Eliminación en Dos Pasos (Clientes) -->
+        <div id="modal-confirm-delete-client" class="modal-backdrop hidden" style="z-index: 2500;" role="dialog" aria-modal="true" aria-labelledby="modal-delete-client-title">
+          <div class="modal-card" style="max-width: 480px; width: 92%;">
+            <div class="modal-header" style="border-bottom: 1px solid #fee2e2; background: #fff5f5;">
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <span style="font-size: 1.3rem;">⚠️</span>
+                <h3 id="modal-delete-client-title" class="modal-title" style="color: #991b1b; font-size: 1.1rem; font-weight: 700;">Confirmar Eliminación de Cliente</h3>
+              </div>
+              <button type="button" id="btn-close-delete-client-modal" class="modal-close" aria-label="Cerrar modal">&times;</button>
             </div>
-            <div class="confirm-modal-content">
-              <p id="client-delete-modal-msg" class="confirm-modal-text">¿Estás seguro de que deseas eliminar este cliente?</p>
+
+            <!-- PASO 1: Confirmar eliminación del cliente escribiendo "borrar" -->
+            <div id="delete-client-step-1" class="modal-body" style="padding: 22px;">
+              <p id="delete-client-step-1-message" style="margin: 0 0 16px 0; font-size: 0.95rem; color: #1e293b; line-height: 1.55;">
+                ¿Seguro que deseas eliminar este cliente? Esta acción no se puede deshacer.
+              </p>
+              <p style="margin: 0 0 10px 0; font-size: 0.85rem; color: #64748b;">
+                Por motivos de seguridad, escribe la palabra <strong>borrar</strong> para continuar:
+              </p>
+              <div style="margin-bottom: 20px;">
+                <input 
+                  type="text" 
+                  id="input-confirm-delete-client-word" 
+                  class="form-input" 
+                  placeholder="Escribe 'borrar' aquí..." 
+                  autocomplete="off" 
+                  autocapitalize="off" 
+                  spellcheck="false"
+                  style="width: 100%; border: 1.5px solid #cbd5e1; font-weight: 600; font-size: 1rem; padding: 10px 12px; border-radius: 8px;"
+                >
+              </div>
+              <div class="modal-footer-actions" style="margin-top: 10px; padding: 0; display: flex; justify-content: flex-end; gap: 10px;">
+                <button type="button" id="btn-cancel-delete-client-step-1" class="btn-modal-cancel">Cancelar</button>
+                <button type="button" id="btn-continue-delete-client-step-1" class="btn-modal-save btn-modal-danger" disabled>Continuar</button>
+              </div>
             </div>
-            <div class="modal-footer-actions">
-              <button type="button" id="btn-cancel-client-delete" class="btn-modal-cancel">Cancelar</button>
-              <button type="button" id="btn-confirm-client-delete" class="btn-modal-danger">Eliminar</button>
+
+            <!-- PASO 2: Pregunta en cascada si eliminar créditos y pagos asociados -->
+            <div id="delete-client-step-2" class="modal-body hidden" style="padding: 22px;">
+              <p id="delete-client-step-2-message" style="margin: 0 0 14px 0; font-size: 0.95rem; color: #1e293b; line-height: 1.5; font-weight: 600;">
+                ¿Deseas también eliminar todos sus créditos y pagos asociados? Escribe 'borrar' para confirmar
+              </p>
+              <p style="margin: 0 0 10px 0; font-size: 0.85rem; color: #64748b;">
+                Si aceptas se borrará todo lo asociado. Si cancelas se eliminará únicamente el cliente.
+              </p>
+              <div style="margin-bottom: 20px;">
+                <input 
+                  type="text" 
+                  id="input-confirm-delete-client-cascade-word" 
+                  class="form-input" 
+                  placeholder="Escribe 'borrar' aquí..." 
+                  autocomplete="off" 
+                  autocapitalize="off" 
+                  spellcheck="false"
+                  style="width: 100%; border: 1.5px solid #cbd5e1; font-weight: 600; font-size: 1rem; padding: 10px 12px; border-radius: 8px;"
+                >
+              </div>
+              <div class="modal-footer-actions" style="margin-top: 10px; padding: 0; display: flex; justify-content: flex-end; gap: 10px;">
+                <button type="button" id="btn-cancel-delete-client-step-2" class="btn-modal-cancel" title="Eliminar solo el cliente">Cancelar (Solo cliente)</button>
+                <button type="button" id="btn-confirm-delete-client-cascade" class="btn-modal-save btn-modal-danger" disabled>Eliminar todo</button>
+              </div>
             </div>
           </div>
         </div>
@@ -609,12 +665,24 @@
           </button>
         </div>
 
+        <!-- Barra de Búsqueda y Acciones Múltiples de Créditos -->
+        <div class="search-bar-container" style="display: flex; justify-content: flex-end; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 14px;">
+          <div id="credits-bulk-actions-wrap" style="display: flex; gap: 10px; align-items: center;">
+            <button type="button" id="btn-delete-selected-credits" class="btn-danger-action hidden" style="display: none; background: #dc2626; color: #ffffff; padding: 8px 16px; border-radius: 8px; font-weight: 600; font-size: 0.85rem; border: none; cursor: pointer; align-items: center; gap: 6px; box-shadow: 0 2px 4px rgba(220, 38, 38, 0.25);" title="Eliminar los créditos marcados con casilla">
+              <span>🗑️ Eliminar seleccionados (0)</span>
+            </button>
+          </div>
+        </div>
+
         <!-- Contenedor y tabla de créditos -->
         <div class="credits-table-card">
           <div class="table-responsive-wrapper">
             <table class="credits-table" id="credits-table">
               <thead>
                 <tr>
+                  <th style="width: 44px; text-align: center;">
+                    <input type="checkbox" id="check-all-credits" title="Seleccionar todos los créditos" style="width: 17px; height: 17px; cursor: pointer;">
+                  </th>
                   <th scope="col">Cliente</th>
                   <th scope="col">Producto(s)</th>
                   <th scope="col">Cuota inicial pagada</th>
@@ -632,6 +700,71 @@
           </div>
           <div id="no-credits-msg" class="empty-credits-msg hidden">
             <p>No hay créditos registrados.</p>
+          </div>
+        </div>
+
+        <!-- Modal de Confirmación de Eliminación en Dos Pasos (Créditos) -->
+        <div id="modal-confirm-delete-credit" class="modal-backdrop hidden" style="z-index: 2500;" role="dialog" aria-modal="true" aria-labelledby="modal-delete-credit-title">
+          <div class="modal-card" style="max-width: 480px; width: 92%;">
+            <div class="modal-header" style="border-bottom: 1px solid #fee2e2; background: #fff5f5;">
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <span style="font-size: 1.3rem;">⚠️</span>
+                <h3 id="modal-delete-credit-title" class="modal-title" style="color: #991b1b; font-size: 1.1rem; font-weight: 700;">Confirmar Eliminación de Crédito</h3>
+              </div>
+              <button type="button" id="btn-close-delete-credit-modal" class="modal-close" aria-label="Cerrar modal">&times;</button>
+            </div>
+
+            <!-- PASO 1: Confirmar eliminación del crédito escribiendo "borrar" -->
+            <div id="delete-credit-step-1" class="modal-body" style="padding: 22px;">
+              <p id="delete-credit-step-1-message" style="margin: 0 0 16px 0; font-size: 0.95rem; color: #1e293b; line-height: 1.55;">
+                ¿Seguro que deseas eliminar este crédito? Esta acción no se puede deshacer.
+              </p>
+              <p style="margin: 0 0 10px 0; font-size: 0.85rem; color: #64748b;">
+                Por motivos de seguridad, escribe la palabra <strong>borrar</strong> para continuar:
+              </p>
+              <div style="margin-bottom: 20px;">
+                <input 
+                  type="text" 
+                  id="input-confirm-delete-credit-word" 
+                  class="form-input" 
+                  placeholder="Escribe 'borrar' aquí..." 
+                  autocomplete="off" 
+                  autocapitalize="off" 
+                  spellcheck="false"
+                  style="width: 100%; border: 1.5px solid #cbd5e1; font-weight: 600; font-size: 1rem; padding: 10px 12px; border-radius: 8px;"
+                >
+              </div>
+              <div class="modal-footer-actions" style="margin-top: 10px; padding: 0; display: flex; justify-content: flex-end; gap: 10px;">
+                <button type="button" id="btn-cancel-delete-credit-step-1" class="btn-modal-cancel">Cancelar</button>
+                <button type="button" id="btn-continue-delete-credit-step-1" class="btn-modal-save btn-modal-danger" disabled>Continuar</button>
+              </div>
+            </div>
+
+            <!-- PASO 2: Pregunta en cascada si eliminar pagos asociados -->
+            <div id="delete-credit-step-2" class="modal-body hidden" style="padding: 22px;">
+              <p id="delete-credit-step-2-message" style="margin: 0 0 14px 0; font-size: 0.95rem; color: #1e293b; line-height: 1.5; font-weight: 600;">
+                ¿Deseas también eliminar los pagos asociados a este crédito? Escribe 'borrar' para confirmar
+              </p>
+              <p style="margin: 0 0 10px 0; font-size: 0.85rem; color: #64748b;">
+                Si aceptas se borrará el crédito y sus pagos. Si cancelas se eliminará solo el crédito y se recalculará.
+              </p>
+              <div style="margin-bottom: 20px;">
+                <input 
+                  type="text" 
+                  id="input-confirm-delete-credit-cascade-word" 
+                  class="form-input" 
+                  placeholder="Escribe 'borrar' aquí..." 
+                  autocomplete="off" 
+                  autocapitalize="off" 
+                  spellcheck="false"
+                  style="width: 100%; border: 1.5px solid #cbd5e1; font-weight: 600; font-size: 1rem; padding: 10px 12px; border-radius: 8px;"
+                >
+              </div>
+              <div class="modal-footer-actions" style="margin-top: 10px; padding: 0; display: flex; justify-content: flex-end; gap: 10px;">
+                <button type="button" id="btn-cancel-delete-credit-step-2" class="btn-modal-cancel" title="Eliminar solo el crédito y recalcular">Cancelar (Solo crédito)</button>
+                <button type="button" id="btn-confirm-delete-credit-cascade" class="btn-modal-save btn-modal-danger" disabled>Eliminar crédito y pagos</button>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -960,6 +1093,9 @@
                   <table class="schedule-table">
                     <thead>
                       <tr>
+                        <th style="width: 44px; text-align: center;">
+                          <input type="checkbox" id="check-all-detail-payments" title="Seleccionar todos los pagos" style="width: 17px; height: 17px; cursor: pointer;">
+                        </th>
                         <th>Fecha</th>
                         <th>Tipo</th>
                         <th>Monto (USD)</th>
@@ -1061,9 +1197,9 @@
           </div>
         </div>
 
-        <!-- Barra de Búsqueda de Pagos -->
-        <div class="search-bar-container">
-          <div class="search-input-wrapper">
+        <!-- Barra de Búsqueda y Acciones de Pagos -->
+        <div class="search-bar-container" style="display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap;">
+          <div class="search-input-wrapper" style="flex: 1; max-width: 500px;">
             <svg class="search-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
             </svg>
@@ -1074,6 +1210,11 @@
               placeholder="Buscar por cliente o cédula..." 
               aria-label="Buscar en pagos">
           </div>
+          <div id="pagos-bulk-actions-wrap" style="display: flex; gap: 10px; align-items: center;">
+            <button type="button" id="btn-delete-selected-pagos" class="btn-danger-action hidden" style="display: none; background: #dc2626; color: #ffffff; padding: 8px 16px; border-radius: 8px; font-weight: 600; font-size: 0.85rem; border: none; cursor: pointer; align-items: center; gap: 6px; box-shadow: 0 2px 4px rgba(220, 38, 38, 0.25);" title="Eliminar los créditos marcados con casilla">
+              <span>🗑️ Eliminar seleccionados (0)</span>
+            </button>
+          </div>
         </div>
 
         <!-- Tabla de Créditos Activos -->
@@ -1081,6 +1222,9 @@
           <table class="data-table" id="pagos-table">
             <thead>
               <tr>
+                <th style="width: 44px; text-align: center;">
+                  <input type="checkbox" id="check-all-pagos" title="Seleccionar todos" style="width: 17px; height: 17px; cursor: pointer;">
+                </th>
                 <th>Cliente</th>
                 <th>Producto(s)</th>
                 <th>Cuotas</th>
@@ -1398,11 +1542,19 @@
 
               <!-- Lista cronológica de pagos -->
               <div class="detail-section-box">
-                <h4 class="detail-section-title">Registro Cronológico de Pagos</h4>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 8px;">
+                  <h4 class="detail-section-title" style="margin: 0;">Registro Cronológico de Pagos</h4>
+                  <button type="button" id="btn-delete-selected-history-payments" class="btn-danger-action hidden" style="display: none; background: #dc2626; color: #ffffff; padding: 6px 14px; border-radius: 8px; font-weight: 600; font-size: 0.82rem; border: none; cursor: pointer; align-items: center; gap: 6px;" title="Eliminar los pagos seleccionados">
+                    <span>🗑️ Eliminar seleccionados (0)</span>
+                  </button>
+                </div>
                 <div class="table-responsive-wrapper">
                   <table class="schedule-table">
                     <thead>
                       <tr>
+                        <th style="width: 44px; text-align: center;">
+                          <input type="checkbox" id="check-all-history-payments" title="Seleccionar todos los pagos" style="width: 17px; height: 17px; cursor: pointer;">
+                        </th>
                         <th>Fecha</th>
                         <th>Tipo</th>
                         <th>Moneda</th>
@@ -1507,18 +1659,38 @@
         </div>
 
         <!-- Modal Confirmar Eliminación de Pago -->
-        <div id="modal-confirm-delete-payment" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="delete-payment-modal-title">
-          <div class="modal-card confirm-modal-card">
-            <div class="modal-header">
-              <h3 id="delete-payment-modal-title" class="modal-title">Confirmar Eliminación de Pago</h3>
+        <div id="modal-confirm-delete-payment" class="modal-backdrop hidden" style="z-index: 2500;" role="dialog" aria-modal="true" aria-labelledby="delete-payment-modal-title">
+          <div class="modal-card" style="max-width: 480px; width: 92%;">
+            <div class="modal-header" style="border-bottom: 1px solid #fee2e2; background: #fff5f5;">
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <span style="font-size: 1.3rem;">⚠️</span>
+                <h3 id="delete-payment-modal-title" class="modal-title" style="color: #991b1b; font-size: 1.1rem; font-weight: 700;">Confirmar Eliminación de Pago</h3>
+              </div>
               <button type="button" id="btn-close-delete-payment-modal" class="modal-close" aria-label="Cerrar modal">&times;</button>
             </div>
-            <div class="confirm-modal-content">
-              <p id="delete-payment-modal-msg" class="confirm-modal-text">¿Estás seguro de que deseas eliminar este registro de pago? Esta acción revertirá el monto en el saldo y cuotas del crédito.</p>
-            </div>
-            <div class="modal-footer-actions">
-              <button type="button" id="btn-cancel-delete-payment" class="btn-modal-cancel">Cancelar</button>
-              <button type="button" id="btn-confirm-delete-payment" class="btn-modal-danger">Eliminar Pago</button>
+            <div class="modal-body" style="padding: 22px;">
+              <p id="delete-payment-modal-msg" style="margin: 0 0 16px 0; font-size: 0.95rem; color: #1e293b; line-height: 1.55;">
+                ¿Estás seguro de que deseas eliminar este registro de pago? Esta acción revertirá el monto en el saldo y cronograma de cuotas del crédito.
+              </p>
+              <p style="margin: 0 0 10px 0; font-size: 0.85rem; color: #64748b;">
+                Por motivos de seguridad, escribe la palabra <strong>borrar</strong> para confirmar:
+              </p>
+              <div style="margin-bottom: 20px;">
+                <input 
+                  type="text" 
+                  id="input-confirm-delete-payment-word" 
+                  class="form-input" 
+                  placeholder="Escribe 'borrar' aquí..." 
+                  autocomplete="off" 
+                  autocapitalize="off" 
+                  spellcheck="false"
+                  style="width: 100%; border: 1.5px solid #cbd5e1; font-weight: 600; font-size: 1rem; padding: 10px 12px; border-radius: 8px;"
+                >
+              </div>
+              <div class="modal-footer-actions" style="margin-top: 10px; padding: 0; display: flex; justify-content: flex-end; gap: 10px;">
+                <button type="button" id="btn-cancel-delete-payment" class="btn-modal-cancel">Cancelar</button>
+                <button type="button" id="btn-confirm-delete-payment" class="btn-modal-save btn-modal-danger" disabled>Eliminar Pago</button>
+              </div>
             </div>
           </div>
         </div>
