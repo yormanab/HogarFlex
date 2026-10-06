@@ -1,4 +1,4 @@
-const CACHE_NAME = 'hogarflex-v19';
+const CACHE_NAME = 'hogarflex-v20';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',

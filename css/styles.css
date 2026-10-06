@@ -3309,3 +3309,112 @@ body {
       font-size: 0.84rem;
     }
   }
+
+/* ==========================================================
+   MÓDULO 6: LOGS DEL SISTEMA Y AUDITORÍA
+   ========================================================== */
+.modal-card-logs {
+  width: 96%;
+  max-width: 1080px;
+}
+
+.log-badge-level {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 9999px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.log-badge-info {
+  background: #dbeafe;
+  color: #1e40af;
+  border: 1px solid #bfdbfe;
+}
+
+.log-badge-warning {
+  background: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fde68a;
+}
+
+.log-badge-error {
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+}
+
+.log-status-badge {
+  display: inline-block;
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.log-status-success {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.log-status-failed {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.log-action-tag {
+  display: inline-block;
+  font-family: monospace;
+  font-size: 0.76rem;
+  font-weight: 700;
+  background: #f1f5f9;
+  color: #334155;
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid #e2e8f0;
+}
+
+.log-details-preview {
+  display: inline-block;
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.8rem;
+  color: #64748b;
+  vertical-align: middle;
+}
+
+.btn-log-details {
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  color: #1e293b;
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 0.76rem;
+  font-weight: 600;
+  cursor: pointer;
+  margin-left: 6px;
+  transition: all 0.15s ease;
+}
+
+.btn-log-details:hover {
+  background: #e2e8f0;
+  border-color: #94a3b8;
+}
+
+#table-system-logs tbody tr {
+  border-bottom: 1px solid #f1f5f9;
+  transition: background-color 0.15s ease;
+}
+
+#table-system-logs tbody tr:hover {
+  background-color: #f8fafc;
+}
+
+#table-system-logs tbody td {
+  padding: 8px 12px;
+  font-size: 0.82rem;
+}

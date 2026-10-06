@@ -21,7 +21,8 @@ var SHEET_NAMES = {
   PROVEEDORES: "Proveedores",
   FACTURAS: "Facturas",
   PRODUCTOS: "Productos",
-  CONFIG: "Config"
+  CONFIG: "Config",
+  LOGS: "Logs"
 };
 
 // Encabezados por defecto para crear pestañas si están vacías
@@ -33,7 +34,8 @@ var DEFAULT_HEADERS = {
   Proveedores: ["ID", "Nombre", "Teléfono", "Dirección", "Categoría", "Notas"],
   Facturas: ["ID Factura", "Cliente", "Productos", "Total USD", "Fecha", "Estado"],
   Productos: ["ID", "Nombre", "Descripción", "Precio USD", "Categoría", "Stock"],
-  Config: ["Parámetro", "Valor"]
+  Config: ["Parámetro", "Valor"],
+  Logs: ["timestamp", "username", "level", "action", "details", "status", "errorMessage"]
 };
 
 /**
@@ -347,12 +349,61 @@ function doPost(e) {
       return errorResponse_("Datos base64 no proporcionados para la foto del producto.");
     }
 
+    // Acción para registrar lote de logs del sistema en la pestaña Logs
+    if (action === "append_logs" || action === "log_to_sheets" || action === "logtosheets") {
+      var logsArr = payload.logs || payload.logsArray || payload.data || [];
+      var rowsInserted = logToSheets(logsArr);
+      return jsonResponse_({
+        status: "success",
+        success: true,
+        action: "append_logs",
+        rowsInserted: rowsInserted,
+        message: "Logs guardados en Google Sheets exitosamente (" + rowsInserted + " filas)."
+      });
+    }
+
     return errorResponse_("Acción no reconocida: " + action);
   } catch (err) {
     return errorResponse_("Error en doPost: " + err.toString());
   } finally {
     lock.releaseLock();
   }
+}
+
+/**
+ * Agrega un lote de logs a la pestaña Logs en Google Sheets
+ * Columnas: timestamp | username | level | action | details | status | errorMessage
+ */
+function logToSheets(logsArray) {
+  if (!logsArray || !Array.isArray(logsArray) || logsArray.length === 0) return 0;
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = getOrCreateSheet_(ss, SHEET_NAMES.LOGS || "Logs");
+  var headers = DEFAULT_HEADERS.Logs || ["timestamp", "username", "level", "action", "details", "status", "errorMessage"];
+
+  if (sheet.getLastRow() === 0) {
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+  }
+
+  var rowsToInsert = logsArray.map(function(item) {
+    var detailsStr = "";
+    if (item.details !== null && item.details !== undefined) {
+      detailsStr = typeof item.details === "object" ? JSON.stringify(item.details) : String(item.details);
+    }
+    return [
+      String(item.timestamp || new Date().toISOString()),
+      String(item.username || "Yorgeh2023"),
+      String(item.level || "INFO"),
+      String(item.action || ""),
+      detailsStr,
+      String(item.status || "success"),
+      String(item.errorMessage || "")
+    ];
+  });
+
+  var startRow = sheet.getLastRow() + 1;
+  sheet.getRange(startRow, 1, rowsToInsert.length, headers.length).setValues(rowsToInsert);
+  SpreadsheetApp.flush();
+  return rowsToInsert.length;
 }
 
 /**

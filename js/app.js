@@ -93,6 +93,7 @@ const AUTH_CREDENTIALS = {
 };
 
 const SESSION_KEY = "hogarflex_authenticated_user";
+const SYSTEM_LOGS_KEY = "hogarflex_logs";
 
 // Elementos del DOM
 const loginView = document.getElementById("login-view");
@@ -117,6 +118,7 @@ document.addEventListener("DOMContentLoaded", () => {
   initProveedoresModule();
   initFacturacionModule();
   initBackupModule();
+  initSystemLogsModule();
   auditCreditStatuses();
 });
 
@@ -174,16 +176,45 @@ function handleLogin() {
     sessionStorage.setItem(SESSION_KEY, enteredUser);
     loginForm.reset();
     showApp();
+    if (typeof addSystemLog === "function") {
+      addSystemLog({
+        level: "INFO",
+        action: "USER_LOGIN",
+        username: enteredUser,
+        details: { username: enteredUser, timestamp: new Date().toISOString() },
+        status: "success"
+      });
+    }
   } else {
     // Credenciales incorrectas
     loginError.style.display = "block";
     passwordInput.value = "";
     passwordInput.focus();
+    if (typeof addSystemLog === "function") {
+      addSystemLog({
+        level: "WARNING",
+        action: "USER_LOGIN",
+        username: enteredUser || "Desconocido",
+        details: { username: enteredUser || "Desconocido", reason: "Contraseña o usuario incorrecto" },
+        status: "failed",
+        errorMessage: "Usuario o contraseña incorrectos"
+      });
+    }
   }
 }
 
 // Procesar cierre de sesión
 function handleLogout() {
+  const currentUser = sessionStorage.getItem(SESSION_KEY) || AUTH_CREDENTIALS.username;
+  if (typeof addSystemLog === "function") {
+    addSystemLog({
+      level: "INFO",
+      action: "USER_LOGOUT",
+      username: currentUser,
+      details: { username: currentUser, timestamp: new Date().toISOString() },
+      status: "success"
+    });
+  }
   sessionStorage.removeItem(SESSION_KEY);
   showLogin();
 }
@@ -1055,6 +1086,15 @@ function handleClientFormSubmit(e) {
       errorMsg.textContent = "Por favor completa todos los campos requeridos.";
       errorMsg.style.display = "block";
     }
+    if (typeof addSystemLog === "function") {
+      addSystemLog({
+        level: "WARNING",
+        action: "VALIDATION_ERROR",
+        details: { form: "client", reason: "Campos requeridos incompletos", dni: dniVal, name: nameVal },
+        status: "failed",
+        errorMessage: "Validación fallida: completa todos los campos del cliente"
+      });
+    }
     return;
   }
 
@@ -1075,11 +1115,27 @@ function handleClientFormSubmit(e) {
     if (isEditing) {
       const index = currentClients.findIndex((c) => String(c.id) === String(idInput.value));
       if (index !== -1) {
+        const oldClient = currentClients[index];
+        const changedFields = [];
+        if (oldClient.dni !== dniVal) changedFields.push({ field: "dni", old: oldClient.dni, new: dniVal });
+        if (oldClient.name !== nameVal) changedFields.push({ field: "name", old: oldClient.name, new: nameVal });
+        if (oldClient.phone !== phoneVal) changedFields.push({ field: "phone", old: oldClient.phone, new: phoneVal });
+        if (oldClient.address !== addressVal) changedFields.push({ field: "address", old: oldClient.address, new: addressVal });
+
         currentClients[index].dni = dniVal;
         currentClients[index].name = nameVal;
         currentClients[index].phone = phoneVal;
         currentClients[index].address = addressVal;
         currentClients[index].updatedAt = Date.now();
+
+        if (typeof addSystemLog === "function") {
+          addSystemLog({
+            level: "INFO",
+            action: "UPDATE_CLIENT",
+            details: { id: oldClient.id, name: nameVal, changedFields },
+            status: "success"
+          });
+        }
       }
     } else {
       const newClient = {
@@ -1091,6 +1147,14 @@ function handleClientFormSubmit(e) {
         createdAt: Date.now()
       };
       currentClients.push(newClient);
+      if (typeof addSystemLog === "function") {
+        addSystemLog({
+          level: "INFO",
+          action: "CREATE_CLIENT",
+          details: { id: newClient.id, name: newClient.name, dni: newClient.dni, date: new Date().toISOString() },
+          status: "success"
+        });
+      }
     }
 
     saveClientsToStorage(currentClients);
@@ -1099,6 +1163,15 @@ function handleClientFormSubmit(e) {
   };
 
   if (existingClient && !isEditing) {
+    if (typeof addSystemLog === "function") {
+      addSystemLog({
+        level: "WARNING",
+        action: "VALIDATION_ERROR",
+        details: { form: "client", reason: "Duplicado de cédula/RIF detectado", dni: dniVal, existingClient: existingClient.name },
+        status: "failed",
+        errorMessage: `Cédula o RIF ${dniVal} ya pertenece a ${existingClient.name}`
+      });
+    }
     showDuplicateClientModal(existingClient.name || "Cliente existente", saveClientAction);
     return;
   }
@@ -1310,6 +1383,16 @@ function executeClientOnlyDeletion() {
   const clients = getStoredClients();
   const updatedClients = clients.filter((c) => !targetIds.includes(String(c.id)));
   saveClientsToStorage(updatedClients);
+
+  if (typeof addSystemLog === "function") {
+    addSystemLog({
+      level: "INFO",
+      action: "DELETE_CLIENT",
+      details: { targetIds, count: targetIds.length, cascade: false },
+      status: "success"
+    });
+  }
+
   closeDeleteClientModal();
   renderClients();
 }
@@ -1341,6 +1424,20 @@ function executeClientCascadeDeletion() {
     return !belongsToDeletedClient && !creditWasDeleted;
   });
   saveInvoicesToStorage(remainingInvoices);
+
+  if (typeof addSystemLog === "function") {
+    addSystemLog({
+      level: "INFO",
+      action: "DELETE_CLIENT",
+      details: {
+        targetIds,
+        count: targetIds.length,
+        cascade: true,
+        deletedCreditsCount: credits.length - remainingCredits.length
+      },
+      status: "success"
+    });
+  }
 
   closeDeleteClientModal();
   renderClients();
@@ -1500,6 +1597,32 @@ function openDeleteCreditModal(target) {
   if (typeof target === "string") {
     target = { mode: "single", creditId: target };
   }
+
+  // Comprobar si algún crédito a eliminar está en estado "Cortado" (Operación no permitida)
+  const allCreds = getStoredCredits();
+  const checkIds = target.mode === "single" ? [String(target.creditId)] : (target.creditIds || []).map(String);
+  const targetCreds = allCreds.filter((c) => checkIds.includes(String(c.id)));
+  const cortadoItem = targetCreds.find((c) => String(c.status || "").toLowerCase() === "cortado");
+
+  if (cortadoItem) {
+    if (typeof addSystemLog === "function") {
+      addSystemLog({
+        level: "WARNING",
+        action: "OPERATION_FORBIDDEN",
+        details: {
+          operation: "DELETE_CREDIT",
+          creditId: cortadoItem.id,
+          status: cortadoItem.status,
+          reason: "Intento de eliminar crédito en estado Cortado"
+        },
+        status: "failed",
+        errorMessage: `Intento de operación no permitida: crédito ${cortadoItem.id} en estado Cortado`
+      });
+    }
+    alert("⚠️ Operación no permitida: No se puede eliminar un crédito que se encuentra en estado Cortado por políticas de auditoría.");
+    return;
+  }
+
   creditDeletionTarget = target;
 
   const modal = document.getElementById("modal-confirm-delete-credit");
@@ -1590,6 +1713,15 @@ function executeCreditOnlyDeletion() {
   const remainingCredits = credits.filter((c) => !targetIds.includes(String(c.id)));
   saveCreditsToStorage(remainingCredits);
 
+  if (typeof addSystemLog === "function") {
+    addSystemLog({
+      level: "INFO",
+      action: "DELETE_CREDIT",
+      details: { targetIds, count: targetIds.length, cascade: false },
+      status: "success"
+    });
+  }
+
   closeDeleteCreditModal();
   renderCredits();
   renderPagosSection();
@@ -1615,6 +1747,15 @@ function executeCreditCascadeDeletion() {
     return !targetIds.includes(credId);
   });
   saveInvoicesToStorage(remainingInvoices);
+
+  if (typeof addSystemLog === "function") {
+    addSystemLog({
+      level: "INFO",
+      action: "DELETE_CREDIT",
+      details: { targetIds, count: targetIds.length, cascade: true },
+      status: "success"
+    });
+  }
 
   closeDeleteCreditModal();
   renderCredits();
@@ -2279,6 +2420,18 @@ function updateCreditCalculations(options = {}) {
   // 4. Monto de cada cuota (en USD)
   const installmentAmount = (remainingBalance > 0 && installmentsCount > 0) ? (remainingBalance / installmentsCount) : 0;
 
+  if (isNaN(installmentAmount) || isNaN(remainingBalance)) {
+    if (typeof addSystemLog === "function") {
+      addSystemLog({
+        level: "ERROR",
+        action: "CALCULATION_ERROR",
+        details: { totalSaleUSD, downpaymentAmountUSD, remainingBalance, installmentsCount, installmentAmount },
+        status: "failed",
+        errorMessage: "Error en cálculo de cuotas: valor no numérico (NaN)"
+      });
+    }
+  }
+
   // Pintar en DOM
   document.getElementById("calc-products-total").textContent = `$${productsTotal.toFixed(2)}`;
   document.getElementById("calc-shipping-total").textContent = shippingAmount > 0 ? `+$${shippingAmount.toFixed(2)}` : "$0.00";
@@ -2333,6 +2486,15 @@ function handleCreditFormSubmit(e) {
       errorMsg.textContent = "Por favor selecciona un cliente para el crédito.";
       errorMsg.style.display = "block";
     }
+    if (typeof addSystemLog === "function") {
+      addSystemLog({
+        level: "WARNING",
+        action: "VALIDATION_ERROR",
+        details: { form: "credit", reason: "Cliente no seleccionado" },
+        status: "failed",
+        errorMessage: "Por favor selecciona un cliente para el crédito."
+      });
+    }
     clientSelect.focus();
     return;
   }
@@ -2341,6 +2503,15 @@ function handleCreditFormSubmit(e) {
     if (errorMsg) {
       errorMsg.textContent = "Debes añadir al menos un producto a la venta.";
       errorMsg.style.display = "block";
+    }
+    if (typeof addSystemLog === "function") {
+      addSystemLog({
+        level: "WARNING",
+        action: "VALIDATION_ERROR",
+        details: { form: "credit", reason: "Sin productos seleccionados" },
+        status: "failed",
+        errorMessage: "Debes añadir al menos un producto a la venta."
+      });
     }
     return;
   }
@@ -2390,6 +2561,15 @@ function handleCreditFormSubmit(e) {
         errorMsg.textContent = "Por favor ingresa la Tasa BCV de hoy para calcular la inicial en Bolívares.";
         errorMsg.style.display = "block";
       }
+      if (typeof addSystemLog === "function") {
+        addSystemLog({
+          level: "WARNING",
+          action: "VALIDATION_ERROR",
+          details: { form: "credit", reason: "Tasa BCV de hoy requerida para inicial en Bolívares" },
+          status: "failed",
+          errorMessage: "Tasa BCV de hoy requerida para inicial en Bolívares"
+        });
+      }
       if (downpaymentRateBcvInput) downpaymentRateBcvInput.focus();
       return;
     }
@@ -2407,6 +2587,15 @@ function handleCreditFormSubmit(e) {
       if (errorMsg) {
         errorMsg.textContent = "Por favor ingresa la Tasa BCV de hoy para calcular la parte de la inicial en Bolívares.";
         errorMsg.style.display = "block";
+      }
+      if (typeof addSystemLog === "function") {
+        addSystemLog({
+          level: "WARNING",
+          action: "VALIDATION_ERROR",
+          details: { form: "credit", reason: "Tasa BCV de hoy requerida para parte mixta en Bolívares" },
+          status: "failed",
+          errorMessage: "Tasa BCV de hoy requerida para inicial mixta"
+        });
       }
       if (downpaymentRateBcvInput) downpaymentRateBcvInput.focus();
       return;
@@ -2534,6 +2723,37 @@ function handleCreditFormSubmit(e) {
     currentCredits.unshift(newCredit);
     saveCreditsToStorage(currentCredits);
 
+    if (typeof addSystemLog === "function") {
+      addSystemLog({
+        level: "INFO",
+        action: "CREATE_CREDIT",
+        details: {
+          id: newCredit.id,
+          clienteId: clientObj.id,
+          clienteNombre: clientObj.name,
+          montoTotalUSD: newCredit.totalSaleUSD,
+          cuotas: newCredit.installmentsCount,
+          inicialUSD: newCredit.downpaymentAmount,
+          saldoUSD: newCredit.remainingBalance,
+          fecha: new Date(newCredit.createdAt).toISOString()
+        },
+        status: "success"
+      });
+
+      addSystemLog({
+        level: "INFO",
+        action: "CALCULATE_INSTALLMENTS",
+        details: {
+          creditId: newCredit.id,
+          totalSaleUSD: newCredit.totalSaleUSD,
+          remainingBalance: newCredit.remainingBalance,
+          installmentsCount: newCredit.installmentsCount,
+          installmentAmountUSD: newCredit.installmentAmount
+        },
+        status: "success"
+      });
+    }
+
     closeCreditModal();
     renderCredits();
   };
@@ -2556,6 +2776,19 @@ function handleCreditFormSubmit(e) {
   const activeCount = activeCredits.length;
 
   if (activeCount >= 1) {
+    if (typeof addSystemLog === "function") {
+      addSystemLog({
+        level: "WARNING",
+        action: "CREDIT_LIMIT_EXCEEDED",
+        details: {
+          clientId: clientObj.id,
+          clientName: clientObj.name,
+          activeCreditsCount: activeCount
+        },
+        status: "failed",
+        errorMessage: `El cliente ${clientObj.name} ya tiene ${activeCount} crédito(s) activo(s)`
+      });
+    }
     showActiveCreditsWarningModal(activeCount, performSaveCredit);
     return;
   }
@@ -2676,6 +2909,15 @@ let currentOverdueItem = null;
 
 // Envío de notificaciones nativas del navegador con Notification API y fallback
 function sendNativeNotification(title, body) {
+  if (typeof addSystemLog === "function") {
+    addSystemLog({
+      level: "INFO",
+      action: "NOTIFICATION_SENT",
+      details: { title, body },
+      status: "success"
+    });
+  }
+
   if (!("Notification" in window)) {
     alert(`${title}\n\n${body}`);
     return;
@@ -2778,6 +3020,22 @@ function auditCreditStatuses() {
       const instAmount = nextUnpaid.amountUSD !== undefined
         ? parseFloat(nextUnpaid.amountUSD)
         : (parseFloat(nextUnpaid.amount) || 0);
+
+      const auditReason = todayStr < dueStr ? "Fecha anterior a vencimiento" : (todayStr === dueStr ? "Vence hoy" : "Cuota vencida (en mora)");
+      if (typeof addSystemLog === "function") {
+        addSystemLog({
+          level: "INFO",
+          action: "AUDIT_STATUS_CHANGE",
+          details: {
+            creditId: credit.id,
+            cliente: clientName,
+            de: previousStatus,
+            hacia: newStatus,
+            razon: auditReason
+          },
+          status: "success"
+        });
+      }
 
       // PARTE 2 — Notificaciones por Notification API (sin backend)
       if (newStatus === "Pendiente") {
@@ -3603,6 +3861,15 @@ function handlePayInstallmentSubmit(e) {
         errorBanner.textContent = "Por favor ingresa la Tasa BCV de hoy para realizar el cobro en Bolívares.";
         errorBanner.style.display = "block";
       }
+      if (typeof addSystemLog === "function") {
+        addSystemLog({
+          level: "WARNING",
+          action: "VALIDATION_ERROR",
+          details: { form: "pay_installment", reason: "Tasa BCV de hoy requerida para pago en Bolívares" },
+          status: "failed",
+          errorMessage: "Tasa BCV de hoy requerida para cobrar cuota en Bolívares"
+        });
+      }
       if (rateBcvTodayInput) rateBcvTodayInput.focus();
       return;
     }
@@ -3646,6 +3913,24 @@ function handlePayInstallmentSubmit(e) {
   });
 
   saveCreditsToStorage(credits);
+
+  if (typeof addSystemLog === "function") {
+    addSystemLog({
+      level: "INFO",
+      action: "CREATE_PAYMENT",
+      details: {
+        creditoId: credit.id,
+        pagoId: newPayId,
+        monto: cuotaAmountUSD,
+        moneda: currency,
+        fecha: payDateVal,
+        tipo: "cuota",
+        cuotaNumero: nextPending.number,
+        saldoRestanteUSD: newBalance
+      },
+      status: "success"
+    });
+  }
 
   closePayInstallmentModal();
   renderCredits();
@@ -3958,6 +4243,15 @@ function handlePaymentFormSubmit(e) {
       errorBanner.textContent = "Por favor ingresa un monto válido mayor a cero.";
       errorBanner.style.display = "block";
     }
+    if (typeof addSystemLog === "function") {
+      addSystemLog({
+        level: "WARNING",
+        action: "VALIDATION_ERROR",
+        details: { form: "credit_payment", reason: "Monto inválido menor o igual a cero" },
+        status: "failed",
+        errorMessage: "Monto inválido para el abono"
+      });
+    }
     amountInput.focus();
     return;
   }
@@ -3972,6 +4266,15 @@ function handlePaymentFormSubmit(e) {
       if (errorBanner) {
         errorBanner.textContent = "Por favor ingresa la Tasa BCV de hoy para realizar el cobro en Bolívares.";
         errorBanner.style.display = "block";
+      }
+      if (typeof addSystemLog === "function") {
+        addSystemLog({
+          level: "WARNING",
+          action: "VALIDATION_ERROR",
+          details: { form: "credit_payment", reason: "Tasa BCV de hoy requerida para abono en Bolívares" },
+          status: "failed",
+          errorMessage: "Tasa BCV requerida para abono en Bolívares"
+        });
       }
       if (rateBcvTodayInput) rateBcvTodayInput.focus();
       return;
@@ -4057,6 +4360,23 @@ function handlePaymentFormSubmit(e) {
 
   // Guardar en localStorage
   saveCreditsToStorage(credits);
+
+  if (typeof addSystemLog === "function") {
+    addSystemLog({
+      level: "INFO",
+      action: "CREATE_PAYMENT",
+      details: {
+        creditoId: credit.id,
+        pagoId: newPayId,
+        montoUSD: amountValUSD,
+        moneda: currency,
+        fecha: payDateVal,
+        tipo: "abono",
+        saldoRestanteUSD: newRemainingBalance
+      },
+      status: "success"
+    });
+  }
 
   closeCreditPaymentModal();
   renderCredits();
@@ -5025,6 +5345,22 @@ function handleEditPaymentSubmit(e) {
   // Guardar en localStorage
   saveCreditsToStorage(credits);
 
+  if (typeof addSystemLog === "function") {
+    addSystemLog({
+      level: "INFO",
+      action: "UPDATE_PAYMENT",
+      details: {
+        creditoId: credit.id,
+        pagoId: payment.id,
+        montoUSD: amountUSD,
+        moneda: currencyVal,
+        fecha: dateVal,
+        tasaBCV: currencyVal === "BS" ? rateBCV : null
+      },
+      status: "success"
+    });
+  }
+
   closeEditPaymentModal();
   renderCredits();
   renderPagosSection();
@@ -5104,6 +5440,19 @@ function executeDeletePayment() {
 
   // Guardar en localStorage
   saveCreditsToStorage(credits);
+
+  if (typeof addSystemLog === "function") {
+    addSystemLog({
+      level: "INFO",
+      action: "DELETE_PAYMENT",
+      details: {
+        creditoId: credit.id,
+        targetIds,
+        cantidad: targetIds.length
+      },
+      status: "success"
+    });
+  }
 
   // triggerAutoCloudBackup("creditos") explícito al terminar
   if (typeof triggerAutoCloudBackup === "function") {
@@ -7955,6 +8304,11 @@ function renderDashboardSection() {
       }).join("");
     }
   }
+
+  // Actualizar tarjeta resumen de logs y auditoría en el Dashboard
+  if (typeof updateDashboardLogsUI === "function") {
+    updateDashboardLogsUI();
+  }
 }
 
 // ============================================================
@@ -10084,7 +10438,26 @@ async function exportToGoogleSheets(isSilent = false) {
   console.log(`[HogarFlex Cloud Export] 🚀 Iniciando exportToGoogleSheets(isSilent = ${isSilent})...`);
   if (isExportingSheets) return;
 
+  const syncStartTime = Date.now();
+  if (!isSilent && typeof addSystemLog === "function") {
+    addSystemLog({
+      level: "INFO",
+      action: "SYNC_SHEETS",
+      details: { tipo: "manual_export", isSilent },
+      status: "success"
+    });
+  }
+
   if (!navigator.onLine) {
+    if (typeof addSystemLog === "function") {
+      addSystemLog({
+        level: "ERROR",
+        action: "SYNC_SHEETS_ERROR",
+        details: { tipo: "export", motivo: "Sin conexión a internet" },
+        status: "failed",
+        errorMessage: "Fallo de conexión con Google: Dispositivo sin internet (offline)"
+      });
+    }
     if (!isSilent) showSheetsStatus("Sin conexión. El respaldo se hará cuando vuelva el internet.", "error");
     return;
   }
@@ -10324,22 +10697,58 @@ async function exportToGoogleSheets(isSilent = false) {
     });
 
     if (!res.ok) {
-      throw new Error(`Error en el servidor de Apps Script (${res.status})`);
+      const httpErrMsg = `Error en el servidor de Apps Script (${res.status}): ${res.statusText || 'Petición rechazada'}`;
+      if (typeof addSystemLog === "function") {
+        addSystemLog({
+          level: "ERROR",
+          action: "SYNC_SHEETS_ERROR",
+          details: { tipo: "export", status: res.status, statusText: res.statusText },
+          status: "failed",
+          errorMessage: httpErrMsg
+        });
+      }
+      throw new Error(httpErrMsg);
     }
 
     const json = await res.json();
     const isSuccess = json && (json.status === "success" || json.success === true);
     if (!isSuccess) {
-      throw new Error(json.message || json.error || "No se pudo escribir en el spreadsheet.");
+      const appsScriptErrMsg = json.message || json.error || "No se pudo escribir en el spreadsheet.";
+      if (typeof addSystemLog === "function") {
+        addSystemLog({
+          level: "ERROR",
+          action: "SYNC_SHEETS_ERROR",
+          details: { tipo: "export", appsScriptError: appsScriptErrMsg },
+          status: "failed",
+          errorMessage: appsScriptErrMsg
+        });
+      }
+      throw new Error(appsScriptErrMsg);
     }
 
     localStorage.setItem(BACKUP_LAST_SHEETS_KEY, nowStr);
     renderBackupSection();
 
+    const durationSec = ((Date.now() - syncStartTime) / 1000).toFixed(2);
+    const totalRecords = clients.length + credits.length + sales.length + suppliers.length + products.length;
+    if (typeof addSystemLog === "function") {
+      addSystemLog({
+        level: "INFO",
+        action: "SYNC_SHEETS_SUCCESS",
+        details: { tipo: "export", totalRegistros: totalRecords, duracion: `${durationSec}s` },
+        status: "success"
+      });
+    }
+
     // Sincronizar en segundo plano fotos de productos a Google Drive (HogarFlex_Productos)
     setTimeout(() => {
       exportProductImagesToGoogleDrive(true).catch(() => {});
     }, 100);
+
+    // Sincronizar también logs del sistema en segundo plano
+    setTimeout(() => {
+      if (typeof syncLogsToSheets === "function") syncLogsToSheets();
+    }, 200);
 
     if (!isSilent) {
       showSheetsStatus(`✅ Sincronización exitosa con HogarFlex_DB: ${nowStr}`, "success");
@@ -10347,9 +10756,19 @@ async function exportToGoogleSheets(isSilent = false) {
     }
   } catch (err) {
     console.error("Error al exportar a Google Sheets vía Apps Script:", err);
+    const exactErrMsg = err.message || String(err);
+    if (typeof addSystemLog === "function") {
+      addSystemLog({
+        level: "ERROR",
+        action: "SYNC_SHEETS_ERROR",
+        details: { tipo: "export", error: exactErrMsg },
+        status: "failed",
+        errorMessage: exactErrMsg
+      });
+    }
     if (!isSilent) {
-      showSheetsStatus(`Error: ${err.message || err}`, "error");
-      showCloudSyncToast(`Error al guardar en la nube: ${err.message || err}`, "error");
+      showSheetsStatus(`Error: ${exactErrMsg}`, "error");
+      showCloudSyncToast(`Error al guardar en la nube: ${exactErrMsg}`, "error");
       if (retryBtn) retryBtn.classList.remove("hidden");
     }
   } finally {
@@ -10366,6 +10785,15 @@ async function importFromGoogleSheets(isSilent = false) {
   if (isImportingSheets || isExportingSheets) return;
 
   if (!navigator.onLine) {
+    if (typeof addSystemLog === "function") {
+      addSystemLog({
+        level: "ERROR",
+        action: "SYNC_SHEETS_ERROR",
+        details: { tipo: "import", error: "Sin conexión a internet" },
+        status: "failed",
+        errorMessage: "Sin conexión a internet"
+      });
+    }
     if (!isSilent) {
       showCloudSyncToast("Sin conexión. No se pudo recargar desde la nube.", "error");
       showSheetsStatus("Sin conexión. No se pudo recargar desde la nube.", "error");
@@ -10375,6 +10803,15 @@ async function importFromGoogleSheets(isSilent = false) {
 
   const scriptUrl = getAppsScriptUrl();
   if (!scriptUrl) {
+    if (typeof addSystemLog === "function") {
+      addSystemLog({
+        level: "ERROR",
+        action: "SYNC_SHEETS_ERROR",
+        details: { tipo: "import", error: "URL de Apps Script no configurada" },
+        status: "failed",
+        errorMessage: "URL de Apps Script no configurada"
+      });
+    }
     if (!isSilent) {
       showSheetsStatus("Por favor configura la URL de Google Apps Script en la sección de Respaldo.", "error");
     }
@@ -10383,6 +10820,15 @@ async function importFromGoogleSheets(isSilent = false) {
 
   isImportingSheets = true;
   setCloudButtonsLoading(true, "import");
+
+  if (typeof addSystemLog === "function") {
+    addSystemLog({
+      level: "INFO",
+      action: "SYNC_SHEETS",
+      details: { tipo: "import" },
+      status: "success"
+    });
+  }
 
   if (!isSilent) {
     showCloudSyncToast("⏳ Descargando base de datos desde HogarFlex_DB...", "info");
@@ -10836,15 +11282,41 @@ async function importFromGoogleSheets(isSilent = false) {
     if (typeof renderBackupSection === "function") renderBackupSection();
 
     const successSummary = `✅ Sincronizado (Reemplazo total): ${importedClients.length} clientes, ${importedCredits.length} créditos, ${importedSales.length} ventas, ${importedProducts.length} productos, ${importedSuppliers.length} proveedores, ${importedInvoices.length} facturas.`;
+    if (typeof addSystemLog === "function") {
+      addSystemLog({
+        level: "INFO",
+        action: "SYNC_SHEETS_SUCCESS",
+        details: {
+          tipo: "import",
+          clientes: importedClients.length,
+          creditos: importedCredits.length,
+          ventas: importedSales.length,
+          productos: importedProducts.length,
+          proveedores: importedSuppliers.length,
+          facturas: importedInvoices.length
+        },
+        status: "success"
+      });
+    }
     showSheetsStatus(successSummary, "success");
     if (!isSilent) {
       showCloudSyncToast(successSummary, "success");
     }
   } catch (err) {
     console.error("Error al importar desde Google Sheets vía Apps Script:", err);
+    const exactErrMsg = err.message || String(err);
+    if (typeof addSystemLog === "function") {
+      addSystemLog({
+        level: "ERROR",
+        action: "SYNC_SHEETS_ERROR",
+        details: { tipo: "import", error: exactErrMsg },
+        status: "failed",
+        errorMessage: exactErrMsg
+      });
+    }
     if (!isSilent) {
-      showSheetsStatus(`Error al recargar desde la nube: ${err.message || err}`, "error");
-      showCloudSyncToast(`Error al recargar: ${err.message || err}`, "error");
+      showSheetsStatus(`Error al recargar desde la nube: ${exactErrMsg}`, "error");
+      showCloudSyncToast(`Error al recargar: ${exactErrMsg}`, "error");
     }
   } finally {
     isImportingSheets = false;
@@ -11242,3 +11714,664 @@ window.getAppsScriptUrl = getAppsScriptUrl;
 window.setAppsScriptUrl = setAppsScriptUrl;
 window.updateBackendStatusUI = updateBackendStatusUI;
 window.auditCreditStatuses = auditCreditStatuses;
+
+// ============================================================
+// MÓDULO 6: LOGS DEL SISTEMA Y AUDITORÍA
+// ============================================================
+
+let isSyncingLogs = false;
+
+// Obtener registros de logs desde Local Storage
+function getSystemLogs() {
+  try {
+    const raw = localStorage.getItem(SYSTEM_LOGS_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (err) {
+    console.error("Error al leer logs desde Local Storage:", err);
+    return [];
+  }
+}
+
+// Guardar array de logs en Local Storage
+function saveSystemLogs(logs) {
+  try {
+    localStorage.setItem(SYSTEM_LOGS_KEY, JSON.stringify(logs));
+  } catch (err) {
+    console.error("Error al guardar logs en Local Storage:", err);
+  }
+}
+
+// Obtener nombre de usuario actual
+function getCurrentUsername() {
+  try {
+    const sessionUser = sessionStorage.getItem(SESSION_KEY) || localStorage.getItem(SESSION_KEY);
+    if (sessionUser) return sessionUser;
+  } catch (e) {}
+  return "Yorgeh2023";
+}
+
+// Formatear timestamp ISO a formato legible
+function formatLogTimestamp(isoStr) {
+  if (!isoStr) return "-";
+  try {
+    const d = new Date(isoStr);
+    if (isNaN(d.getTime())) return isoStr;
+    const pad = (n) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  } catch (e) {
+    return isoStr;
+  }
+}
+
+// Formatear vista previa de detalles para la tabla
+function formatLogDetailsPreview(details, errorMessage) {
+  if (errorMessage) return `Error: ${errorMessage}`;
+  if (!details) return "-";
+  if (typeof details === "string") return details;
+  try {
+    const parts = [];
+    for (const [k, v] of Object.entries(details)) {
+      if (v !== undefined && v !== null && v !== "") {
+        if (typeof v === "object") {
+          parts.push(`${k}: ${JSON.stringify(v)}`);
+        } else {
+          parts.push(`${k}: ${v}`);
+        }
+      }
+    }
+    return parts.join(" | ") || "-";
+  } catch (e) {
+    return String(details);
+  }
+}
+
+// Registrar un nuevo log en el sistema
+function addSystemLog(entry) {
+  if (!entry) return null;
+
+  const currentUsername = getCurrentUsername();
+  const logId = "log_" + Date.now() + "_" + Math.random().toString(36).substr(2, 6);
+
+  const newLog = {
+    id: logId,
+    timestamp: entry.timestamp || new Date().toISOString(),
+    level: entry.level || "INFO",
+    action: entry.action || "SYSTEM_EVENT",
+    username: entry.username || currentUsername,
+    details: entry.details || {},
+    status: entry.status || "success",
+    errorMessage: entry.errorMessage || (entry.status === "failed" && entry.details && entry.details.error ? String(entry.details.error) : ""),
+    synced: false
+  };
+
+  try {
+    let logs = getSystemLogs();
+    logs.push(newLog);
+
+    // Límite de 500 registros locales (FIFO)
+    if (logs.length > 500) {
+      const droppedLogs = logs.slice(0, logs.length - 500);
+      const hasUnsyncedInDropped = droppedLogs.some(l => !l.synced);
+      if (hasUnsyncedInDropped && !isSyncingLogs) {
+        setTimeout(() => {
+          if (typeof syncLogsToSheets === "function") syncLogsToSheets();
+        }, 100);
+      }
+      logs = logs.slice(logs.length - 500);
+    }
+
+    saveSystemLogs(logs);
+
+    // Auto-sincronización por lote (Batch Sync al acumular 100 sin sincronizar)
+    const unsyncedCount = logs.filter(l => !l.synced).length;
+    if (unsyncedCount >= 100 && !isSyncingLogs && !String(newLog.action).startsWith("SYNC_")) {
+      setTimeout(() => {
+        if (typeof syncLogsToSheets === "function") syncLogsToSheets();
+      }, 500);
+    }
+
+    // Actualizar UI en vivo si el modal de logs está abierto
+    const logsModal = document.getElementById("modal-system-logs");
+    if (logsModal && !logsModal.classList.contains("hidden")) {
+      renderSystemLogsTable();
+    }
+
+    updateDashboardLogsUI();
+  } catch (err) {
+    console.error("Error al registrar system log:", err);
+  }
+
+  return newLog;
+}
+
+// Sincronizar logs acumulados con Google Sheets (pestaña Logs)
+async function syncLogsToSheets(isManual = false) {
+  if (isSyncingLogs) return;
+
+  if (!navigator.onLine) {
+    if (isManual) {
+      if (typeof showCloudSyncToast === "function") {
+        showCloudSyncToast("Sin conexión a internet. No se pueden sincronizar los logs.", "error");
+      } else {
+        alert("Sin conexión a internet. No se pueden sincronizar los logs.");
+      }
+    }
+    return;
+  }
+
+  const scriptUrl = getAppsScriptUrl();
+  if (!scriptUrl) {
+    if (isManual) {
+      if (typeof showCloudSyncToast === "function") {
+        showCloudSyncToast("Por favor configura la URL de Apps Script en Respaldo.", "error");
+      } else {
+        alert("Por favor configura la URL de Google Apps Script en la sección de Respaldo.");
+      }
+    }
+    return;
+  }
+
+  const allLogs = getSystemLogs();
+  const unsyncedLogs = allLogs.filter(l => !l.synced);
+  if (unsyncedLogs.length === 0) {
+    if (isManual) {
+      if (typeof showCloudSyncToast === "function") {
+        showCloudSyncToast("Todos los logs locales ya están sincronizados.", "info");
+      }
+    }
+    return;
+  }
+
+  const syncBtn = document.getElementById("btn-sync-logs-sheets");
+  const origBtnText = syncBtn ? syncBtn.innerHTML : "";
+  if (syncBtn) {
+    syncBtn.setAttribute("disabled", "true");
+    syncBtn.innerHTML = `<span>⏳</span> Sincronizando (${unsyncedLogs.length})...`;
+  }
+
+  isSyncingLogs = true;
+
+  try {
+    const payloadLogs = unsyncedLogs.map(l => ({
+      timestamp: l.timestamp || new Date().toISOString(),
+      username: l.username || "Yorgeh2023",
+      level: l.level || "INFO",
+      action: l.action || "SYSTEM_EVENT",
+      details: typeof l.details === "object" ? JSON.stringify(l.details) : String(l.details || ""),
+      status: l.status || "success",
+      errorMessage: l.errorMessage || ""
+    }));
+
+    const res = await fetch(scriptUrl, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({
+        action: "append_logs",
+        logs: payloadLogs
+      })
+    });
+
+    if (!res.ok) {
+      throw new Error(`Error en servidor Apps Script (${res.status})`);
+    }
+
+    const json = await res.json();
+    const isSuccess = json && (json.status === "success" || json.success === true);
+    if (!isSuccess) {
+      throw new Error(json.message || json.error || "No se pudo sincronizar los logs con Google Sheets.");
+    }
+
+    // Marcar logs como sincronizados en Local Storage
+    const unsyncedIds = new Set(unsyncedLogs.map(l => l.id));
+    const currentLogs = getSystemLogs();
+    currentLogs.forEach(l => {
+      if (unsyncedIds.has(l.id)) {
+        l.synced = true;
+      }
+    });
+    saveSystemLogs(currentLogs);
+
+    if (typeof showCloudSyncToast === "function") {
+      showCloudSyncToast(`✅ Sincronizados ${payloadLogs.length} logs en Google Sheets`, "success");
+    }
+
+    renderSystemLogsTable();
+    updateDashboardLogsUI();
+  } catch (err) {
+    console.error("Error al sincronizar logs con Google Sheets:", err);
+    if (isManual) {
+      const errMsg = err.message || String(err);
+      if (typeof showCloudSyncToast === "function") {
+        showCloudSyncToast(`Error al sincronizar logs: ${errMsg}`, "error");
+      } else {
+        alert(`Error al sincronizar logs: ${errMsg}`);
+      }
+    }
+  } finally {
+    isSyncingLogs = false;
+    if (syncBtn) {
+      syncBtn.removeAttribute("disabled");
+      syncBtn.innerHTML = origBtnText || `<span>☁️</span> Sincronizar con Sheets`;
+    }
+  }
+}
+
+// Limpiar únicamente los logs locales
+function clearLocalLogs() {
+  const confirmed = confirm("¿Estás seguro de que deseas limpiar los logs locales? Esta acción vaciará el historial guardado en este navegador (no afecta los logs ya registrados en Google Sheets).");
+  if (!confirmed) return;
+
+  saveSystemLogs([]);
+  renderSystemLogsTable();
+  updateDashboardLogsUI();
+
+  if (typeof showCloudSyncToast === "function") {
+    showCloudSyncToast("🗑️ Logs locales vaciados exitosamente", "info");
+  }
+}
+
+// Exportar logs a archivo CSV con UTF-8 BOM
+function exportLogsToCSV() {
+  const logs = getFilteredLogs();
+  if (!logs || logs.length === 0) {
+    if (typeof showCloudSyncToast === "function") {
+      showCloudSyncToast("No hay logs disponibles para exportar con los filtros actuales.", "info");
+    } else {
+      alert("No hay logs disponibles para exportar con los filtros actuales.");
+    }
+    return;
+  }
+
+  const escapeCSV = (val) => {
+    if (val === null || val === undefined) return '""';
+    const str = typeof val === "object" ? JSON.stringify(val) : String(val);
+    return `"${str.replace(/"/g, '""')}"`;
+  };
+
+  const headers = [
+    escapeCSV("Fecha / Hora"),
+    escapeCSV("Nivel"),
+    escapeCSV("Acción"),
+    escapeCSV("Usuario"),
+    escapeCSV("Estado"),
+    escapeCSV("Detalles"),
+    escapeCSV("Mensaje de Error")
+  ].join(",");
+
+  const rows = logs.map(l => [
+    escapeCSV(l.timestamp),
+    escapeCSV(l.level),
+    escapeCSV(l.action),
+    escapeCSV(l.username),
+    escapeCSV(l.status),
+    escapeCSV(typeof l.details === "object" ? JSON.stringify(l.details) : l.details),
+    escapeCSV(l.errorMessage || "")
+  ].join(","));
+
+  const csvContent = "\uFEFF" + [headers, ...rows].join("\r\n");
+  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  const dateStr = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+  a.href = url;
+  a.download = `hogarflex_logs_${dateStr}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+
+  if (typeof showCloudSyncToast === "function") {
+    showCloudSyncToast(`📥 Descargando archivo CSV con ${logs.length} registros...`, "success");
+  }
+}
+
+// Obtener logs filtrados según controles de la interfaz
+function getFilteredLogs() {
+  const allLogs = getSystemLogs();
+
+  const levelFilter = (document.getElementById("filter-log-level")?.value || "").trim().toUpperCase();
+  const actionFilter = (document.getElementById("filter-log-action")?.value || "").trim();
+  const dateStart = (document.getElementById("filter-log-date-start")?.value || "").trim();
+  const dateEnd = (document.getElementById("filter-log-date-end")?.value || "").trim();
+  const searchText = (document.getElementById("filter-log-search")?.value || "").trim().toLowerCase();
+
+  const filtered = allLogs.filter(log => {
+    // 1. Nivel
+    if (levelFilter && (log.level || "").toUpperCase() !== levelFilter) {
+      return false;
+    }
+
+    // 2. Acción
+    if (actionFilter && (log.action || "") !== actionFilter) {
+      return false;
+    }
+
+    // 3. Rango de fechas
+    if (dateStart || dateEnd) {
+      const logDate = (log.timestamp || "").slice(0, 10);
+      if (dateStart && logDate < dateStart) return false;
+      if (dateEnd && logDate > dateEnd) return false;
+    }
+
+    // 4. Búsqueda de texto
+    if (searchText) {
+      const actionText = (log.action || "").toLowerCase();
+      const userText = (log.username || "").toLowerCase();
+      const errText = (log.errorMessage || "").toLowerCase();
+      let detailsText = "";
+      try {
+        detailsText = typeof log.details === "object" ? JSON.stringify(log.details).toLowerCase() : String(log.details || "").toLowerCase();
+      } catch (e) {
+        detailsText = "";
+      }
+
+      if (!actionText.includes(searchText) &&
+          !userText.includes(searchText) &&
+          !errText.includes(searchText) &&
+          !detailsText.includes(searchText)) {
+        return false;
+      }
+    }
+
+    return true;
+  });
+
+  // Orden descendente (más recientes primero)
+  filtered.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+  return filtered;
+}
+
+// Renderizar tabla de logs en el modal
+function renderSystemLogsTable() {
+  const tbody = document.getElementById("tbody-system-logs");
+  const emptyState = document.getElementById("logs-empty-state");
+  const counterDisplay = document.getElementById("logs-counter-display");
+  const table = document.getElementById("table-system-logs");
+
+  const filteredLogs = getFilteredLogs();
+  const totalLogs = getSystemLogs().length;
+
+  if (counterDisplay) {
+    counterDisplay.textContent = `Mostrando ${filteredLogs.length} de ${totalLogs} logs en Local Storage (máx. 500)`;
+  }
+
+  if (!tbody) return;
+
+  if (filteredLogs.length === 0) {
+    tbody.innerHTML = "";
+    if (emptyState) emptyState.classList.remove("hidden");
+    if (table) table.classList.add("hidden");
+    return;
+  }
+
+  if (emptyState) emptyState.classList.add("hidden");
+  if (table) table.classList.remove("hidden");
+
+  tbody.innerHTML = filteredLogs.map(log => {
+    const formattedDate = formatLogTimestamp(log.timestamp);
+    const lvl = (log.level || "INFO").toUpperCase();
+    let lvlClass = "log-badge-info";
+    if (lvl === "WARNING") lvlClass = "log-badge-warning";
+    else if (lvl === "ERROR") lvlClass = "log-badge-error";
+
+    const isSuccess = log.status === "success";
+    const statusClass = isSuccess ? "log-status-success" : "log-status-failed";
+    const statusLabel = isSuccess ? "Éxito" : "Fallo";
+
+    const preview = formatLogDetailsPreview(log.details, log.errorMessage);
+    const logId = log.id;
+
+    return `
+      <tr>
+        <td style="font-family: monospace; font-size: 0.8rem; color: #475569; white-space: nowrap;">
+          ${escapeHtml(formattedDate)}
+        </td>
+        <td style="text-align: center;">
+          <span class="log-badge-level ${lvlClass}">${escapeHtml(lvl)}</span>
+        </td>
+        <td>
+          <span class="log-action-tag">${escapeHtml(log.action || "-")}</span>
+        </td>
+        <td style="color: #334155; font-weight: 500;">
+          ${escapeHtml(log.username || "-")}
+        </td>
+        <td style="text-align: center;">
+          <span class="log-status-badge ${statusClass}">${statusLabel}</span>
+        </td>
+        <td>
+          <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+            <span class="log-details-preview" title="${escapeHtml(preview)}">${escapeHtml(preview)}</span>
+            <button type="button" class="btn-log-details" onclick="openLogDetailViewer('${logId}')" title="Ver objeto JSON completo">
+              👁️ Detalle
+            </button>
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join("");
+}
+
+// Abrir sub-modal para ver el JSON detallado del log
+function openLogDetailViewer(logId) {
+  const logs = getSystemLogs();
+  const log = logs.find(l => l.id === logId);
+  const modal = document.getElementById("modal-log-detail-viewer");
+  const content = document.getElementById("log-detail-viewer-content");
+
+  if (!log || !modal || !content) return;
+
+  content.textContent = JSON.stringify(log, null, 2);
+  modal.classList.remove("hidden");
+}
+
+// Cerrar sub-modal de detalle de log
+function closeLogDetailViewer() {
+  const modal = document.getElementById("modal-log-detail-viewer");
+  if (modal) modal.classList.add("hidden");
+}
+
+// Abrir modal principal de logs
+function openSystemLogsModal() {
+  const modal = document.getElementById("modal-system-logs");
+  if (!modal) return;
+  modal.classList.remove("hidden");
+  renderSystemLogsTable();
+}
+
+// Cerrar modal principal de logs
+function closeSystemLogsModal() {
+  const modal = document.getElementById("modal-system-logs");
+  if (modal) modal.classList.add("hidden");
+}
+
+// Actualizar tarjeta resumen en el dashboard
+function updateDashboardLogsUI() {
+  const logs = getSystemLogs();
+  const total = logs.length;
+  const errorCount = logs.filter(l => l.level === "ERROR" || l.status === "failed").length;
+  const warningCount = logs.filter(l => l.level === "WARNING").length;
+  const infoCount = logs.filter(l => l.level === "INFO").length;
+
+  const summaryText = document.getElementById("dashboard-logs-summary-text");
+  if (summaryText) {
+    if (total === 0) {
+      summaryText.textContent = "Sin registros recientes de auditoría y operaciones.";
+    } else {
+      const lastLog = logs[logs.length - 1];
+      const lastAction = lastLog ? (lastLog.action || "evento") : "";
+      summaryText.textContent = `${total} eventos registrados (${infoCount} INFO, ${warningCount} WARN, ${errorCount} ERR). Último: ${lastAction}`;
+    }
+  }
+
+  const badgeError = document.getElementById("dashboard-logs-badge-error");
+  if (badgeError) {
+    if (errorCount > 0) {
+      badgeError.textContent = `${errorCount} Error(es)`;
+      badgeError.classList.remove("hidden");
+    } else {
+      badgeError.classList.add("hidden");
+    }
+  }
+}
+
+// Escuchar y registrar cambios manuales en tasas BCV
+function setupBcvRateTracking() {
+  const bcvInputIds = [
+    "credit-downpayment-rate-bcv",
+    "payment-rate-bcv-today",
+    "pay-inst-rate-bcv-today",
+    "edit-pay-rate-bcv",
+    "sale-rate-bcv",
+    "cost-rate-bcv",
+    "expense-rate-bcv"
+  ];
+
+  bcvInputIds.forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+
+    let previousVal = el.value || "";
+
+    el.addEventListener("focus", () => {
+      previousVal = el.value || "";
+    });
+
+    el.addEventListener("change", () => {
+      const newVal = el.value || "";
+      if (newVal !== previousVal && newVal !== "") {
+        addSystemLog({
+          level: "INFO",
+          action: "CHANGE_BCV",
+          details: {
+            campo: id,
+            valorAnterior: previousVal ? parseFloat(previousVal) : null,
+            nuevoValor: parseFloat(newVal)
+          },
+          status: "success"
+        });
+        previousVal = newVal;
+      }
+    });
+  });
+}
+
+// Inicializar Módulo de Logs del Sistema
+function initSystemLogsModule() {
+  // Botones de apertura del modal
+  const btnOpenHeader = document.getElementById("btn-open-system-logs");
+  if (btnOpenHeader) btnOpenHeader.addEventListener("click", openSystemLogsModal);
+
+  const btnOpenCard = document.getElementById("btn-open-system-logs-card");
+  if (btnOpenCard) btnOpenCard.addEventListener("click", openSystemLogsModal);
+
+  // Botón cerrar modal principal
+  const btnClose = document.getElementById("btn-close-system-logs");
+  if (btnClose) btnClose.addEventListener("click", closeSystemLogsModal);
+
+  // Cerrar al hacer clic en el backdrop
+  const modalLogs = document.getElementById("modal-system-logs");
+  if (modalLogs) {
+    modalLogs.addEventListener("click", (e) => {
+      if (e.target === modalLogs) closeSystemLogsModal();
+    });
+  }
+
+  // Sub-modal detalle
+  const btnCloseDetailX = document.getElementById("btn-close-log-detail-viewer");
+  if (btnCloseDetailX) btnCloseDetailX.addEventListener("click", closeLogDetailViewer);
+
+  const btnCloseDetailBtn = document.getElementById("btn-close-log-detail-viewer-btn");
+  if (btnCloseDetailBtn) btnCloseDetailBtn.addEventListener("click", closeLogDetailViewer);
+
+  const modalDetail = document.getElementById("modal-log-detail-viewer");
+  if (modalDetail) {
+    modalDetail.addEventListener("click", (e) => {
+      if (e.target === modalDetail) closeLogDetailViewer();
+    });
+  }
+
+  // Filtros
+  const filterLevel = document.getElementById("filter-log-level");
+  if (filterLevel) filterLevel.addEventListener("change", renderSystemLogsTable);
+
+  const filterAction = document.getElementById("filter-log-action");
+  if (filterAction) filterAction.addEventListener("change", renderSystemLogsTable);
+
+  const filterStart = document.getElementById("filter-log-date-start");
+  if (filterStart) filterStart.addEventListener("change", renderSystemLogsTable);
+
+  const filterEnd = document.getElementById("filter-log-date-end");
+  if (filterEnd) filterEnd.addEventListener("change", renderSystemLogsTable);
+
+  const filterSearch = document.getElementById("filter-log-search");
+  if (filterSearch) {
+    filterSearch.addEventListener("input", () => {
+      renderSystemLogsTable();
+    });
+  }
+
+  // Limpiar filtros
+  const btnReset = document.getElementById("btn-filter-logs-reset");
+  if (btnReset) {
+    btnReset.addEventListener("click", () => {
+      if (filterLevel) filterLevel.value = "";
+      if (filterAction) filterAction.value = "";
+      if (filterStart) filterStart.value = "";
+      if (filterEnd) filterEnd.value = "";
+      if (filterSearch) filterSearch.value = "";
+      renderSystemLogsTable();
+    });
+  }
+
+  // Acciones globales
+  const btnSyncSheets = document.getElementById("btn-sync-logs-sheets");
+  if (btnSyncSheets) btnSyncSheets.addEventListener("click", () => syncLogsToSheets(true));
+
+  const btnDownloadCSV = document.getElementById("btn-download-logs-csv");
+  if (btnDownloadCSV) btnDownloadCSV.addEventListener("click", exportLogsToCSV);
+
+  const btnClearLocal = document.getElementById("btn-clear-local-logs");
+  if (btnClearLocal) btnClearLocal.addEventListener("click", clearLocalLogs);
+
+  // Escucha de cambios de tasa BCV
+  setupBcvRateTracking();
+
+  // Escuchar cierre de pestaña / sesión
+  window.addEventListener("beforeunload", () => {
+    try {
+      const user = getCurrentUsername();
+      if (user) {
+        addSystemLog({
+          level: "INFO",
+          action: "SESSION_CLOSE",
+          details: { evento: "Cierre de ventana o recarga del navegador" },
+          status: "success"
+        });
+      }
+    } catch (e) {}
+  });
+
+  // Actualizar dashboard
+  updateDashboardLogsUI();
+}
+
+// Exportar funciones de Módulo 6 a window
+window.getSystemLogs = getSystemLogs;
+window.saveSystemLogs = saveSystemLogs;
+window.getCurrentUsername = getCurrentUsername;
+window.addSystemLog = addSystemLog;
+window.syncLogsToSheets = syncLogsToSheets;
+window.clearLocalLogs = clearLocalLogs;
+window.exportLogsToCSV = exportLogsToCSV;
+window.getFilteredLogs = getFilteredLogs;
+window.renderSystemLogsTable = renderSystemLogsTable;
+window.openLogDetailViewer = openLogDetailViewer;
+window.closeLogDetailViewer = closeLogDetailViewer;
+window.openSystemLogsModal = openSystemLogsModal;
+window.closeSystemLogsModal = closeSystemLogsModal;
+window.updateDashboardLogsUI = updateDashboardLogsUI;
+window.setupBcvRateTracking = setupBcvRateTracking;
+window.initSystemLogsModule = initSystemLogsModule;
+

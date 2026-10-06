@@ -182,6 +182,9 @@
             <p class="module-subtitle">Métricas clave, flujo de ingresos y control de créditos en tiempo real</p>
           </div>
           <div style="display: flex; gap: 8px; align-items: center;">
+            <button type="button" id="btn-open-system-logs" class="btn-primary-action" style="padding: 8px 16px; font-size: 0.88rem; display: flex; align-items: center; gap: 6px; background: #1e293b; color: #ffffff; border: 1px solid #334155; border-radius: 8px; font-weight: 600; cursor: pointer;">
+              <span>📋</span> Logs del Sistema
+            </button>
             <button type="button" id="btn-refresh-dashboard" class="btn-primary-action" style="padding: 8px 16px; font-size: 0.88rem; display: flex; align-items: center; gap: 6px;">
               <span>🔄</span> Actualizar
             </button>
@@ -303,6 +306,25 @@
             <div style="font-size: 2rem; margin-bottom: 6px;">🎉</div>
             <h4 style="color: #15803d; margin: 0; font-size: 1.05rem;">¡Excelente! Todos los créditos están al día</h4>
             <p style="color: #166534; font-size: 0.88rem; margin-top: 4px;">No se registran créditos con cuotas vencidas actualmente.</p>
+          </div>
+        </div>
+
+        <!-- 4. Tarjeta Resumen de Auditoría y Logs del Sistema -->
+        <div id="dashboard-audit-logs-card" class="dashboard-audit-logs-card" style="margin-top: 28px; background: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0; padding: 18px 22px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px; box-shadow: var(--shadow-sm);">
+          <div style="display: flex; align-items: center; gap: 14px;">
+            <div style="width: 44px; height: 44px; border-radius: 10px; background: rgba(26, 58, 107, 0.08); display: flex; align-items: center; justify-content: center; font-size: 1.4rem;">
+              📋
+            </div>
+            <div>
+              <h4 style="margin: 0; font-size: 1rem; color: #0f172a; font-weight: 700;">Auditoría y Logs del Sistema</h4>
+              <p style="margin: 3px 0 0 0; font-size: 0.84rem; color: #64748b;" id="dashboard-logs-summary-text">Historial de acciones de usuario, validaciones y sincronizaciones.</p>
+            </div>
+          </div>
+          <div style="display: flex; gap: 10px; align-items: center;">
+            <span id="dashboard-logs-badge-error" class="badge hidden" style="background: #fee2e2; color: #991b1b; padding: 4px 10px; border-radius: 9999px; font-size: 0.78rem; font-weight: 700;">0 Errores</span>
+            <button type="button" id="btn-open-system-logs-card" class="btn-primary-action" style="padding: 8px 16px; font-size: 0.85rem; display: flex; align-items: center; gap: 6px;">
+              Ver Panel de Logs
+            </button>
           </div>
         </div>
       </section>
@@ -3007,6 +3029,164 @@
           </div>
         </div>
       </div>
+
+      <!-- Modal: Panel de Logs del Sistema y Auditoría (Módulo 6) -->
+      <div id="modal-system-logs" class="modal-backdrop hidden" style="z-index: 2600;" role="dialog" aria-modal="true" aria-labelledby="modal-logs-title">
+        <div class="modal-card modal-card-logs" style="max-width: 1080px; width: 96%; max-height: 92vh; display: flex; flex-direction: column;">
+          <!-- Header -->
+          <div class="modal-header" style="background: #0f172a; color: #ffffff; border-bottom: 1px solid #1e293b; padding: 16px 20px;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <span style="font-size: 1.4rem;">📋</span>
+              <div>
+                <h3 id="modal-logs-title" class="modal-title" style="color: #ffffff; margin: 0; font-size: 1.15rem; font-weight: 700;">Logs del Sistema y Auditoría</h3>
+                <small style="color: #94a3b8; font-size: 0.8rem;">Registro de eventos, acciones de usuario y sincronización</small>
+              </div>
+            </div>
+            <button type="button" id="btn-close-system-logs" class="modal-close" style="color: #cbd5e1; font-size: 1.6rem; cursor: pointer; background: transparent; border: none;" aria-label="Cerrar modal">&times;</button>
+          </div>
+
+          <!-- Body -->
+          <div class="modal-body" style="padding: 18px 20px; overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 14px;">
+            
+            <!-- Barra de Filtros -->
+            <div class="logs-filter-toolbar" style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px;">
+              <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+                <!-- Filtro por Nivel -->
+                <div style="display: flex; flex-direction: column; gap: 4px; min-width: 140px;">
+                  <label for="filter-log-level" style="font-size: 0.76rem; font-weight: 600; color: #475569;">NIVEL</label>
+                  <select id="filter-log-level" class="form-input" style="padding: 7px 10px; font-size: 0.84rem; height: 38px;">
+                    <option value="">Todos los niveles</option>
+                    <option value="INFO">INFO</option>
+                    <option value="WARNING">WARNING</option>
+                    <option value="ERROR">ERROR</option>
+                  </select>
+                </div>
+
+                <!-- Filtro por Acción -->
+                <div style="display: flex; flex-direction: column; gap: 4px; min-width: 170px;">
+                  <label for="filter-log-action" style="font-size: 0.76rem; font-weight: 600; color: #475569;">ACCIÓN</label>
+                  <select id="filter-log-action" class="form-input" style="padding: 7px 10px; font-size: 0.84rem; height: 38px;">
+                    <option value="">Todas las acciones</option>
+                    <option value="CREATE_CLIENT">Crear cliente</option>
+                    <option value="UPDATE_CLIENT">Modificar cliente</option>
+                    <option value="DELETE_CLIENT">Eliminar cliente</option>
+                    <option value="CREATE_CREDIT">Crear crédito</option>
+                    <option value="DELETE_CREDIT">Eliminar crédito</option>
+                    <option value="CREATE_PAYMENT">Crear pago</option>
+                    <option value="UPDATE_PAYMENT">Modificar pago</option>
+                    <option value="DELETE_PAYMENT">Eliminar pago</option>
+                    <option value="AUDIT_STATUS_CHANGE">Cambio estatus auditoría</option>
+                    <option value="CHANGE_BCV">Cambio manual BCV</option>
+                    <option value="SYNC_SHEETS">Sincronización Sheets iniciada</option>
+                    <option value="SYNC_SHEETS_SUCCESS">Sincronización Sheets completada</option>
+                    <option value="SYNC_SHEETS_ERROR">Error sincronización Sheets</option>
+                    <option value="VALIDATION_ERROR">Validación fallida</option>
+                    <option value="OPERATION_FORBIDDEN">Operación no permitida</option>
+                    <option value="CREDIT_LIMIT_EXCEEDED">Cuota/Límite excedido</option>
+                    <option value="CALCULATE_INSTALLMENTS">Cálculo de cuotas</option>
+                    <option value="USER_LOGIN">Login</option>
+                    <option value="USER_LOGOUT">Logout</option>
+                    <option value="SESSION_CLOSE">Cierre de sesión / pestaña</option>
+                    <option value="SERVICE_WORKER_STATUS">Service Worker</option>
+                    <option value="NOTIFICATION_SENT">Notificación enviada</option>
+                  </select>
+                </div>
+
+                <!-- Filtro Desde -->
+                <div style="display: flex; flex-direction: column; gap: 4px; min-width: 140px;">
+                  <label for="filter-log-date-start" style="font-size: 0.76rem; font-weight: 600; color: #475569;">DESDE</label>
+                  <input type="date" id="filter-log-date-start" class="form-input" style="padding: 7px 10px; font-size: 0.84rem; height: 38px;">
+                </div>
+
+                <!-- Filtro Hasta -->
+                <div style="display: flex; flex-direction: column; gap: 4px; min-width: 140px;">
+                  <label for="filter-log-date-end" style="font-size: 0.76rem; font-weight: 600; color: #475569;">HASTA</label>
+                  <input type="date" id="filter-log-date-end" class="form-input" style="padding: 7px 10px; font-size: 0.84rem; height: 38px;">
+                </div>
+
+                <!-- Búsqueda texto -->
+                <div style="display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 180px;">
+                  <label for="filter-log-search" style="font-size: 0.76rem; font-weight: 600; color: #475569;">BUSCAR</label>
+                  <input type="text" id="filter-log-search" class="form-input" placeholder="Buscar texto, detalle o usuario..." style="padding: 7px 10px; font-size: 0.84rem; height: 38px;">
+                </div>
+
+                <!-- Botón Limpiar filtros -->
+                <div style="display: flex; flex-direction: column; gap: 4px; align-self: flex-end;">
+                  <label style="font-size: 0.76rem; visibility: hidden;">ACCION</label>
+                  <button type="button" id="btn-filter-logs-reset" class="btn-modal-cancel" style="padding: 8px 12px; font-size: 0.84rem; height: 38px;" title="Restablecer filtros">
+                    Limpiar Filtros
+                  </button>
+                </div>
+              </div>
+
+              <!-- Fila de Acciones Globales -->
+              <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; padding-top: 8px; border-top: 1px dashed #cbd5e1;">
+                <div id="logs-counter-display" style="font-size: 0.82rem; color: #475569; font-weight: 600;">
+                  Mostrando 0 logs (0 en Local Storage, máx. 500)
+                </div>
+                <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                  <button type="button" id="btn-sync-logs-sheets" class="btn-primary-action" style="padding: 7px 14px; font-size: 0.82rem; background: #0284c7; color: #ffffff; border: none; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 6px;" title="Enviar logs pendientes a Google Sheets">
+                    <span>☁️</span> Sincronizar con Sheets
+                  </button>
+                  <button type="button" id="btn-download-logs-csv" class="btn-primary-action" style="padding: 7px 14px; font-size: 0.82rem; background: #15803d; color: #ffffff; border: none; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 6px;" title="Exportar archivo CSV compatible con Excel">
+                    <span>📥</span> Descargar Logs (CSV)
+                  </button>
+                  <button type="button" id="btn-clear-local-logs" class="btn-modal-cancel btn-modal-danger" style="padding: 7px 14px; font-size: 0.82rem; cursor: pointer; display: flex; align-items: center; gap: 6px;" title="Borra solo Local Storage (no afecta Google Sheets)">
+                    <span>🗑️</span> Limpiar Logs Locales
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Tabla de Logs -->
+            <div class="table-responsive-wrapper" style="border: 1px solid #e2e8f0; border-radius: 8px; max-height: 480px; overflow-y: auto; background: #ffffff;">
+              <table class="data-table" id="table-system-logs" style="width: 100%; border-collapse: collapse; font-size: 0.85rem;">
+                <thead style="position: sticky; top: 0; background: #f1f5f9; z-index: 10; border-bottom: 2px solid #cbd5e1;">
+                  <tr>
+                    <th style="padding: 10px 12px; text-align: left; width: 165px;">Fecha / Hora</th>
+                    <th style="padding: 10px 12px; text-align: center; width: 90px;">Nivel</th>
+                    <th style="padding: 10px 12px; text-align: left; width: 170px;">Acción</th>
+                    <th style="padding: 10px 12px; text-align: left; width: 110px;">Usuario</th>
+                    <th style="padding: 10px 12px; text-align: center; width: 95px;">Estado</th>
+                    <th style="padding: 10px 12px; text-align: left;">Detalles</th>
+                  </tr>
+                </thead>
+                <tbody id="tbody-system-logs">
+                  <!-- Filas dinámicas -->
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Estado vacío -->
+            <div id="logs-empty-state" class="hidden" style="text-align: center; padding: 40px 20px; color: #64748b; background: #f8fafc; border-radius: 8px; border: 1px dashed #cbd5e1;">
+              <div style="font-size: 2.2rem; margin-bottom: 8px;">📭</div>
+              <h4 style="margin: 0; color: #334155; font-size: 1rem;">No hay logs para mostrar</h4>
+              <p style="margin: 4px 0 0 0; font-size: 0.82rem;">No se encontraron registros que coincidan con los filtros seleccionados.</p>
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+      <!-- Sub-Modal: Detalle Expandido de un Log -->
+      <div id="modal-log-detail-viewer" class="modal-backdrop hidden" style="z-index: 2700;" role="dialog" aria-modal="true" aria-labelledby="modal-log-viewer-title">
+        <div class="modal-card" style="max-width: 600px; width: 92%;">
+          <div class="modal-header" style="background: #1e293b; color: #ffffff;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span>🔍</span>
+              <h3 id="modal-log-viewer-title" class="modal-title" style="color: #ffffff; font-size: 1.05rem; margin: 0;">Detalle de Registro de Auditoría</h3>
+            </div>
+            <button type="button" id="btn-close-log-detail-viewer" class="modal-close" style="color: #ffffff; background: none; border: none; font-size: 1.4rem; cursor: pointer;">&times;</button>
+          </div>
+          <div class="modal-body" style="padding: 18px 20px;">
+            <div id="log-detail-viewer-content" style="background: #0f172a; color: #f8fafc; padding: 14px; border-radius: 8px; font-family: monospace; font-size: 0.82rem; overflow-x: auto; max-height: 400px; white-space: pre-wrap; word-break: break-all;">
+            </div>
+            <div style="margin-top: 16px; display: flex; justify-content: flex-end;">
+              <button type="button" id="btn-close-log-detail-viewer-btn" class="btn-modal-cancel">Cerrar</button>
+            </div>
+          </div>
+        </div>
+      </div>
     </main>
   </div>
 
@@ -3017,8 +3197,29 @@
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', function() {
         navigator.serviceWorker.register('./sw.js')
-          .then(function(reg) { console.log('SW registrado:', reg.scope); })
-          .catch(function(err) { console.log('SW error:', err); });
+          .then(function(reg) {
+            console.log('SW registrado:', reg.scope);
+            if (typeof addSystemLog === 'function') {
+              addSystemLog({
+                level: 'INFO',
+                action: 'SERVICE_WORKER_STATUS',
+                details: { scope: reg.scope, version: 'hogarflex-v20' },
+                status: 'success'
+              });
+            }
+          })
+          .catch(function(err) {
+            console.log('SW error:', err);
+            if (typeof addSystemLog === 'function') {
+              addSystemLog({
+                level: 'WARNING',
+                action: 'SERVICE_WORKER_STATUS',
+                details: { error: err.message || String(err) },
+                status: 'failed',
+                errorMessage: err.message || String(err)
+              });
+            }
+          });
       });
     }
   </script>
