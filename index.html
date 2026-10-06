@@ -703,70 +703,6 @@
           </div>
         </div>
 
-        <!-- Modal de Confirmación de Eliminación en Dos Pasos (Créditos) -->
-        <div id="modal-confirm-delete-credit" class="modal-backdrop hidden" style="z-index: 2500;" role="dialog" aria-modal="true" aria-labelledby="modal-delete-credit-title">
-          <div class="modal-card" style="max-width: 480px; width: 92%;">
-            <div class="modal-header" style="border-bottom: 1px solid #fee2e2; background: #fff5f5;">
-              <div style="display: flex; align-items: center; gap: 8px;">
-                <span style="font-size: 1.3rem;">⚠️</span>
-                <h3 id="modal-delete-credit-title" class="modal-title" style="color: #991b1b; font-size: 1.1rem; font-weight: 700;">Confirmar Eliminación de Crédito</h3>
-              </div>
-              <button type="button" id="btn-close-delete-credit-modal" class="modal-close" aria-label="Cerrar modal">&times;</button>
-            </div>
-
-            <!-- PASO 1: Confirmar eliminación del crédito escribiendo "borrar" -->
-            <div id="delete-credit-step-1" class="modal-body" style="padding: 22px;">
-              <p id="delete-credit-step-1-message" style="margin: 0 0 16px 0; font-size: 0.95rem; color: #1e293b; line-height: 1.55;">
-                ¿Seguro que deseas eliminar este crédito? Esta acción no se puede deshacer.
-              </p>
-              <p style="margin: 0 0 10px 0; font-size: 0.85rem; color: #64748b;">
-                Por motivos de seguridad, escribe la palabra <strong>borrar</strong> para continuar:
-              </p>
-              <div style="margin-bottom: 20px;">
-                <input 
-                  type="text" 
-                  id="input-confirm-delete-credit-word" 
-                  class="form-input" 
-                  placeholder="Escribe 'borrar' aquí..." 
-                  autocomplete="off" 
-                  autocapitalize="off" 
-                  spellcheck="false"
-                  style="width: 100%; border: 1.5px solid #cbd5e1; font-weight: 600; font-size: 1rem; padding: 10px 12px; border-radius: 8px;"
-                >
-              </div>
-              <div class="modal-footer-actions" style="margin-top: 10px; padding: 0; display: flex; justify-content: flex-end; gap: 10px;">
-                <button type="button" id="btn-cancel-delete-credit-step-1" class="btn-modal-cancel">Cancelar</button>
-                <button type="button" id="btn-continue-delete-credit-step-1" class="btn-modal-save btn-modal-danger" disabled>Continuar</button>
-              </div>
-            </div>
-
-            <!-- PASO 2: Pregunta en cascada si eliminar pagos asociados -->
-            <div id="delete-credit-step-2" class="modal-body hidden" style="padding: 22px;">
-              <p id="delete-credit-step-2-message" style="margin: 0 0 14px 0; font-size: 0.95rem; color: #1e293b; line-height: 1.5; font-weight: 600;">
-                ¿Deseas también eliminar los pagos asociados a este crédito? Escribe 'borrar' para confirmar
-              </p>
-              <p style="margin: 0 0 10px 0; font-size: 0.85rem; color: #64748b;">
-                Si aceptas se borrará el crédito y sus pagos. Si cancelas se eliminará solo el crédito y se recalculará.
-              </p>
-              <div style="margin-bottom: 20px;">
-                <input 
-                  type="text" 
-                  id="input-confirm-delete-credit-cascade-word" 
-                  class="form-input" 
-                  placeholder="Escribe 'borrar' aquí..." 
-                  autocomplete="off" 
-                  autocapitalize="off" 
-                  spellcheck="false"
-                  style="width: 100%; border: 1.5px solid #cbd5e1; font-weight: 600; font-size: 1rem; padding: 10px 12px; border-radius: 8px;"
-                >
-              </div>
-              <div class="modal-footer-actions" style="margin-top: 10px; padding: 0; display: flex; justify-content: flex-end; gap: 10px;">
-                <button type="button" id="btn-cancel-delete-credit-step-2" class="btn-modal-cancel" title="Eliminar solo el crédito y recalcular">Cancelar (Solo crédito)</button>
-                <button type="button" id="btn-confirm-delete-credit-cascade" class="btn-modal-save btn-modal-danger" disabled>Eliminar crédito y pagos</button>
-              </div>
-            </div>
-          </div>
-        </div>
 
         <!-- Modal Formulario para Crear Crédito -->
         <div id="credit-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="modal-credit-title">
@@ -3002,6 +2938,71 @@
             <div class="modal-footer-actions" style="margin-top: 10px; padding: 0; display: flex; justify-content: flex-end; gap: 10px;">
               <button type="button" id="btn-cancel-delete-payment" class="btn-modal-cancel">Cancelar</button>
               <button type="button" id="btn-confirm-delete-payment" class="btn-modal-save btn-modal-danger" disabled>Eliminar Pago</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal de Confirmación de Eliminación en Dos Pasos (Créditos) -->
+      <div id="modal-confirm-delete-credit" class="modal-backdrop hidden" style="z-index: 2500;" role="dialog" aria-modal="true" aria-labelledby="modal-delete-credit-title">
+        <div class="modal-card" style="max-width: 480px; width: 92%;">
+          <div class="modal-header" style="border-bottom: 1px solid #fee2e2; background: #fff5f5;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 1.3rem;">⚠️</span>
+              <h3 id="modal-delete-credit-title" class="modal-title" style="color: #991b1b; font-size: 1.1rem; font-weight: 700;">Confirmar Eliminación de Crédito</h3>
+            </div>
+            <button type="button" id="btn-close-delete-credit-modal" class="modal-close" aria-label="Cerrar modal">&times;</button>
+          </div>
+
+          <!-- PASO 1: Confirmar eliminación del crédito escribiendo "borrar" -->
+          <div id="delete-credit-step-1" class="modal-body" style="padding: 22px;">
+            <p id="delete-credit-step-1-message" style="margin: 0 0 16px 0; font-size: 0.95rem; color: #1e293b; line-height: 1.55;">
+              ¿Seguro que deseas eliminar este crédito? Esta acción no se puede deshacer.
+            </p>
+            <p style="margin: 0 0 10px 0; font-size: 0.85rem; color: #64748b;">
+              Por motivos de seguridad, escribe la palabra <strong>borrar</strong> para continuar:
+            </p>
+            <div style="margin-bottom: 20px;">
+              <input 
+                type="text" 
+                id="input-confirm-delete-credit-word" 
+                class="form-input" 
+                placeholder="Escribe 'borrar' aquí..." 
+                autocomplete="off" 
+                autocapitalize="off" 
+                spellcheck="false"
+                style="width: 100%; border: 1.5px solid #cbd5e1; font-weight: 600; font-size: 1rem; padding: 10px 12px; border-radius: 8px;"
+              >
+            </div>
+            <div class="modal-footer-actions" style="margin-top: 10px; padding: 0; display: flex; justify-content: flex-end; gap: 10px;">
+              <button type="button" id="btn-cancel-delete-credit-step-1" class="btn-modal-cancel">Cancelar</button>
+              <button type="button" id="btn-continue-delete-credit-step-1" class="btn-modal-save btn-modal-danger" disabled>Continuar</button>
+            </div>
+          </div>
+
+          <!-- PASO 2: Pregunta en cascada si eliminar pagos asociados -->
+          <div id="delete-credit-step-2" class="modal-body hidden" style="padding: 22px;">
+            <p id="delete-credit-step-2-message" style="margin: 0 0 14px 0; font-size: 0.95rem; color: #1e293b; line-height: 1.5; font-weight: 600;">
+              ¿Deseas también eliminar los pagos asociados a este crédito? Escribe 'borrar' para confirmar
+            </p>
+            <p style="margin: 0 0 10px 0; font-size: 0.85rem; color: #64748b;">
+              Si aceptas se borrará el crédito y sus pagos. Si cancelas se eliminará solo el crédito y se recalculará.
+            </p>
+            <div style="margin-bottom: 20px;">
+              <input 
+                type="text" 
+                id="input-confirm-delete-credit-cascade-word" 
+                class="form-input" 
+                placeholder="Escribe 'borrar' aquí..." 
+                autocomplete="off" 
+                autocapitalize="off" 
+                spellcheck="false"
+                style="width: 100%; border: 1.5px solid #cbd5e1; font-weight: 600; font-size: 1rem; padding: 10px 12px; border-radius: 8px;"
+              >
+            </div>
+            <div class="modal-footer-actions" style="margin-top: 10px; padding: 0; display: flex; justify-content: flex-end; gap: 10px;">
+              <button type="button" id="btn-cancel-delete-credit-step-2" class="btn-modal-cancel" title="Eliminar solo el crédito y recalcular">Cancelar (Solo crédito)</button>
+              <button type="button" id="btn-confirm-delete-credit-cascade" class="btn-modal-save btn-modal-danger" disabled>Eliminar crédito y pagos</button>
             </div>
           </div>
         </div>
