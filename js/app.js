@@ -1475,10 +1475,10 @@ function updateSelectedCreditsButton() {
   const tbody = document.getElementById("credits-tbody");
   const btnDeleteSelected = document.getElementById("btn-delete-selected-credits");
   const checkAll = document.getElementById("check-all-credits");
-  if (!tbody || !btnDeleteSelected) return;
+  if (!btnDeleteSelected) return;
 
-  const checkedBoxes = tbody.querySelectorAll(".credit-row-checkbox:checked");
-  const allBoxes = tbody.querySelectorAll(".credit-row-checkbox");
+  const checkedBoxes = tbody ? tbody.querySelectorAll(".credit-row-checkbox:checked") : document.querySelectorAll(".credit-row-checkbox:checked");
+  const allBoxes = tbody ? tbody.querySelectorAll(".credit-row-checkbox") : document.querySelectorAll(".credit-row-checkbox");
   const count = checkedBoxes.length;
 
   if (count > 0) {
@@ -3236,6 +3236,33 @@ function renderCredits() {
     };
   });
 
+  // Delegación de eventos para checkboxes en el tbody de créditos
+  if (tbody._creditCheckboxHandler) {
+    tbody.removeEventListener("change", tbody._creditCheckboxHandler);
+  }
+  tbody._creditCheckboxHandler = (e) => {
+    if (e.target && e.target.classList.contains("credit-row-checkbox")) {
+      updateSelectedCreditsButton();
+    }
+  };
+  tbody.addEventListener("change", tbody._creditCheckboxHandler);
+
+  // Checkbox maestro para créditos
+  const checkAllCredits = document.getElementById("check-all-credits");
+  if (checkAllCredits) {
+    if (checkAllCredits._masterHandler) {
+      checkAllCredits.removeEventListener("change", checkAllCredits._masterHandler);
+    }
+    checkAllCredits._masterHandler = () => {
+      const boxes = tbody.querySelectorAll(".credit-row-checkbox");
+      boxes.forEach((cb) => {
+        cb.checked = checkAllCredits.checked;
+      });
+      updateSelectedCreditsButton();
+    };
+    checkAllCredits.addEventListener("change", checkAllCredits._masterHandler);
+  }
+
   updateSelectedCreditsButton();
 }
 
@@ -4100,10 +4127,11 @@ function updateSelectedPagosButton() {
   const tbody = document.getElementById("pagos-tbody");
   const btnDeleteSelected = document.getElementById("btn-delete-selected-pagos");
   const checkAll = document.getElementById("check-all-pagos");
-  if (!tbody || !btnDeleteSelected) return;
+  if (!btnDeleteSelected) return;
 
-  const checkedBoxes = tbody.querySelectorAll(".pagos-row-checkbox:checked");
-  const allBoxes = tbody.querySelectorAll(".pagos-row-checkbox");
+  const selector = ".pagos-row-checkbox, .pago-row-checkbox";
+  const checkedBoxes = tbody ? tbody.querySelectorAll(".pagos-row-checkbox:checked, .pago-row-checkbox:checked") : document.querySelectorAll(".pagos-row-checkbox:checked, .pago-row-checkbox:checked");
+  const allBoxes = tbody ? tbody.querySelectorAll(selector) : document.querySelectorAll(selector);
   const count = checkedBoxes.length;
 
   if (count > 0) {
@@ -4572,7 +4600,7 @@ function renderPagosSection() {
     return `
       <tr>
         <td style="width: 44px; text-align: center;">
-          <input type="checkbox" class="pagos-row-checkbox" data-id="${c.id}" style="width: 17px; height: 17px; cursor: pointer;">
+          <input type="checkbox" class="pagos-row-checkbox pago-row-checkbox" data-id="${c.id}" style="width: 17px; height: 17px; cursor: pointer;">
         </td>
         <td>
           <div style="font-weight: 700; color: var(--color-primary);">${clientName}</div>
@@ -4609,8 +4637,40 @@ function renderPagosSection() {
     `;
   }).join("");
 
+  // Delegación de eventos para checkboxes en el tbody de pagos
+  if (tbody._pagoCheckboxHandler) {
+    tbody.removeEventListener("change", tbody._pagoCheckboxHandler);
+  }
+  tbody._pagoCheckboxHandler = (e) => {
+    if (e.target && (e.target.classList.contains("pago-row-checkbox") || e.target.classList.contains("pagos-row-checkbox"))) {
+      updateSelectedPagosButton();
+    }
+  };
+  tbody.addEventListener("change", tbody._pagoCheckboxHandler);
+
+  // Checkbox maestro para pagos
+  const checkAllPagos = document.getElementById("check-all-pagos");
+  if (checkAllPagos) {
+    if (checkAllPagos._masterHandler) {
+      checkAllPagos.removeEventListener("change", checkAllPagos._masterHandler);
+    }
+    checkAllPagos._masterHandler = () => {
+      const boxes = tbody.querySelectorAll(".pagos-row-checkbox, .pago-row-checkbox");
+      boxes.forEach((cb) => {
+        cb.checked = checkAllPagos.checked;
+      });
+      updateSelectedPagosButton();
+    };
+    checkAllPagos.addEventListener("change", checkAllPagos._masterHandler);
+  }
+
   updateSelectedPagosButton();
 }
+
+function renderPagos() {
+  renderPagosSection();
+}
+window.renderPagos = renderPagos;
 
 // Renderizar filas de la tabla de historial de pagos (usado por modal de detalle y modal de historial)
 function renderPaymentHistoryRows(credit, payments) {
