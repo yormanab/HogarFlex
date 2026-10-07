@@ -122,6 +122,7 @@ document.addEventListener("DOMContentLoaded", () => {
   initCierresModule();
   initGastosIngresosModule();
   initDivisasModule();
+  initTasaModeModule();
   auditCreditStatuses();
 });
 
@@ -16128,6 +16129,290 @@ window.deleteCompraDivisa = deleteCompraDivisa;
 window.switchDivisasSubtab = switchDivisasSubtab;
 window.renderDivisasModule = renderDivisasModule;
 window.initDivisasModule = initDivisasModule;
+
+// ============================================================
+// MÓDULO 10: TASA BCV AUTOMÁTICA Y SELECTOR DE MODO
+// ============================================================
+
+const BCV_LAST_TIMESTAMP_KEY = "hogarflex_last_bcv_time";
+
+/**
+ * Consulta la tasa oficial del BCV desde el backend (Apps Script).
+ * Si tiene éxito, persiste el valor en localStorage (hogarflex_last_bcv) con timestamp.
+ * Si falla, retorna la última tasa guardada como fallback si existe.
+ * 
+ * @returns {Promise<{ ok: boolean, fallback?: boolean, tasa?: number, timestamp?: string, message?: string }>}
+ */
+async function fetchTasaBCVAutomatica() {
+  const scriptUrl = typeof getAppsScriptUrl === "function" ? getAppsScriptUrl() : "";
+  const rawSaved = localStorage.getItem("hogarflex_last_bcv");
+  const lastSavedRate = (rawSaved && !isNaN(parseFloat(rawSaved)) && parseFloat(rawSaved) > 0)
+    ? parseFloat(rawSaved)
+    : null;
+  const lastTimestamp = localStorage.getItem(BCV_LAST_TIMESTAMP_KEY) || null;
+
+  // Si no hay conexión o no hay URL configurada
+  if ((typeof navigator !== "undefined" && navigator.onLine === false) || !scriptUrl) {
+    if (lastSavedRate !== null) {
+      return {
+        ok: false,
+        fallback: true,
+        tasa: lastSavedRate,
+        timestamp: lastTimestamp,
+        message: "Sin conexión. Usando última tasa guardada."
+      };
+    }
+    return {
+      ok: false,
+      fallback: false,
+      message: "No hay tasa disponible ni conexión a internet."
+    };
+  }
+
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 12000);
+
+    const res = await fetch(scriptUrl, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({
+        action: "get_tasa_bcv"
+      }),
+      signal: controller.signal
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!res.ok) {
+      throw new Error(`HTTP ${res.status}`);
+    }
+
+    const data = await res.json();
+
+    if (data && (data.success || data.status === "success") && data.tasa > 0) {
+      const tasaNum = parseFloat(data.tasa);
+      const timestamp = data.timestamp || new Date().toISOString();
+
+      // Guardar en localStorage usando la clave estándar del sistema
+      if (typeof saveLastBcvRate === "function") {
+        saveLastBcvRate(tasaNum);
+      } else {
+        localStorage.setItem("hogarflex_last_bcv", String(tasaNum));
+      }
+      localStorage.setItem(BCV_LAST_TIMESTAMP_KEY, timestamp);
+
+      if (typeof addSystemLog === "function") {
+        addSystemLog({
+          level: "INFO",
+          action: "FETCH_BCV_AUTO",
+          details: { tasa: tasaNum, origen: "bcv_oficial", timestamp: timestamp },
+          status: "success"
+        });
+      }
+
+      if (typeof updateCalcBcvResult === "function") {
+        updateCalcBcvResult();
+      }
+
+      if (typeof showCloudSyncToast === "function") {
+        showCloudSyncToast(`🌐 Tasa BCV Oficial obtenida: Bs. ${formatCierreCurrency(tasaNum)}`, "success");
+      }
+
+      return {
+        ok: true,
+        fallback: false,
+        tasa: tasaNum,
+        timestamp: timestamp,
+        message: "Tasa BCV obtenida exitosamente desde portal oficial."
+      };
+    } else {
+      throw new Error(data?.message || data?.error || "Respuesta inválida del backend");
+    }
+  } catch (err) {
+    console.warn("[Tasa BCV Auto] Error al obtener tasa oficial:", err);
+
+    if (typeof addSystemLog === "function") {
+      addSystemLog({
+        level: "WARNING",
+        action: "FETCH_BCV_AUTO",
+        details: { error: err.message, fallbackUsado: lastSavedRate !== null },
+        status: "failed"
+      });
+    }
+
+    if (lastSavedRate !== null) {
+      return {
+        ok: false,
+        fallback: true,
+        tasa: lastSavedRate,
+        timestamp: lastTimestamp,
+        message: "Sin conexión. Usando última tasa guardada."
+      };
+    }
+
+    return {
+      ok: false,
+      fallback: false,
+      message: "No hay tasa disponible. Selecciona Manual."
+    };
+  }
+}
+
+function formatBcvTimeElapsed(timestamp) {
+  if (!timestamp) return "hoy";
+  const date = new Date(timestamp);
+  if (isNaN(date.getTime())) return "hoy";
+  const diffMs = Date.now() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  if (diffMins < 1) return "hace un momento";
+  if (diffMins < 60) return `hace ${diffMins} min`;
+  const diffHours = Math.floor(diffMins / 60);
+  if (diffHours < 24) return `hace ${diffHours} h`;
+  return "hoy";
+}
+
+function resetTasaModeSelector(selectorEl) {
+  if (!selectorEl) return;
+  const buttons = selectorEl.querySelectorAll(".btn-tasa-mode");
+  buttons.forEach(b => {
+    if (b.getAttribute("data-mode") === "manual") b.classList.add("active");
+    else b.classList.remove("active");
+  });
+  const targetInputId = selectorEl.getAttribute("data-target-input");
+  const targetInput = targetInputId ? document.getElementById(targetInputId) : null;
+  if (targetInput) targetInput.disabled = false;
+  const statusEl = selectorEl.nextElementSibling && selectorEl.nextElementSibling.classList.contains("tasa-bcv-status")
+    ? selectorEl.nextElementSibling
+    : null;
+  if (statusEl) {
+    statusEl.style.display = "none";
+    statusEl.className = "tasa-bcv-status";
+    statusEl.innerHTML = "";
+  }
+}
+
+function setupTasaModeSelectors() {
+  document.querySelectorAll(".tasa-mode-selector").forEach(selectorEl => {
+    if (selectorEl.dataset.tasaSelectorInit === "true") return;
+    selectorEl.dataset.tasaSelectorInit = "true";
+
+    const targetInputId = selectorEl.getAttribute("data-target-input");
+    const targetInput = targetInputId ? document.getElementById(targetInputId) : null;
+    const statusEl = selectorEl.nextElementSibling && selectorEl.nextElementSibling.classList.contains("tasa-bcv-status")
+      ? selectorEl.nextElementSibling
+      : null;
+
+    const buttons = selectorEl.querySelectorAll(".btn-tasa-mode");
+
+    buttons.forEach(btn => {
+      btn.addEventListener("click", async (e) => {
+        e.preventDefault();
+        const mode = btn.getAttribute("data-mode");
+
+        // Marcar botón activo
+        buttons.forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+
+        if (mode === "bcv") {
+          // Deshabilitar input de tasa
+          if (targetInput) {
+            targetInput.disabled = true;
+          }
+
+          // Mostrar spinner en status
+          if (statusEl) {
+            statusEl.className = "tasa-bcv-status status-loading";
+            statusEl.innerHTML = '<span class="tasa-spinner"></span> <span>Consultando tasa oficial del BCV...</span>';
+            statusEl.style.display = "flex";
+          }
+
+          const res = await fetchTasaBCVAutomatica();
+
+          if (res.ok) {
+            if (targetInput) {
+              targetInput.value = res.tasa.toFixed(2);
+              targetInput.dispatchEvent(new Event("input", { bubbles: true }));
+              targetInput.dispatchEvent(new Event("change", { bubbles: true }));
+            }
+            if (targetInputId === "input-calc-bcv-rate-trigger" && typeof updateCalcBcvResult === "function") {
+              updateCalcBcvResult();
+            }
+            if (statusEl) {
+              const timeStr = formatBcvTimeElapsed(res.timestamp);
+              statusEl.className = "tasa-bcv-status status-success";
+              const formattedRate = typeof formatCierreCurrency === "function" ? formatCierreCurrency(res.tasa) : res.tasa.toFixed(2);
+              statusEl.innerHTML = `<span>✅ BCV Oficial: ${formattedRate} Bs — actualizado ${timeStr}</span>`;
+            }
+          } else if (res.fallback) {
+            if (targetInput) {
+              targetInput.value = res.tasa.toFixed(2);
+              targetInput.dispatchEvent(new Event("input", { bubbles: true }));
+              targetInput.dispatchEvent(new Event("change", { bubbles: true }));
+            }
+            if (targetInputId === "input-calc-bcv-rate-trigger" && typeof updateCalcBcvResult === "function") {
+              updateCalcBcvResult();
+            }
+            if (statusEl) {
+              statusEl.className = "tasa-bcv-status status-warning";
+              const formattedRate = typeof formatCierreCurrency === "function" ? formatCierreCurrency(res.tasa) : res.tasa.toFixed(2);
+              statusEl.innerHTML = `<span>⚠️ Sin conexión. Usando última tasa guardada: ${formattedRate} Bs</span>`;
+            }
+          } else {
+            // Error sin fallback
+            if (targetInput) {
+              targetInput.disabled = false;
+            }
+            if (statusEl) {
+              statusEl.className = "tasa-bcv-status status-error";
+              statusEl.innerHTML = `<span>⚠️ No hay tasa disponible. Selecciona Manual.</span>`;
+            }
+            // Activar modo Manual automáticamente
+            buttons.forEach(b => {
+              if (b.getAttribute("data-mode") === "manual") b.classList.add("active");
+              else b.classList.remove("active");
+            });
+          }
+        } else if (mode === "usdt" || mode === "zelle") {
+          // Habilitar input editable, limpiar status
+          if (targetInput) {
+            targetInput.disabled = false;
+            const tasaPar = typeof getTasaParalela === "function" ? getTasaParalela() : null;
+            if (tasaPar && (!targetInput.value || parseFloat(targetInput.value) === 0)) {
+              targetInput.value = tasaPar.toFixed(2);
+              targetInput.dispatchEvent(new Event("input", { bubbles: true }));
+              targetInput.dispatchEvent(new Event("change", { bubbles: true }));
+            }
+            targetInput.focus();
+          }
+          if (statusEl) {
+            statusEl.style.display = "none";
+          }
+        } else {
+          // Modo Manual: habilitar input editable, limpiar status
+          if (targetInput) {
+            targetInput.disabled = false;
+            targetInput.focus();
+          }
+          if (statusEl) {
+            statusEl.style.display = "none";
+          }
+        }
+      });
+    });
+  });
+}
+
+function initTasaModeModule() {
+  setupTasaModeSelectors();
+}
+
+window.fetchTasaBCVAutomatica = fetchTasaBCVAutomatica;
+window.formatBcvTimeElapsed = formatBcvTimeElapsed;
+window.resetTasaModeSelector = resetTasaModeSelector;
+window.setupTasaModeSelectors = setupTasaModeSelectors;
+window.initTasaModeModule = initTasaModeModule;
+
 
 
 

@@ -168,6 +168,10 @@ function doGet(e) {
       });
     }
 
+    if (action === "get_tasa_bcv" || action === "gettasa_bcv" || action === "tasa_bcv") {
+      return handleGetTasaBcv_();
+    }
+
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     if (!ss) {
       return errorResponse_("No se pudo acceder al Spreadsheet activo.");
@@ -231,6 +235,10 @@ function doPost(e) {
 
     var payload = JSON.parse(e.postData.contents);
     var action = (payload.action || "write").toLowerCase();
+
+    if (action === "get_tasa_bcv" || action === "gettasa_bcv" || action === "tasa_bcv") {
+      return handleGetTasaBcv_();
+    }
 
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     if (!ss) {
@@ -732,4 +740,88 @@ function errorResponse_(msg) {
     error: msg,
     message: msg
   })).setMimeType(ContentService.MimeType.JSON);
+}
+
+/**
+ * =========================================================================
+ * MÓDULO 10: TASA BCV AUTOMÁTICA
+ * =========================================================================
+ */
+function handleGetTasaBcv_() {
+  try {
+    var bcvData = fetchTasaBCVFromWeb_();
+    return jsonResponse_({
+      status: "success",
+      success: true,
+      action: "get_tasa_bcv",
+      tasa: bcvData.tasa,
+      tasa_str: bcvData.tasa_str,
+      timestamp: bcvData.timestamp,
+      message: "Tasa BCV obtenida exitosamente desde el portal oficial."
+    });
+  } catch (err) {
+    return jsonResponse_({
+      status: "error",
+      success: false,
+      action: "get_tasa_bcv",
+      error: err.toString(),
+      message: "No se pudo obtener la tasa desde el portal BCV: " + err.message
+    });
+  }
+}
+
+function fetchTasaBCVFromWeb_() {
+  var url = "https://www.bcv.org.ve/";
+  var response = UrlFetchApp.fetch(url, {
+    muteHttpExceptions: true,
+    followRedirects: true,
+    validateHttpsCertificates: false,
+    headers: {
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    }
+  });
+
+  var code = response.getResponseCode();
+  if (code !== 200) {
+    throw new Error("El portal del BCV respondió con código HTTP " + code);
+  }
+
+  var html = response.getContentText("UTF-8");
+
+  // El portal del BCV contiene la tasa del Dólar dentro de un bloque con id 'dolar':
+  // <div id="dolar"> ... <strong> 52,12340000 </strong> ... </div>
+  var match = html.match(/id=["']dolar["'][\s\S]*?<strong>\s*([0-9\.,]+)\s*<\/strong>/i);
+
+  if (!match) {
+    // Patrón alternativo: buscar texto USD seguido de strong con número
+    match = html.match(/USD[\s\S]*?<strong>\s*([0-9\.,]+)\s*<\/strong>/i);
+  }
+
+  if (!match) {
+    // Patrón alternativo: buscar Tipo de Cambio de Referencia
+    var start = html.indexOf("Tipo de Cambio de Referencia");
+    if (start !== -1) {
+      var scope = html.slice(start, start + 3500);
+      match = scope.match(/USD\s*[:\s]*([0-9\.,]+)/i) || scope.match(/([0-9]{1,3}(?:\.[0-9]{3})*,[0-9]{2,8}|[0-9]+,[0-9]{2,8})/);
+    }
+  }
+
+  if (!match) {
+    throw new Error("No se pudo localizar el valor de la tasa USD en el contenido del BCV.");
+  }
+
+  var rawStr = match[1].trim();
+  // Formato venezolano: separar puntos de miles y cambiar coma por punto
+  var cleanStr = rawStr.replace(/\./g, "").replace(",", ".");
+  var tasaNum = parseFloat(cleanStr);
+
+  if (isNaN(tasaNum) || tasaNum <= 0) {
+    throw new Error("El valor extraído no es un número válido: " + rawStr);
+  }
+
+  return {
+    tasa: Math.round(tasaNum * 10000) / 10000,
+    tasa_str: rawStr,
+    timestamp: new Date().toISOString()
+  };
 }

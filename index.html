@@ -868,7 +868,14 @@
                   <small class="field-hint">Ingresa el monto recibido en Bs. (ej: 200000)</small>
                 </div>
                 <div class="form-group">
-                  <label for="credit-downpayment-rate-bcv" class="form-label">Tasa BCV de hoy (Bs/USD)</label>
+                  <label for="credit-downpayment-rate-bcv" class="form-label">Tasa de cambio (Bs/USD)</label>
+                  <div class="tasa-mode-selector" data-target-input="credit-downpayment-rate-bcv">
+                    <button type="button" class="btn-tasa-mode active" data-mode="manual">✏️ Manual</button>
+                    <button type="button" class="btn-tasa-mode" data-mode="bcv">🌐 BCV Oficial</button>
+                    <button type="button" class="btn-tasa-mode" data-mode="usdt">💵 USDT</button>
+                    <button type="button" class="btn-tasa-mode" data-mode="zelle">💳 Zelle</button>
+                  </div>
+                  <div class="tasa-bcv-status" id="tasa-bcv-status-credit-downpayment" style="display:none"></div>
                   <div class="price-input-wrapper">
                     <span class="rate-prefix">Bs.</span>
                     <input type="number" id="credit-downpayment-rate-bcv" class="form-input rate-input" placeholder="Ej: 50.00" min="0.01" step="0.01">
@@ -1288,12 +1295,19 @@
 
               <!-- Campo Tasa BCV de hoy (solo aparece al pagar en Bolívares) -->
               <div id="payment-rate-bcv-box" class="form-group hidden">
-                <label for="payment-rate-bcv-today" class="form-label">Tasa BCV de hoy (Bs/USD)</label>
+                <label for="payment-rate-bcv-today" class="form-label">Tasa de cambio (Bs/USD)</label>
+                <div class="tasa-mode-selector" data-target-input="payment-rate-bcv-today">
+                  <button type="button" class="btn-tasa-mode active" data-mode="manual">✏️ Manual</button>
+                  <button type="button" class="btn-tasa-mode" data-mode="bcv">🌐 BCV Oficial</button>
+                  <button type="button" class="btn-tasa-mode" data-mode="usdt">💵 USDT</button>
+                  <button type="button" class="btn-tasa-mode" data-mode="zelle">💳 Zelle</button>
+                </div>
+                <div class="tasa-bcv-status" id="tasa-bcv-status-payment" style="display:none"></div>
                 <div class="price-input-wrapper">
                   <span class="rate-prefix">Bs.</span>
                   <input type="number" id="payment-rate-bcv-today" class="form-input rate-input" placeholder="Ej: 50.00" min="0.01" step="0.01">
                 </div>
-                <small class="field-hint">Ingresa la tasa BCV oficial de hoy para calcular el equivalente en USD</small>
+                <small class="field-hint">Ingresa la tasa de cambio para calcular el equivalente en USD</small>
               </div>
 
               <!-- Monto pagado en Bolívares (visible cuando elige Bolívares) -->
@@ -1439,12 +1453,19 @@
 
               <!-- Campo Tasa BCV de hoy (solo visible al pagar en Bolívares) -->
               <div id="pay-inst-rate-bcv-box" class="form-group hidden">
-                <label for="pay-inst-rate-bcv-today" class="form-label">Tasa BCV de hoy (Bs/USD)</label>
+                <label for="pay-inst-rate-bcv-today" class="form-label">Tasa de cambio (Bs/USD)</label>
+                <div class="tasa-mode-selector" data-target-input="pay-inst-rate-bcv-today">
+                  <button type="button" class="btn-tasa-mode active" data-mode="manual">✏️ Manual</button>
+                  <button type="button" class="btn-tasa-mode" data-mode="bcv">🌐 BCV Oficial</button>
+                  <button type="button" class="btn-tasa-mode" data-mode="usdt">💵 USDT</button>
+                  <button type="button" class="btn-tasa-mode" data-mode="zelle">💳 Zelle</button>
+                </div>
+                <div class="tasa-bcv-status" id="tasa-bcv-status-pay-inst" style="display:none"></div>
                 <div class="price-input-wrapper">
                   <span class="rate-prefix">Bs.</span>
                   <input type="number" id="pay-inst-rate-bcv-today" class="form-input rate-input" placeholder="Ej: 50.00" min="0.01" step="0.01">
                 </div>
-                <small class="field-hint">Ingresa la tasa BCV oficial de hoy para calcular el cobro de la cuota en Bolívares</small>
+                <small class="field-hint">Ingresa la tasa de cambio para calcular el cobro de la cuota en Bolívares</small>
               </div>
 
               <!-- Monto pagado -->
@@ -1605,7 +1626,14 @@
               </div>
 
               <div id="edit-pay-rate-bcv-box" class="form-group hidden">
-                <label for="edit-pay-rate-bcv" class="form-label">Tasa BCV de hoy (Bs/USD)</label>
+                <label for="edit-pay-rate-bcv" class="form-label">Tasa de cambio aplicada (Bs/USD)</label>
+                <div class="tasa-mode-selector" data-target-input="edit-pay-rate-bcv">
+                  <button type="button" class="btn-tasa-mode active" data-mode="manual">✏️ Manual</button>
+                  <button type="button" class="btn-tasa-mode" data-mode="bcv">🌐 BCV Oficial</button>
+                  <button type="button" class="btn-tasa-mode" data-mode="usdt">💵 USDT</button>
+                  <button type="button" class="btn-tasa-mode" data-mode="zelle">💳 Zelle</button>
+                </div>
+                <div class="tasa-bcv-status" id="tasa-bcv-status-edit-pay" style="display:none"></div>
                 <div class="price-input-wrapper">
                   <span class="rate-prefix">Bs.</span>
                   <input type="number" id="edit-pay-rate-bcv" class="form-input rate-input" step="0.01" min="0.01">
@@ -1807,12 +1835,19 @@
             <!-- Campos específicos para Bolívares (Tasa BCV y Monto Bs) -->
             <div id="sale-bs-box" class="form-grid-2col hidden" style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: var(--radius-md); padding: 12px; gap: 12px;">
               <div class="form-group" style="margin-bottom: 0;">
-                <label for="sale-rate-bcv" class="form-label">Tasa BCV de hoy (Bs/$)</label>
+                <label for="sale-rate-bcv" class="form-label">Tasa de cambio (Bs/$)</label>
+                <div class="tasa-mode-selector" data-target-input="sale-rate-bcv">
+                  <button type="button" class="btn-tasa-mode active" data-mode="manual">✏️ Manual</button>
+                  <button type="button" class="btn-tasa-mode" data-mode="bcv">🌐 BCV Oficial</button>
+                  <button type="button" class="btn-tasa-mode" data-mode="usdt">💵 USDT</button>
+                  <button type="button" class="btn-tasa-mode" data-mode="zelle">💳 Zelle</button>
+                </div>
+                <div class="tasa-bcv-status" id="tasa-bcv-status-sale" style="display:none"></div>
                 <div class="price-input-wrapper">
                   <span class="rate-prefix">Bs.</span>
                   <input type="number" id="sale-rate-bcv" class="form-input rate-input" placeholder="Ej: 52.50" step="0.01" min="0.01">
                 </div>
-                <small class="field-hint">Tasa oficial de cambio</small>
+                <small class="field-hint">Tasa para calcular la equivalencia</small>
               </div>
               <div class="form-group" style="margin-bottom: 0;">
                 <label for="sale-amount-bs" class="form-label">Monto cobrado en Bs.</label>
@@ -2377,6 +2412,13 @@
               </div>
               <div class="form-group" style="margin-bottom: 0;">
                 <label for="cost-rate-bcv" class="form-label" style="font-size: 0.8rem;">Tasa de cambio</label>
+                <div class="tasa-mode-selector" data-target-input="cost-rate-bcv">
+                  <button type="button" class="btn-tasa-mode active" data-mode="manual">✏️ Manual</button>
+                  <button type="button" class="btn-tasa-mode" data-mode="bcv">🌐 BCV Oficial</button>
+                  <button type="button" class="btn-tasa-mode" data-mode="usdt">💵 USDT</button>
+                  <button type="button" class="btn-tasa-mode" data-mode="zelle">💳 Zelle</button>
+                </div>
+                <div class="tasa-bcv-status" id="tasa-bcv-status-cost" style="display:none"></div>
                 <div class="price-input-wrapper">
                   <span class="rate-prefix">Bs.</span>
                   <input type="number" id="cost-rate-bcv" class="form-input rate-input" placeholder="Ej: 52.50" step="0.01">
@@ -2507,7 +2549,14 @@
 
             <!-- Tasa BCV si el gasto es en Bs -->
             <div id="expense-bs-box" class="form-group hidden" style="background: #f8fafc; border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 10px;">
-              <label for="expense-rate-bcv" class="form-label" style="font-size: 0.82rem;">Tasa BCV del día (para calcular equivalente en USD):</label>
+              <label for="expense-rate-bcv" class="form-label" style="font-size: 0.82rem;">Tasa de cambio (para calcular equivalente en USD):</label>
+              <div class="tasa-mode-selector" data-target-input="expense-rate-bcv">
+                <button type="button" class="btn-tasa-mode active" data-mode="manual">✏️ Manual</button>
+                <button type="button" class="btn-tasa-mode" data-mode="bcv">🌐 BCV Oficial</button>
+                <button type="button" class="btn-tasa-mode" data-mode="usdt">💵 USDT</button>
+                <button type="button" class="btn-tasa-mode" data-mode="zelle">💳 Zelle</button>
+              </div>
+              <div class="tasa-bcv-status" id="tasa-bcv-status-expense" style="display:none"></div>
               <div class="price-input-wrapper">
                 <span class="rate-prefix">Bs.</span>
                 <input type="number" id="expense-rate-bcv" class="form-input rate-input" placeholder="Ej: 52.50" step="0.01">
@@ -2908,6 +2957,13 @@
                     <label for="cierre-input-tasa-bcv" class="form-label" style="font-weight: 600; font-size: 0.82rem; color: #b45309;">
                       Tasa BCV del Día (Bs/$) *
                     </label>
+                    <div class="tasa-mode-selector" data-target-input="cierre-input-tasa-bcv">
+                      <button type="button" class="btn-tasa-mode active" data-mode="manual">✏️ Manual</button>
+                      <button type="button" class="btn-tasa-mode" data-mode="bcv">🌐 BCV Oficial</button>
+                      <button type="button" class="btn-tasa-mode" data-mode="usdt">💵 USDT</button>
+                      <button type="button" class="btn-tasa-mode" data-mode="zelle">💳 Zelle</button>
+                    </div>
+                    <div class="tasa-bcv-status" id="tasa-bcv-status-cierre" style="display:none"></div>
                     <div style="position: relative;">
                       <input type="number" id="cierre-input-tasa-bcv" class="form-input" step="0.0001" min="0.01" placeholder="Ej: 36.50" required style="border-color: #f59e0b; font-weight: 700; background: #fffbeb;">
                     </div>
@@ -3598,7 +3654,15 @@
                   </div>
                 </div>
 
-                <div style="display: flex; flex-direction: column; gap: 12px;">
+                <div style="display: flex; flex-direction: column; gap: 10px;">
+                  <div class="tasa-mode-selector" data-target-input="input-calc-bcv-rate-trigger">
+                    <button type="button" class="btn-tasa-mode active" data-mode="manual">✏️ Manual</button>
+                    <button type="button" class="btn-tasa-mode" data-mode="bcv">🌐 BCV Oficial</button>
+                    <button type="button" class="btn-tasa-mode" data-mode="usdt">💵 USDT</button>
+                    <button type="button" class="btn-tasa-mode" data-mode="zelle">💳 Zelle</button>
+                  </div>
+                  <div class="tasa-bcv-status" id="tasa-bcv-status-calc-bcv" style="display:none"></div>
+
                   <div class="form-group" style="margin: 0;">
                     <label for="input-calc-bcv-monto" class="form-label" style="font-size: 0.82rem; font-weight: 600;">Monto a convertir</label>
                     <input type="number" id="input-calc-bcv-monto" class="form-input" min="0" step="0.01" placeholder="0.00" style="font-weight: 600;">
@@ -4487,6 +4551,13 @@
             <input type="hidden" id="edit-tasa-target-type" value="">
             <div class="form-group" style="margin-bottom: 16px;">
               <label for="input-edit-tasa-val" id="label-edit-tasa-val" class="form-label" style="font-weight: 600; font-size: 0.86rem;">Nueva Tasa (Bs / USD)</label>
+              <div class="tasa-mode-selector" data-target-input="input-edit-tasa-val">
+                <button type="button" class="btn-tasa-mode active" data-mode="manual">✏️ Manual</button>
+                <button type="button" class="btn-tasa-mode" data-mode="bcv">🌐 BCV Oficial</button>
+                <button type="button" class="btn-tasa-mode" data-mode="usdt">💵 USDT</button>
+                <button type="button" class="btn-tasa-mode" data-mode="zelle">💳 Zelle</button>
+              </div>
+              <div class="tasa-bcv-status" id="tasa-bcv-status-modal-divisas" style="display:none"></div>
               <div style="position: relative;">
                 <span style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); font-weight: 700; color: #64748b; font-size: 0.82rem;">Bs.</span>
                 <input type="number" id="input-edit-tasa-val" class="form-input" min="0.01" step="0.01" placeholder="0.00" style="padding-left: 36px; font-weight: 700; font-size: 1rem;" required>
