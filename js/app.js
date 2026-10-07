@@ -121,6 +121,7 @@ document.addEventListener("DOMContentLoaded", () => {
   initSystemLogsModule();
   initCierresModule();
   initGastosIngresosModule();
+  initDivisasModule();
   auditCreditStatuses();
 });
 
@@ -287,6 +288,9 @@ function switchSection(sectionName) {
   }
   if (sectionName === "gastos-ingresos") {
     renderGastosIngresosModule();
+  }
+  if (sectionName === "divisas") {
+    renderDivisasModule();
   }
   if (sectionName === "backup") {
     renderBackupSection();
@@ -15571,6 +15575,560 @@ window.deleteProductoCatalog = deleteProductoCatalog;
 window.renderCatalogoTable = renderCatalogoTable;
 window.renderGastosIngresosModule = renderGastosIngresosModule;
 window.initGastosIngresosModule = initGastosIngresosModule;
+
+// ============================================================
+// MÓDULO 9: COMPRA DE DIVISAS + CALCULADORA
+// ============================================================
+
+const COMPRAS_DIVISAS_STORAGE_KEY = "hogarflex_compras_divisas";
+const TASA_PARALELA_STORAGE_KEY = "hogarflex_tasa_paralela";
+
+let currentDivisasSubtab = "operacion";
+let pendingDivisaCompraData = null;
+let currentEditingRateType = null; // "BCV" | "PARALELA"
+
+// Helper de acceso a LocalStorage (No sincroniza con Google Sheets)
+function getStoredComprasDivisas() {
+  try {
+    const raw = localStorage.getItem(COMPRAS_DIVISAS_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch (e) {
+    console.error("Error al leer compras de divisas:", e);
+    return [];
+  }
+}
+
+function saveStoredComprasDivisas(compras) {
+  try {
+    localStorage.setItem(COMPRAS_DIVISAS_STORAGE_KEY, JSON.stringify(compras || []));
+  } catch (e) {
+    console.error("Error al guardar compras de divisas:", e);
+  }
+}
+
+function getTasaParalela() {
+  try {
+    const raw = localStorage.getItem(TASA_PARALELA_STORAGE_KEY);
+    if (raw !== null && raw !== undefined && raw !== "") {
+      const val = parseFloat(raw);
+      if (!isNaN(val) && val > 0) return val;
+    }
+  } catch (e) {}
+  return null;
+}
+
+function saveTasaParalela(rate) {
+  const val = parseFloat(rate);
+  if (isNaN(val) || val <= 0) return false;
+  localStorage.setItem(TASA_PARALELA_STORAGE_KEY, String(val));
+  if (typeof addSystemLog === "function") {
+    addSystemLog({
+      level: "INFO",
+      action: "UPDATE_TASA_PARALELA",
+      details: { tasa_paralela: val },
+      status: "success"
+    });
+  }
+  return true;
+}
+
+// Cálculo en tiempo real de tasa implícita en la compra
+function updateImplicitRatePreview() {
+  const montoBsInput = document.getElementById("input-divisa-monto-bs");
+  const unidadesInput = document.getElementById("input-divisa-unidades");
+  const tipoSelect = document.getElementById("select-divisa-tipo");
+  const textEl = document.getElementById("divisa-tasa-implicita-text");
+  const subEl = document.getElementById("divisa-tasa-implicita-sub");
+  const btnRegistrar = document.getElementById("btn-divisa-solicitar-registro");
+
+  const montoBs = parseFloat(montoBsInput?.value) || 0;
+  const unidades = parseFloat(unidadesInput?.value) || 0;
+  const tipo = tipoSelect?.value || "USD";
+
+  if (montoBs > 0 && unidades > 0) {
+    const tasaImplicita = montoBs / unidades;
+    if (textEl) textEl.textContent = `Cada unidad te costó: Bs. ${formatCierreCurrency(tasaImplicita)}`;
+    if (subEl) subEl.textContent = `Tasa implícita: Bs. ${formatCierreCurrency(tasaImplicita)} por ${tipo}`;
+    if (btnRegistrar) btnRegistrar.classList.remove("hidden");
+  } else {
+    if (textEl) textEl.textContent = "Cada unidad te costó: Bs. 0,00";
+    if (subEl) subEl.textContent = "Calculada automáticamente (Bs gastados ÷ Unidades obtenidas)";
+    if (btnRegistrar) btnRegistrar.classList.add("hidden");
+  }
+}
+
+// Confirmación para registrar compra o solo calcular
+function promptRegisterDivisaPurchase() {
+  const montoBsInput = document.getElementById("input-divisa-monto-bs");
+  const unidadesInput = document.getElementById("input-divisa-unidades");
+  const tipoSelect = document.getElementById("select-divisa-tipo");
+
+  const montoBs = parseFloat(montoBsInput?.value) || 0;
+  const unidades = parseFloat(unidadesInput?.value) || 0;
+  const tipo = tipoSelect?.value || "USD";
+
+  if (montoBs <= 0 || unidades <= 0) {
+    alert("Por favor ingresa tanto los bolívares gastados como las unidades obtenidas.");
+    return;
+  }
+
+  const tasaImplicita = montoBs / unidades;
+
+  pendingDivisaCompraData = {
+    id: "compra_" + Date.now() + "_" + Math.random().toString(36).substr(2, 5),
+    fecha: new Date().toISOString().substring(0, 10),
+    tipo_divisa: tipo,
+    monto_bs: montoBs,
+    cantidad_obtenida: unidades,
+    tasa_implicita: tasaImplicita
+  };
+
+  const msgEl = document.getElementById("modal-confirm-divisas-msg");
+  if (msgEl) {
+    msgEl.innerHTML = `Compraste <strong>${formatCierreCurrency(unidades)} ${tipo}</strong> gastando <strong>Bs. ${formatCierreCurrency(montoBs)}</strong> (<strong>Bs. ${formatCierreCurrency(tasaImplicita)}</strong> por unidad).<br><br>¿Quieres registrar esta operación o solo estabas calculando?`;
+  }
+
+  const modal = document.getElementById("modal-confirm-compra-divisas");
+  if (modal) modal.classList.remove("hidden");
+}
+
+function confirmRegisterDivisaPurchase() {
+  if (!pendingDivisaCompraData) return;
+
+  const compras = getStoredComprasDivisas();
+  compras.unshift(pendingDivisaCompraData);
+  saveStoredComprasDivisas(compras);
+
+  if (typeof addSystemLog === "function") {
+    addSystemLog({
+      level: "INFO",
+      action: "COMPRA_DIVISAS",
+      details: {
+        id: pendingDivisaCompraData.id,
+        tipo: pendingDivisaCompraData.tipo_divisa,
+        monto_bs: pendingDivisaCompraData.monto_bs,
+        cantidad_obtenida: pendingDivisaCompraData.cantidad_obtenida,
+        tasa_implicita: pendingDivisaCompraData.tasa_implicita
+      },
+      status: "success"
+    });
+  }
+
+  const modal = document.getElementById("modal-confirm-compra-divisas");
+  if (modal) modal.classList.add("hidden");
+
+  if (typeof showCloudSyncToast === "function") {
+    showCloudSyncToast(`✅ Compra de ${formatCierreCurrency(pendingDivisaCompraData.cantidad_obtenida)} ${pendingDivisaCompraData.tipo_divisa} registrada`, "success");
+  }
+
+  // Limpiar campos para nueva operación
+  const bsInput = document.getElementById("input-divisa-monto-bs");
+  const uniInput = document.getElementById("input-divisa-unidades");
+  if (bsInput) bsInput.value = "";
+  if (uniInput) uniInput.value = "";
+  updateImplicitRatePreview();
+
+  pendingDivisaCompraData = null;
+  renderComprasDivisasTable();
+}
+
+function cancelRegisterDivisaPurchase() {
+  const modal = document.getElementById("modal-confirm-compra-divisas");
+  if (modal) modal.classList.add("hidden");
+  pendingDivisaCompraData = null;
+  // Los campos quedan igual para seguir calculando
+}
+
+// Calculadora Rápida: Tasa BCV
+function updateCalcBcvResult() {
+  const montoInput = document.getElementById("input-calc-bcv-monto");
+  const dirSelect = document.getElementById("select-calc-bcv-direccion");
+  const resEl = document.getElementById("calc-bcv-resultado");
+  const badgeRate = document.getElementById("badge-divisas-tasa-bcv");
+
+  const rate = typeof getLastBcvRate === "function" ? getLastBcvRate() : 36.50;
+  if (badgeRate) badgeRate.textContent = `Bs. ${formatCierreCurrency(rate)}`;
+
+  const monto = parseFloat(montoInput?.value) || 0;
+  const dir = dirSelect?.value || "BS_TO_USD";
+
+  if (monto <= 0) {
+    if (resEl) resEl.textContent = "—";
+    return;
+  }
+
+  if (dir === "BS_TO_USD") {
+    const usdVal = rate > 0 ? (monto / rate) : 0;
+    if (resEl) resEl.textContent = `≈ $${usdVal.toFixed(2)} USD`;
+  } else {
+    const bsVal = monto * rate;
+    if (resEl) resEl.textContent = `≈ Bs. ${formatCierreCurrency(bsVal)}`;
+  }
+}
+
+// Calculadora Rápida: Tasa Paralela (USDT / Zelle)
+function updateCalcParalelaResult() {
+  const montoInput = document.getElementById("input-calc-paralela-monto");
+  const dirSelect = document.getElementById("select-calc-paralela-direccion");
+  const resEl = document.getElementById("calc-paralela-resultado");
+  const badgeRate = document.getElementById("badge-divisas-tasa-paralela");
+  const noRateMsg = document.getElementById("calc-paralela-no-rate-msg");
+
+  const rate = getTasaParalela();
+
+  if (rate === null || rate <= 0) {
+    if (badgeRate) badgeRate.textContent = "No definida";
+    if (noRateMsg) noRateMsg.classList.remove("hidden");
+    if (resEl) resEl.textContent = "Ingresa la tasa para calcular";
+    return;
+  }
+
+  if (badgeRate) badgeRate.textContent = `Bs. ${formatCierreCurrency(rate)}`;
+  if (noRateMsg) noRateMsg.classList.add("hidden");
+
+  const monto = parseFloat(montoInput?.value) || 0;
+  const dir = dirSelect?.value || "BS_TO_PARALELA";
+
+  if (monto <= 0) {
+    if (resEl) resEl.textContent = "—";
+    return;
+  }
+
+  if (dir === "BS_TO_PARALELA") {
+    const uVal = rate > 0 ? (monto / rate) : 0;
+    if (resEl) resEl.textContent = `≈ ${uVal.toFixed(2)} USDT / Zelle`;
+  } else {
+    const bsVal = monto * rate;
+    if (resEl) resEl.textContent = `≈ Bs. ${formatCierreCurrency(bsVal)}`;
+  }
+}
+
+// Modal para editar tasas (BCV o Paralela)
+function openEditRateModal(type) {
+  currentEditingRateType = type; // "BCV" o "PARALELA"
+  const modal = document.getElementById("modal-edit-tasa-divisas");
+  const titleEl = document.getElementById("modal-edit-tasa-divisas-title");
+  const labelEl = document.getElementById("label-edit-tasa-val");
+  const inputVal = document.getElementById("input-edit-tasa-val");
+  const typeHidden = document.getElementById("edit-tasa-target-type");
+
+  if (!modal) return;
+
+  if (typeHidden) typeHidden.value = type;
+
+  if (type === "BCV") {
+    if (titleEl) titleEl.textContent = "🏦 Editar Tasa Oficial BCV";
+    if (labelEl) labelEl.textContent = "Tasa Oficial BCV (Bs / USD)";
+    const currentRate = typeof getLastBcvRate === "function" ? getLastBcvRate() : 36.50;
+    if (inputVal) inputVal.value = currentRate.toFixed(2);
+  } else {
+    if (titleEl) titleEl.textContent = "⚡ Editar Tasa Paralela (USDT / Zelle)";
+    if (labelEl) labelEl.textContent = "Tasa Paralela (Bs / USDT / Zelle)";
+    const currentRate = getTasaParalela();
+    if (inputVal) inputVal.value = currentRate ? currentRate.toFixed(2) : "";
+  }
+
+  modal.classList.remove("hidden");
+  if (inputVal) inputVal.focus();
+}
+
+function closeEditRateModal() {
+  const modal = document.getElementById("modal-edit-tasa-divisas");
+  if (modal) modal.classList.add("hidden");
+  currentEditingRateType = null;
+}
+
+function handleSaveRateSubmit(e) {
+  if (e) e.preventDefault();
+  const typeHidden = document.getElementById("edit-tasa-target-type");
+  const inputVal = document.getElementById("input-edit-tasa-val");
+  const type = typeHidden?.value || currentEditingRateType;
+  const rateNum = parseFloat(inputVal?.value) || 0;
+
+  if (rateNum <= 0) {
+    alert("Por favor ingresa una tasa válida mayor a cero.");
+    inputVal?.focus();
+    return;
+  }
+
+  if (type === "BCV") {
+    if (typeof saveLastBcvRate === "function") {
+      saveLastBcvRate(rateNum);
+    } else {
+      localStorage.setItem("hogarflex_last_bcv", String(rateNum));
+    }
+    if (typeof addSystemLog === "function") {
+      addSystemLog({
+        level: "INFO",
+        action: "UPDATE_TASA_BCV",
+        details: { tasa_bcv: rateNum, origen: "divisas_calculadora" },
+        status: "success"
+      });
+    }
+    updateCalcBcvResult();
+    if (typeof showCloudSyncToast === "function") {
+      showCloudSyncToast(`🏦 Tasa BCV actualizada a Bs. ${formatCierreCurrency(rateNum)}`, "success");
+    }
+  } else {
+    saveTasaParalela(rateNum);
+    updateCalcParalelaResult();
+    if (typeof showCloudSyncToast === "function") {
+      showCloudSyncToast(`⚡ Tasa Paralela actualizada a Bs. ${formatCierreCurrency(rateNum)}`, "success");
+    }
+  }
+
+  closeEditRateModal();
+}
+
+// Historial de compras de divisas
+function renderComprasDivisasTable() {
+  const tbody = document.getElementById("tbody-compras-divisas");
+  const emptyState = document.getElementById("divisas-empty-state");
+  const statsContainer = document.getElementById("divisas-stats-badges");
+
+  if (!tbody) return;
+
+  const compras = getStoredComprasDivisas();
+
+  if (compras.length === 0) {
+    tbody.innerHTML = "";
+    if (emptyState) emptyState.classList.remove("hidden");
+    if (statsContainer) statsContainer.innerHTML = "";
+    return;
+  }
+
+  if (emptyState) emptyState.classList.add("hidden");
+
+  let totalBs = 0;
+  let totalUSD = 0;
+  let totalUSDT = 0;
+  let totalZelle = 0;
+
+  const rowsHtml = compras.map(c => {
+    const montoBs = parseFloat(c.monto_bs) || 0;
+    const cant = parseFloat(c.cantidad_obtenida) || 0;
+    const tasa = parseFloat(c.tasa_implicita) || 0;
+    const tipo = String(c.tipo_divisa || "USD").toUpperCase();
+
+    totalBs += montoBs;
+    if (tipo === "USD") totalUSD += cant;
+    else if (tipo === "USDT") totalUSDT += cant;
+    else if (tipo === "ZELLE") totalZelle += cant;
+
+    let badgeClass = "badge-divisa-usd";
+    if (tipo === "USDT") badgeClass = "badge-divisa-usdt";
+    else if (tipo === "ZELLE") badgeClass = "badge-divisa-zelle";
+
+    return `
+      <tr>
+        <td style="font-family: monospace; white-space: nowrap; color: #475569;">${escapeHtml(c.fecha || "—")}</td>
+        <td><span class="badge ${badgeClass}">${escapeHtml(tipo)}</span></td>
+        <td style="text-align: right; font-family: monospace; font-weight: 700; color: #be123c;">
+          Bs. ${formatCierreCurrency(montoBs)}
+        </td>
+        <td style="text-align: right; font-family: monospace; font-weight: 700; color: #047857;">
+          ${formatCierreCurrency(cant)} ${escapeHtml(tipo)}
+        </td>
+        <td style="text-align: right; font-family: monospace; color: #1e293b; font-weight: 600;">
+          Bs. ${formatCierreCurrency(tasa)}
+        </td>
+        <td style="text-align: center; white-space: nowrap;">
+          <button type="button" class="btn-action-delete-compra" data-id="${escapeHtml(c.id)}" title="Eliminar compra" style="background: none; border: 1px solid #fecaca; border-radius: 4px; padding: 4px 8px; cursor: pointer; font-size: 0.85rem; color: #dc2626;">
+            🗑️
+          </button>
+        </td>
+      </tr>
+    `;
+  }).join("");
+
+  tbody.innerHTML = rowsHtml;
+
+  // Render chips de resumen
+  if (statsContainer) {
+    let chipsHtml = `
+      <span class="divisa-stat-chip" style="background: #fdf2f8; border-color: #fbcfe8; color: #9d174d;">
+        Total Bs: <strong>Bs. ${formatCierreCurrency(totalBs)}</strong>
+      </span>
+    `;
+    if (totalUSD > 0) {
+      chipsHtml += `
+        <span class="divisa-stat-chip" style="background: #ecfdf5; border-color: #a7f3d0; color: #065f46;">
+          USD: <strong>$${formatCierreCurrency(totalUSD)}</strong>
+        </span>
+      `;
+    }
+    if (totalUSDT > 0) {
+      chipsHtml += `
+        <span class="divisa-stat-chip" style="background: #e0f2fe; border-color: #bae6fd; color: #075985;">
+          USDT: <strong>${formatCierreCurrency(totalUSDT)}</strong>
+        </span>
+      `;
+    }
+    if (totalZelle > 0) {
+      chipsHtml += `
+        <span class="divisa-stat-chip" style="background: #f3e8ff; border-color: #e9d5ff; color: #6b21a8;">
+          Zelle: <strong>${formatCierreCurrency(totalZelle)}</strong>
+        </span>
+      `;
+    }
+    statsContainer.innerHTML = chipsHtml;
+  }
+
+  // Listeners de eliminar compra
+  tbody.querySelectorAll(".btn-action-delete-compra").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const id = btn.getAttribute("data-id");
+      if (id) deleteCompraDivisa(id);
+    });
+  });
+}
+
+function deleteCompraDivisa(id) {
+  const compras = getStoredComprasDivisas();
+  const compra = compras.find(c => String(c.id) === String(id));
+  if (!compra) return;
+
+  if (!confirm(`¿Estás seguro de que deseas eliminar esta compra de ${compra.cantidad_obtenida} ${compra.tipo_divisa} por Bs. ${formatCierreCurrency(compra.monto_bs)}?`)) {
+    return;
+  }
+
+  const updated = compras.filter(c => String(c.id) !== String(id));
+  saveStoredComprasDivisas(updated);
+
+  if (typeof addSystemLog === "function") {
+    addSystemLog({
+      level: "INFO",
+      action: "DELETE_COMPRA_DIVISAS",
+      details: { id: compra.id, tipo: compra.tipo_divisa, monto_bs: compra.monto_bs, cantidad_obtenida: compra.cantidad_obtenida },
+      status: "success"
+    });
+  }
+
+  renderComprasDivisasTable();
+
+  if (typeof showCloudSyncToast === "function") {
+    showCloudSyncToast("🗑️ Compra de divisas eliminada", "info");
+  }
+}
+
+// Subnavegación del Módulo 9
+function switchDivisasSubtab(targetSubtab) {
+  currentDivisasSubtab = targetSubtab;
+  const tabs = document.querySelectorAll(".divisas-subnav .subnav-tab");
+  tabs.forEach(t => {
+    if (t.getAttribute("data-divisassubtab") === targetSubtab) {
+      t.classList.add("active");
+    } else {
+      t.classList.remove("active");
+    }
+  });
+
+  const viewOp = document.getElementById("subtab-content-divisas-operacion");
+  const viewHist = document.getElementById("subtab-content-divisas-historial");
+
+  if (targetSubtab === "operacion") {
+    if (viewOp) viewOp.classList.remove("hidden");
+    if (viewHist) viewHist.classList.add("hidden");
+    updateCalcBcvResult();
+    updateCalcParalelaResult();
+  } else {
+    if (viewOp) viewOp.classList.add("hidden");
+    if (viewHist) viewHist.classList.remove("hidden");
+    renderComprasDivisasTable();
+  }
+}
+
+function renderDivisasModule() {
+  updateImplicitRatePreview();
+  updateCalcBcvResult();
+  updateCalcParalelaResult();
+  renderComprasDivisasTable();
+  switchDivisasSubtab(currentDivisasSubtab || "operacion");
+}
+
+function initDivisasModule() {
+  // Subnav
+  const subnavBtns = document.querySelectorAll(".divisas-subnav .subnav-tab");
+  subnavBtns.forEach(btn => {
+    btn.addEventListener("click", () => {
+      const target = btn.getAttribute("data-divisassubtab");
+      if (target) switchDivisasSubtab(target);
+    });
+  });
+
+  // Inputs compra
+  const bsInput = document.getElementById("input-divisa-monto-bs");
+  const uniInput = document.getElementById("input-divisa-unidades");
+  const tipoSelect = document.getElementById("select-divisa-tipo");
+  const btnSolicitarReg = document.getElementById("btn-divisa-solicitar-registro");
+
+  if (bsInput) bsInput.addEventListener("input", updateImplicitRatePreview);
+  if (uniInput) uniInput.addEventListener("input", updateImplicitRatePreview);
+  if (tipoSelect) tipoSelect.addEventListener("change", updateImplicitRatePreview);
+  if (btnSolicitarReg) btnSolicitarReg.addEventListener("click", promptRegisterDivisaPurchase);
+
+  // Botones confirmación compra
+  const btnConfirm = document.getElementById("btn-confirm-save-divisa");
+  const btnCancel = document.getElementById("btn-cancel-save-divisa");
+  if (btnConfirm) btnConfirm.addEventListener("click", confirmRegisterDivisaPurchase);
+  if (btnCancel) btnCancel.addEventListener("click", cancelRegisterDivisaPurchase);
+
+  // Calculadora BCV
+  const inputCalcBcv = document.getElementById("input-calc-bcv-monto");
+  const selectCalcBcvDir = document.getElementById("select-calc-bcv-direccion");
+  const btnEditBcv = document.getElementById("btn-edit-tasa-bcv-divisas");
+
+  if (inputCalcBcv) inputCalcBcv.addEventListener("input", updateCalcBcvResult);
+  if (selectCalcBcvDir) selectCalcBcvDir.addEventListener("change", updateCalcBcvResult);
+  if (btnEditBcv) btnEditBcv.addEventListener("click", () => openEditRateModal("BCV"));
+
+  // Calculadora Paralela
+  const inputCalcParalela = document.getElementById("input-calc-paralela-monto");
+  const selectCalcParalelaDir = document.getElementById("select-calc-paralela-direccion");
+  const btnEditParalela = document.getElementById("btn-edit-tasa-paralela-divisas");
+
+  if (inputCalcParalela) inputCalcParalela.addEventListener("input", updateCalcParalelaResult);
+  if (selectCalcParalelaDir) selectCalcParalelaDir.addEventListener("change", updateCalcParalelaResult);
+  if (btnEditParalela) btnEditParalela.addEventListener("click", () => openEditRateModal("PARALELA"));
+
+  // Modal editar tasa
+  const btnCloseEditTasa = document.getElementById("btn-close-edit-tasa-divisas");
+  const btnCancelEditTasa = document.getElementById("btn-cancel-edit-tasa-divisas");
+  const formEditTasa = document.getElementById("form-edit-tasa-divisas");
+
+  if (btnCloseEditTasa) btnCloseEditTasa.addEventListener("click", closeEditRateModal);
+  if (btnCancelEditTasa) btnCancelEditTasa.addEventListener("click", closeEditRateModal);
+  if (formEditTasa) formEditTasa.addEventListener("submit", handleSaveRateSubmit);
+
+  // Inicializar vistas
+  updateImplicitRatePreview();
+  updateCalcBcvResult();
+  updateCalcParalelaResult();
+  renderComprasDivisasTable();
+}
+
+// Exportar funciones del Módulo 9 a window
+window.COMPRAS_DIVISAS_STORAGE_KEY = COMPRAS_DIVISAS_STORAGE_KEY;
+window.TASA_PARALELA_STORAGE_KEY = TASA_PARALELA_STORAGE_KEY;
+window.getStoredComprasDivisas = getStoredComprasDivisas;
+window.saveStoredComprasDivisas = saveStoredComprasDivisas;
+window.getTasaParalela = getTasaParalela;
+window.saveTasaParalela = saveTasaParalela;
+window.updateImplicitRatePreview = updateImplicitRatePreview;
+window.promptRegisterDivisaPurchase = promptRegisterDivisaPurchase;
+window.confirmRegisterDivisaPurchase = confirmRegisterDivisaPurchase;
+window.cancelRegisterDivisaPurchase = cancelRegisterDivisaPurchase;
+window.updateCalcBcvResult = updateCalcBcvResult;
+window.updateCalcParalelaResult = updateCalcParalelaResult;
+window.openEditRateModal = openEditRateModal;
+window.closeEditRateModal = closeEditRateModal;
+window.handleSaveRateSubmit = handleSaveRateSubmit;
+window.renderComprasDivisasTable = renderComprasDivisasTable;
+window.deleteCompraDivisa = deleteCompraDivisa;
+window.switchDivisasSubtab = switchDivisasSubtab;
+window.renderDivisasModule = renderDivisasModule;
+window.initDivisasModule = initDivisasModule;
+
 
 
 

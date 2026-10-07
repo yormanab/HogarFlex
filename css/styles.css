@@ -3827,3 +3827,62 @@ body {
   padding: 10px 14px;
   vertical-align: middle;
 }
+
+/* ============================================================ */
+/* MÓDULO 9: COMPRA DE DIVISAS + CALCULADORA                   */
+/* ============================================================ */
+
+.badge-divisa {
+  padding: 3px 9px;
+  border-radius: 6px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.badge-divisa-usd {
+  background: #ecfdf5;
+  color: #047857;
+  border: 1px solid #a7f3d0;
+}
+
+.badge-divisa-usdt {
+  background: #e0f2fe;
+  color: #0284c7;
+  border: 1px solid #bae6fd;
+}
+
+.badge-divisa-zelle {
+  background: #f3e8ff;
+  color: #7e22ce;
+  border: 1px solid #e9d5ff;
+}
+
+.divisa-stat-chip {
+  padding: 4px 10px;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  color: #334155;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+#table-compras-divisas tbody tr {
+  border-bottom: 1px solid #f1f5f9;
+  transition: background-color 0.15s ease;
+}
+
+#table-compras-divisas tbody tr:hover {
+  background-color: #f8fafc;
+}
+
+#table-compras-divisas tbody td {
+  padding: 10px 14px;
+  vertical-align: middle;
+}
