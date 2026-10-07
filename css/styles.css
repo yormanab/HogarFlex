@@ -3651,3 +3651,179 @@ body {
 #table-cierres-history tbody td {
   padding: 10px 14px;
 }
+
+/* ============================================================
+   MÓDULO 8: GASTOS, INGRESOS Y CATÁLOGO DE PRODUCTOS
+   ============================================================ */
+
+/* Drawer Lateral de Productos (NO un modal que tape el formulario) */
+.product-catalog-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 420px;
+  max-width: 92vw;
+  height: 100vh;
+  background: #ffffff;
+  box-shadow: -10px 0 35px rgba(15, 23, 42, 0.22);
+  z-index: 10050;
+  transform: translateX(100%);
+  transition: transform 0.32s cubic-bezier(0.16, 1, 0.3, 1);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-left: 1px solid #cbd5e1;
+}
+
+.product-catalog-drawer.open {
+  transform: translateX(0);
+}
+
+.product-drawer-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid #e2e8f0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #f8fafc;
+  flex-shrink: 0;
+}
+
+.drawer-close-btn {
+  background: none;
+  border: none;
+  font-size: 1.6rem;
+  color: #64748b;
+  cursor: pointer;
+  line-height: 1;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: all 0.15s ease;
+}
+
+.drawer-close-btn:hover {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+.product-drawer-body {
+  padding: 20px;
+  overflow-y: auto;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.product-drawer-footer {
+  padding: 14px 20px;
+  border-top: 1px solid #e2e8f0;
+  background: #f8fafc;
+  display: flex;
+  gap: 10px;
+  flex-shrink: 0;
+  margin-top: auto;
+}
+
+@media (max-width: 640px) {
+  .product-catalog-drawer {
+    top: auto;
+    bottom: 0;
+    right: 0;
+    left: 0;
+    width: 100%;
+    max-width: 100%;
+    height: auto;
+    max-height: 88vh;
+    border-radius: 20px 20px 0 0;
+    border-left: none;
+    border-top: 1px solid #cbd5e1;
+    transform: translateY(100%);
+    box-shadow: 0 -10px 35px rgba(15, 23, 42, 0.28);
+  }
+
+  .product-catalog-drawer.open {
+    transform: translateY(0);
+  }
+}
+
+/* Badges de Categoría de Gastos */
+.badge-cat-gasto {
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  display: inline-block;
+  text-align: center;
+}
+
+.badge-cat-inventario {
+  background: #e0f2fe;
+  color: #0369a1;
+  border: 1px solid #bae6fd;
+}
+
+.badge-cat-personal {
+  background: #f3e8ff;
+  color: #7e22ce;
+  border: 1px solid #e9d5ff;
+}
+
+.badge-cat-operativo {
+  background: #fef3c7;
+  color: #b45309;
+  border: 1px solid #fde68a;
+}
+
+.badge-cat-otro {
+  background: #f1f5f9;
+  color: #475569;
+  border: 1px solid #cbd5e1;
+}
+
+/* Badges de Origen de Gastos */
+.badge-origen-gasto {
+  font-size: 0.75rem;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-weight: 600;
+  display: inline-block;
+}
+
+.badge-origen-manual {
+  background: #f8fafc;
+  color: #64748b;
+  border: 1px solid #e2e8f0;
+}
+
+.badge-origen-credito {
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
+}
+
+.badge-origen-pago {
+  background: #ecfdf5;
+  color: #047857;
+  border: 1px solid #a7f3d0;
+}
+
+/* Tablas de Módulo 8 */
+#table-gastos tbody tr,
+#table-ingresos tbody tr,
+#table-catalogo-productos tbody tr {
+  border-bottom: 1px solid #f1f5f9;
+  transition: background-color 0.15s ease;
+}
+
+#table-gastos tbody tr:hover,
+#table-ingresos tbody tr:hover,
+#table-catalogo-productos tbody tr:hover {
+  background-color: #f8fafc;
+}
+
+#table-gastos tbody td,
+#table-ingresos tbody td,
+#table-catalogo-productos tbody td {
+  padding: 10px 14px;
+  vertical-align: middle;
+}

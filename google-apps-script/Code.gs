@@ -23,7 +23,9 @@ var SHEET_NAMES = {
   PRODUCTOS: "Productos",
   CONFIG: "Config",
   LOGS: "Logs",
-  CIERRES: "Cierres"
+  CIERRES: "Cierres",
+  GASTOS: "Gastos",
+  INGRESOS: "Ingresos"
 };
 
 // Encabezados por defecto para crear pestañas si están vacías
@@ -37,7 +39,9 @@ var DEFAULT_HEADERS = {
   Productos: ["ID", "Nombre", "Descripción", "Precio USD", "Categoría", "Stock"],
   Config: ["Parámetro", "Valor"],
   Logs: ["timestamp", "username", "level", "action", "details", "status", "errorMessage"],
-  Cierres: ["id", "fecha", "quincena", "mes", "año", "tasa_bcv", "bs_efectivo", "usd_efectivo", "usd_digital", "total_activos_bs", "gastos_detalle", "total_gastos", "capital_neto", "en_la_calle"]
+  Cierres: ["id", "fecha", "quincena", "mes", "año", "tasa_bcv", "bs_efectivo", "usd_efectivo", "usd_digital", "total_activos_bs", "gastos_detalle", "total_gastos", "capital_neto", "en_la_calle"],
+  Gastos: ["id", "fecha", "descripcion", "categoria", "monto_original", "moneda", "monto_bs", "tasa_bcv_usada", "origen"],
+  Ingresos: ["id", "fecha", "descripcion", "monto_original", "moneda", "monto_bs", "tasa_bcv_usada"]
 };
 
 /**
@@ -179,7 +183,9 @@ function doGet(e) {
       SHEET_NAMES.FACTURAS,
       SHEET_NAMES.PRODUCTOS,
       SHEET_NAMES.CONFIG,
-      SHEET_NAMES.CIERRES
+      SHEET_NAMES.CIERRES,
+      SHEET_NAMES.GASTOS,
+      SHEET_NAMES.INGRESOS
     ];
 
     targetSheets.forEach(function(sheetName) {
@@ -378,6 +384,45 @@ function doPost(e) {
       });
     }
 
+    // Acción para guardar o actualizar gasto en la pestaña Gastos (Módulo 8)
+    if (action === "save_gasto" || action === "savegasto") {
+      var gastoPayload = payload.data || payload.gasto || payload;
+      var savedGastoCount = saveGasto(gastoPayload);
+      return jsonResponse_({
+        status: "success",
+        success: true,
+        action: "save_gasto",
+        rowsAffected: savedGastoCount,
+        message: "Gasto guardado exitosamente en Google Sheets."
+      });
+    }
+
+    // Acción para guardar o actualizar ingreso en la pestaña Ingresos (Módulo 8)
+    if (action === "save_ingreso" || action === "saveingreso") {
+      var ingresoPayload = payload.data || payload.ingreso || payload;
+      var savedIngresoCount = saveIngreso(ingresoPayload);
+      return jsonResponse_({
+        status: "success",
+        success: true,
+        action: "save_ingreso",
+        rowsAffected: savedIngresoCount,
+        message: "Ingreso guardado exitosamente en Google Sheets."
+      });
+    }
+
+    // Acción para guardar o actualizar producto en la pestaña Productos (Módulo 8 - sin imagen)
+    if (action === "save_producto" || action === "saveproducto") {
+      var prodPayload = payload.data || payload.producto || payload;
+      var savedProdCount = saveProducto(prodPayload);
+      return jsonResponse_({
+        status: "success",
+        success: true,
+        action: "save_producto",
+        rowsAffected: savedProdCount,
+        message: "Producto guardado exitosamente en Google Sheets."
+      });
+    }
+
     return errorResponse_("Acción no reconocida: " + action);
   } catch (err) {
     return errorResponse_("Error en doPost: " + err.toString());
@@ -476,6 +521,176 @@ function saveCierre(data) {
     for (var r = 1; r < currentValues.length; r++) {
       if (String(currentValues[r][0]) === String(rowVals[0])) {
         matchedRowIdx = r + 1; // 1-indexed para SpreadsheetApp
+        break;
+      }
+    }
+
+    if (matchedRowIdx > 0) {
+      sheet.getRange(matchedRowIdx, 1, 1, rowVals.length).setValues([rowVals]);
+    } else {
+      rowsToAppend.push(rowVals);
+    }
+  });
+
+  if (rowsToAppend.length > 0) {
+    var startRow = sheet.getLastRow() + 1;
+    sheet.getRange(startRow, 1, rowsToAppend.length, headers.length).setValues(rowsToAppend);
+  }
+
+  SpreadsheetApp.flush();
+  return items.length;
+}
+
+/**
+ * Guarda o actualiza registros en la pestaña Gastos en Google Sheets (Módulo 8)
+ * Columnas: id | fecha | descripcion | categoria | monto_original | moneda | monto_bs | tasa_bcv_usada | origen
+ */
+function saveGasto(data) {
+  if (!data) return 0;
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = getOrCreateSheet_(ss, SHEET_NAMES.GASTOS || "Gastos");
+  var headers = DEFAULT_HEADERS.Gastos || [
+    "id", "fecha", "descripcion", "categoria", "monto_original", "moneda", "monto_bs", "tasa_bcv_usada", "origen"
+  ];
+
+  if (sheet.getLastRow() === 0) {
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+  }
+
+  var items = Array.isArray(data) ? data : [data];
+  if (items.length === 0) return 0;
+
+  var currentValues = sheet.getDataRange().getValues();
+  var rowsToAppend = [];
+
+  items.forEach(function(item) {
+    var rowVals = [
+      String(item.id || ("gasto_" + Date.now())),
+      String(item.fecha || ""),
+      String(item.descripcion || ""),
+      String(item.categoria || "Operativo"),
+      parseFloat(item.monto_original || item.monto || 0) || 0,
+      String(item.moneda || "Bs"),
+      parseFloat(item.monto_bs || 0) || 0,
+      parseFloat(item.tasa_bcv_usada || 0) || 0,
+      String(item.origen || "manual")
+    ];
+
+    var matchedRowIdx = -1;
+    for (var r = 1; r < currentValues.length; r++) {
+      if (String(currentValues[r][0]) === String(rowVals[0])) {
+        matchedRowIdx = r + 1;
+        break;
+      }
+    }
+
+    if (matchedRowIdx > 0) {
+      sheet.getRange(matchedRowIdx, 1, 1, rowVals.length).setValues([rowVals]);
+    } else {
+      rowsToAppend.push(rowVals);
+    }
+  });
+
+  if (rowsToAppend.length > 0) {
+    var startRow = sheet.getLastRow() + 1;
+    sheet.getRange(startRow, 1, rowsToAppend.length, headers.length).setValues(rowsToAppend);
+  }
+
+  SpreadsheetApp.flush();
+  return items.length;
+}
+
+/**
+ * Guarda o actualiza registros en la pestaña Ingresos en Google Sheets (Módulo 8)
+ * Columnas: id | fecha | descripcion | monto_original | moneda | monto_bs | tasa_bcv_usada
+ */
+function saveIngreso(data) {
+  if (!data) return 0;
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = getOrCreateSheet_(ss, SHEET_NAMES.INGRESOS || "Ingresos");
+  var headers = DEFAULT_HEADERS.Ingresos || [
+    "id", "fecha", "descripcion", "monto_original", "moneda", "monto_bs", "tasa_bcv_usada"
+  ];
+
+  if (sheet.getLastRow() === 0) {
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+  }
+
+  var items = Array.isArray(data) ? data : [data];
+  if (items.length === 0) return 0;
+
+  var currentValues = sheet.getDataRange().getValues();
+  var rowsToAppend = [];
+
+  items.forEach(function(item) {
+    var rowVals = [
+      String(item.id || ("ingreso_" + Date.now())),
+      String(item.fecha || ""),
+      String(item.descripcion || ""),
+      parseFloat(item.monto_original || item.monto || 0) || 0,
+      String(item.moneda || "Bs"),
+      parseFloat(item.monto_bs || 0) || 0,
+      parseFloat(item.tasa_bcv_usada || 0) || 0
+    ];
+
+    var matchedRowIdx = -1;
+    for (var r = 1; r < currentValues.length; r++) {
+      if (String(currentValues[r][0]) === String(rowVals[0])) {
+        matchedRowIdx = r + 1;
+        break;
+      }
+    }
+
+    if (matchedRowIdx > 0) {
+      sheet.getRange(matchedRowIdx, 1, 1, rowVals.length).setValues([rowVals]);
+    } else {
+      rowsToAppend.push(rowVals);
+    }
+  });
+
+  if (rowsToAppend.length > 0) {
+    var startRow = sheet.getLastRow() + 1;
+    sheet.getRange(startRow, 1, rowsToAppend.length, headers.length).setValues(rowsToAppend);
+  }
+
+  SpreadsheetApp.flush();
+  return items.length;
+}
+
+/**
+ * Guarda o actualiza registros en la pestaña Productos en Google Sheets (Módulo 8 - Sin imagen)
+ * Columnas: id | nombre | distribuidor | precio_compra_bs | precio_venta_bs | fecha_registro
+ */
+function saveProducto(data) {
+  if (!data) return 0;
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = getOrCreateSheet_(ss, SHEET_NAMES.PRODUCTOS || "Productos");
+  var headers = ["id", "nombre", "distribuidor", "precio_compra_bs", "precio_venta_bs", "fecha_registro"];
+
+  if (sheet.getLastRow() === 0) {
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+  }
+
+  var items = Array.isArray(data) ? data : [data];
+  if (items.length === 0) return 0;
+
+  var currentValues = sheet.getDataRange().getValues();
+  var rowsToAppend = [];
+
+  items.forEach(function(item) {
+    var rowVals = [
+      String(item.id || ("prod_" + Date.now())),
+      String(item.nombre || item.name || ""),
+      String(item.distribuidor || item.distributor || item.supplier || ""),
+      parseFloat(item.precio_compra_bs || item.costPrice || 0) || 0,
+      parseFloat(item.precio_venta_bs || item.salePrice || item.price || 0) || 0,
+      String(item.fecha_registro || new Date().toISOString().split("T")[0])
+    ];
+
+    var matchedRowIdx = -1;
+    for (var r = 1; r < currentValues.length; r++) {
+      if (String(currentValues[r][0]) === String(rowVals[0])) {
+        matchedRowIdx = r + 1;
         break;
       }
     }

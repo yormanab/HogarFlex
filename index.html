@@ -169,6 +169,13 @@
           <span>Cierres</span>
         </button>
 
+        <button class="nav-tab" data-section="gastos-ingresos" id="nav-tab-gastos-ingresos" type="button">
+          <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 013 6H2.25m0 0v11.25c0 .621.504 1.125 1.125 1.125h17.25c.621 0 1.125-.504 1.125-1.125V6H20.25a.75.75 0 01-.75-.75V4.5m-15.75 0V3.75C3.75 3.06 4.31 2.5 5 2.5h14c.69 0 1.25.56 1.25 1.25V4.5m-16.5 0h16.5m-11.25 6.75h6m-6 3h3" />
+          </svg>
+          <span>Gastos e Ingresos</span>
+        </button>
+
         <button class="nav-tab" data-section="backup" type="button">
           <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" d="M12 16.5V9.75m0 0l3 3m-3-3l-3 3M6.75 19.5a4.5 4.5 0 01-1.41-8.775 5.25 5.25 0 0110.233-2.33 3 3 0 013.758 3.848A3.752 3.752 0 0118 19.5H6.75z" />
@@ -3088,6 +3095,386 @@
 
       </section>
 
+      <!-- ==========================================
+           MÓDULO 8: GASTOS, INGRESOS Y CATÁLOGO DE PRODUCTOS
+           ========================================== -->
+      <section id="panel-gastos-ingresos" class="section-panel" aria-labelledby="heading-gastos-ingresos">
+        <div class="module-header" style="margin-bottom: 20px;">
+          <div>
+            <h2 id="heading-gastos-ingresos" class="module-title">Gastos, Ingresos y Catálogo</h2>
+            <p class="module-subtitle">Control de egresos operativos y personales, ingresos adicionales y catálogo de referencia</p>
+          </div>
+          <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+            <button type="button" id="btn-header-nuevo-gasto" class="btn-primary-action" style="padding: 8px 16px; font-size: 0.88rem; display: flex; align-items: center; gap: 6px;">
+              <span>💸</span> Nuevo Gasto
+            </button>
+            <button type="button" id="btn-header-nuevo-ingreso" class="btn-primary-action" style="padding: 8px 16px; font-size: 0.88rem; display: flex; align-items: center; gap: 6px; background: #059669;">
+              <span>💰</span> Nuevo Ingreso
+            </button>
+          </div>
+        </div>
+
+        <!-- Submenú de Navegación del Módulo 8 -->
+        <div class="subnav-container gis-subnav" style="display: flex; gap: 8px; margin-bottom: 20px; border-bottom: 2px solid var(--color-border); padding-bottom: 12px; flex-wrap: wrap;">
+          <button type="button" class="subnav-tab active" data-gissubtab="gastos" id="subtab-btn-gis-gastos">
+            💸 Gastos
+          </button>
+          <button type="button" class="subnav-tab" data-gissubtab="ingresos" id="subtab-btn-gis-ingresos">
+            💰 Ingresos
+          </button>
+          <button type="button" class="subnav-tab" data-gissubtab="catalogo" id="subtab-btn-gis-catalogo">
+            📦 Catálogo
+          </button>
+        </div>
+
+        <!-- SUBTAB 1: GASTOS -->
+        <div id="subtab-content-gis-gastos" class="gis-subtab-view">
+          <!-- Formulario de Gasto -->
+          <div class="card" style="background: #ffffff; border: 1px solid var(--color-border); border-radius: 12px; padding: 22px; box-shadow: var(--shadow-sm); margin-bottom: 24px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+              <div>
+                <h3 id="form-gasto-title" style="margin: 0; font-size: 1.12rem; color: var(--color-primary); font-weight: 700;">
+                  📝 Registrar Gasto
+                </h3>
+                <p id="form-gasto-subtitle" style="margin: 2px 0 0; color: var(--color-text-muted); font-size: 0.84rem;">
+                  Ingresa los detalles del gasto en Bolívares o USD con conversión automática
+                </p>
+              </div>
+              <button type="button" id="btn-cancel-edit-gasto" class="btn-modal-cancel hidden" style="padding: 6px 12px; font-size: 0.82rem;">
+                Cancelar Edición
+              </button>
+            </div>
+
+            <form id="form-gasto-manual" autocomplete="off">
+              <input type="hidden" id="gasto-edit-id" value="">
+
+              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin-bottom: 14px;">
+                <!-- Descripción -->
+                <div class="form-group" style="margin: 0; grid-column: 1 / -1;">
+                  <label for="input-gasto-descripcion" class="form-label" style="font-weight: 600; font-size: 0.84rem;">Descripción del Gasto *</label>
+                  <input type="text" id="input-gasto-descripcion" class="form-input" placeholder="Ej: Compra de mercancía, Pago de flete, Alquiler, etc." required>
+                </div>
+
+                <!-- Monto -->
+                <div class="form-group" style="margin: 0;">
+                  <label for="input-gasto-monto" class="form-label" style="font-weight: 600; font-size: 0.84rem;">Monto *</label>
+                  <input type="number" id="input-gasto-monto" class="form-input" min="0.01" step="0.01" placeholder="0.00" required>
+                  <div id="gasto-usd-conversion-box" class="hidden" style="margin-top: 6px; font-size: 0.82rem; color: #0369a1; background: #f0f9ff; padding: 6px 10px; border-radius: 6px; border: 1px solid #bae6fd; font-weight: 600;">
+                    <span id="gasto-usd-conversion-text">≈ Bs. 0,00 (Tasa BCV: Bs. 0,00)</span>
+                  </div>
+                </div>
+
+                <!-- Moneda -->
+                <div class="form-group" style="margin: 0;">
+                  <label for="select-gasto-moneda" class="form-label" style="font-weight: 600; font-size: 0.84rem;">Moneda *</label>
+                  <select id="select-gasto-moneda" class="form-input" required>
+                    <option value="Bs" selected>Bs (Bolívares)</option>
+                    <option value="USD">USD (Dólares)</option>
+                  </select>
+                </div>
+
+                <!-- Categoría -->
+                <div class="form-group" style="margin: 0;">
+                  <label for="select-gasto-categoria" class="form-label" style="font-weight: 600; font-size: 0.84rem;">Categoría *</label>
+                  <select id="select-gasto-categoria" class="form-input" required>
+                    <option value="Inventario">Inventario</option>
+                    <option value="Personal">Personal</option>
+                    <option value="Operativo">Operativo</option>
+                    <option value="Otro">Otro</option>
+                  </select>
+                </div>
+
+                <!-- Fecha -->
+                <div class="form-group" style="margin: 0;">
+                  <label for="input-gasto-fecha" class="form-label" style="font-weight: 600; font-size: 0.84rem;">Fecha *</label>
+                  <input type="date" id="input-gasto-fecha" class="form-input" required>
+                </div>
+              </div>
+
+              <div style="display: flex; justify-content: flex-end; gap: 10px;">
+                <button type="submit" id="btn-guardar-gasto" class="btn-primary-action" style="padding: 9px 22px; font-size: 0.9rem;">
+                  💾 Guardar Gasto
+                </button>
+              </div>
+            </form>
+          </div>
+
+          <!-- Historial y Tabla de Gastos -->
+          <div class="card" style="background: #ffffff; border: 1px solid var(--color-border); border-radius: 12px; padding: 22px; box-shadow: var(--shadow-sm);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 12px;">
+              <div>
+                <h3 style="margin: 0; font-size: 1.12rem; color: var(--color-primary); font-weight: 700;">
+                  Historial de Gastos
+                </h3>
+                <p style="margin: 2px 0 0; color: var(--color-text-muted); font-size: 0.84rem;">
+                  Filtra por categoría y período. Ordenado del más reciente al más antiguo.
+                </p>
+              </div>
+
+              <!-- Filtros de Gastos -->
+              <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                <div style="display: flex; align-items: center; gap: 6px;">
+                  <label for="filter-gasto-categoria" style="font-size: 0.82rem; font-weight: 600; color: #475569;">Categoría:</label>
+                  <select id="filter-gasto-categoria" class="form-input" style="padding: 6px 10px; font-size: 0.84rem; height: 36px; min-width: 120px;">
+                    <option value="">Todas</option>
+                    <option value="Inventario">Inventario</option>
+                    <option value="Personal">Personal</option>
+                    <option value="Operativo">Operativo</option>
+                    <option value="Otro">Otro</option>
+                  </select>
+                </div>
+
+                <div style="display: flex; align-items: center; gap: 6px;">
+                  <label for="filter-gasto-mes" style="font-size: 0.82rem; font-weight: 600; color: #475569;">Mes:</label>
+                  <select id="filter-gasto-mes" class="form-input" style="padding: 6px 10px; font-size: 0.84rem; height: 36px; min-width: 110px;">
+                    <option value="">Todos</option>
+                    <option value="0">Enero</option>
+                    <option value="1">Febrero</option>
+                    <option value="2">Marzo</option>
+                    <option value="3">Abril</option>
+                    <option value="4">Mayo</option>
+                    <option value="5">Junio</option>
+                    <option value="6">Julio</option>
+                    <option value="7">Agosto</option>
+                    <option value="8">Septiembre</option>
+                    <option value="9">Octubre</option>
+                    <option value="10">Noviembre</option>
+                    <option value="11">Diciembre</option>
+                  </select>
+                </div>
+
+                <div style="display: flex; align-items: center; gap: 6px;">
+                  <label for="filter-gasto-ano" style="font-size: 0.82rem; font-weight: 600; color: #475569;">Año:</label>
+                  <input type="number" id="filter-gasto-ano" class="form-input" style="padding: 6px 10px; font-size: 0.84rem; height: 36px; width: 90px;" min="2020" max="2050">
+                </div>
+              </div>
+            </div>
+
+            <!-- Tabla -->
+            <div class="table-responsive-wrapper" style="border: 1px solid #e2e8f0; border-radius: 8px; max-height: 480px; overflow-y: auto; background: #ffffff;">
+              <table class="data-table" id="table-gastos" style="width: 100%; border-collapse: collapse; font-size: 0.86rem;">
+                <thead style="position: sticky; top: 0; background: #f8fafc; z-index: 10; border-bottom: 2px solid #cbd5e1;">
+                  <tr>
+                    <th style="padding: 10px 14px; text-align: left; width: 110px;">Fecha</th>
+                    <th style="padding: 10px 14px; text-align: left;">Descripción</th>
+                    <th style="padding: 10px 14px; text-align: center; width: 120px;">Categoría</th>
+                    <th style="padding: 10px 14px; text-align: right; width: 130px;">Monto Bs</th>
+                    <th style="padding: 10px 14px; text-align: center; width: 120px;">Origen</th>
+                    <th style="padding: 10px 14px; text-align: center; width: 120px;">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody id="tbody-gastos">
+                  <!-- Dinámico -->
+                </tbody>
+              </table>
+            </div>
+
+            <div id="gastos-empty-state" class="hidden" style="text-align: center; padding: 40px 20px; color: #64748b; background: #f8fafc; border-radius: 8px; border: 1px dashed #cbd5e1; margin-top: 10px;">
+              <div style="font-size: 2.2rem; margin-bottom: 6px;">💸</div>
+              <h4 style="margin: 0; color: #334155; font-size: 1rem; font-weight: 700;">No hay gastos registrados</h4>
+              <p style="margin: 4px 0 0 0; font-size: 0.84rem;">Registra un gasto manual con el formulario superior.</p>
+            </div>
+
+            <!-- Pie de totales -->
+            <div style="margin-top: 16px; padding: 12px 18px; background: #fff1f2; border: 1px solid #fecdd3; border-radius: 10px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+              <span style="font-size: 0.92rem; font-weight: 700; color: #9f1239;">
+                Total gastos del mes:
+              </span>
+              <strong id="display-total-gastos-mes" style="font-size: 1.25rem; font-family: monospace; font-weight: 800; color: #e11d48;">
+                Bs. 0,00
+              </strong>
+            </div>
+          </div>
+        </div>
+
+        <!-- SUBTAB 2: INGRESOS -->
+        <div id="subtab-content-gis-ingresos" class="gis-subtab-view hidden">
+          <!-- Formulario de Ingreso -->
+          <div class="card" style="background: #ffffff; border: 1px solid var(--color-border); border-radius: 12px; padding: 22px; box-shadow: var(--shadow-sm); margin-bottom: 24px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+              <div>
+                <h3 id="form-ingreso-title" style="margin: 0; font-size: 1.12rem; color: #047857; font-weight: 700;">
+                  💰 Registrar Ingreso
+                </h3>
+                <p id="form-ingreso-subtitle" style="margin: 2px 0 0; color: var(--color-text-muted); font-size: 0.84rem;">
+                  Ingresos directos o no provenientes del cobro regular de la empresa
+                </p>
+              </div>
+              <button type="button" id="btn-cancel-edit-ingreso" class="btn-modal-cancel hidden" style="padding: 6px 12px; font-size: 0.82rem;">
+                Cancelar Edición
+              </button>
+            </div>
+
+            <form id="form-ingreso-manual" autocomplete="off">
+              <input type="hidden" id="ingreso-edit-id" value="">
+
+              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin-bottom: 14px;">
+                <!-- Descripción -->
+                <div class="form-group" style="margin: 0; grid-column: 1 / -1;">
+                  <label for="input-ingreso-descripcion" class="form-label" style="font-weight: 600; font-size: 0.84rem;">Descripción del Ingreso *</label>
+                  <input type="text" id="input-ingreso-descripcion" class="form-input" placeholder="Ej: Inyección de capital, Venta extraordinaria, Préstamo, etc." required>
+                </div>
+
+                <!-- Monto -->
+                <div class="form-group" style="margin: 0;">
+                  <label for="input-ingreso-monto" class="form-label" style="font-weight: 600; font-size: 0.84rem;">Monto *</label>
+                  <input type="number" id="input-ingreso-monto" class="form-input" min="0.01" step="0.01" placeholder="0.00" required>
+                  <div id="ingreso-usd-conversion-box" class="hidden" style="margin-top: 6px; font-size: 0.82rem; color: #0369a1; background: #f0f9ff; padding: 6px 10px; border-radius: 6px; border: 1px solid #bae6fd; font-weight: 600;">
+                    <span id="ingreso-usd-conversion-text">≈ Bs. 0,00 (Tasa BCV: Bs. 0,00)</span>
+                  </div>
+                </div>
+
+                <!-- Moneda -->
+                <div class="form-group" style="margin: 0;">
+                  <label for="select-ingreso-moneda" class="form-label" style="font-weight: 600; font-size: 0.84rem;">Moneda *</label>
+                  <select id="select-ingreso-moneda" class="form-input" required>
+                    <option value="Bs" selected>Bs (Bolívares)</option>
+                    <option value="USD">USD (Dólares)</option>
+                  </select>
+                </div>
+
+                <!-- Fecha -->
+                <div class="form-group" style="margin: 0;">
+                  <label for="input-ingreso-fecha" class="form-label" style="font-weight: 600; font-size: 0.84rem;">Fecha *</label>
+                  <input type="date" id="input-ingreso-fecha" class="form-input" required>
+                </div>
+              </div>
+
+              <div style="display: flex; justify-content: flex-end; gap: 10px;">
+                <button type="submit" id="btn-guardar-ingreso" class="btn-primary-action" style="padding: 9px 22px; font-size: 0.9rem; background: #059669;">
+                  💾 Guardar Ingreso
+                </button>
+              </div>
+            </form>
+          </div>
+
+          <!-- Historial de Ingresos -->
+          <div class="card" style="background: #ffffff; border: 1px solid var(--color-border); border-radius: 12px; padding: 22px; box-shadow: var(--shadow-sm);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 12px;">
+              <div>
+                <h3 style="margin: 0; font-size: 1.12rem; color: #047857; font-weight: 700;">
+                  Historial de Ingresos
+                </h3>
+                <p style="margin: 2px 0 0; color: var(--color-text-muted); font-size: 0.84rem;">
+                  Entradas adicionales registradas
+                </p>
+              </div>
+
+              <!-- Filtro de Ingresos -->
+              <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                <div style="display: flex; align-items: center; gap: 6px;">
+                  <label for="filter-ingreso-mes" style="font-size: 0.82rem; font-weight: 600; color: #475569;">Mes:</label>
+                  <select id="filter-ingreso-mes" class="form-input" style="padding: 6px 10px; font-size: 0.84rem; height: 36px; min-width: 110px;">
+                    <option value="">Todos</option>
+                    <option value="0">Enero</option>
+                    <option value="1">Febrero</option>
+                    <option value="2">Marzo</option>
+                    <option value="3">Abril</option>
+                    <option value="4">Mayo</option>
+                    <option value="5">Junio</option>
+                    <option value="6">Julio</option>
+                    <option value="7">Agosto</option>
+                    <option value="8">Septiembre</option>
+                    <option value="9">Octubre</option>
+                    <option value="10">Noviembre</option>
+                    <option value="11">Diciembre</option>
+                  </select>
+                </div>
+
+                <div style="display: flex; align-items: center; gap: 6px;">
+                  <label for="filter-ingreso-ano" style="font-size: 0.82rem; font-weight: 600; color: #475569;">Año:</label>
+                  <input type="number" id="filter-ingreso-ano" class="form-input" style="padding: 6px 10px; font-size: 0.84rem; height: 36px; width: 90px;" min="2020" max="2050">
+                </div>
+              </div>
+            </div>
+
+            <!-- Tabla -->
+            <div class="table-responsive-wrapper" style="border: 1px solid #e2e8f0; border-radius: 8px; max-height: 480px; overflow-y: auto; background: #ffffff;">
+              <table class="data-table" id="table-ingresos" style="width: 100%; border-collapse: collapse; font-size: 0.86rem;">
+                <thead style="position: sticky; top: 0; background: #f8fafc; z-index: 10; border-bottom: 2px solid #cbd5e1;">
+                  <tr>
+                    <th style="padding: 10px 14px; text-align: left; width: 120px;">Fecha</th>
+                    <th style="padding: 10px 14px; text-align: left;">Descripción</th>
+                    <th style="padding: 10px 14px; text-align: right; width: 150px;">Monto Bs</th>
+                    <th style="padding: 10px 14px; text-align: center; width: 120px;">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody id="tbody-ingresos">
+                  <!-- Dinámico -->
+                </tbody>
+              </table>
+            </div>
+
+            <div id="ingresos-empty-state" class="hidden" style="text-align: center; padding: 40px 20px; color: #64748b; background: #f8fafc; border-radius: 8px; border: 1px dashed #cbd5e1; margin-top: 10px;">
+              <div style="font-size: 2.2rem; margin-bottom: 6px;">💰</div>
+              <h4 style="margin: 0; color: #334155; font-size: 1rem; font-weight: 700;">No hay ingresos registrados</h4>
+              <p style="margin: 4px 0 0 0; font-size: 0.84rem;">Registra un nuevo ingreso utilizando el formulario superior.</p>
+            </div>
+
+            <!-- Pie de totales -->
+            <div style="margin-top: 16px; padding: 12px 18px; background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 10px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+              <span style="font-size: 0.92rem; font-weight: 700; color: #065f46;">
+                Total ingresos del mes:
+              </span>
+              <strong id="display-total-ingresos-mes" style="font-size: 1.25rem; font-family: monospace; font-weight: 800; color: #047857;">
+                Bs. 0,00
+              </strong>
+            </div>
+          </div>
+        </div>
+
+        <!-- SUBTAB 3: CATÁLOGO DE PRODUCTOS -->
+        <div id="subtab-content-gis-catalogo" class="gis-subtab-view hidden">
+          <div class="card" style="background: #ffffff; border: 1px solid var(--color-border); border-radius: 12px; padding: 22px; box-shadow: var(--shadow-sm);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 12px;">
+              <div>
+                <h3 style="margin: 0; font-size: 1.12rem; color: var(--color-primary); font-weight: 700;">
+                  Catálogo de Productos de Referencia
+                </h3>
+                <p style="margin: 2px 0 0; color: var(--color-text-muted); font-size: 0.84rem;">
+                  Alimentado desde la creación de créditos, pagos y registros manuales (sin control de stock)
+                </p>
+              </div>
+
+              <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                <input type="text" id="filter-catalogo-search" class="form-input" placeholder="🔍 Buscar por nombre o distribuidor..." style="height: 36px; padding: 6px 12px; font-size: 0.84rem; min-width: 220px;">
+                <button type="button" id="btn-open-drawer-catalogo" class="btn-primary-action" style="padding: 7px 16px; font-size: 0.86rem; display: flex; align-items: center; gap: 6px;">
+                  <span>＋</span> Nuevo Producto
+                </button>
+              </div>
+            </div>
+
+            <!-- Tabla -->
+            <div class="table-responsive-wrapper" style="border: 1px solid #e2e8f0; border-radius: 8px; max-height: 480px; overflow-y: auto; background: #ffffff;">
+              <table class="data-table" id="table-catalogo-productos" style="width: 100%; border-collapse: collapse; font-size: 0.86rem;">
+                <thead style="position: sticky; top: 0; background: #f8fafc; z-index: 10; border-bottom: 2px solid #cbd5e1;">
+                  <tr>
+                    <th style="padding: 10px 14px; text-align: center; width: 80px;">Imagen</th>
+                    <th style="padding: 10px 14px; text-align: left;">Nombre</th>
+                    <th style="padding: 10px 14px; text-align: left;">Distribuidor</th>
+                    <th style="padding: 10px 14px; text-align: right; width: 140px;">Precio compra</th>
+                    <th style="padding: 10px 14px; text-align: right; width: 140px;">Precio venta</th>
+                    <th style="padding: 10px 14px; text-align: center; width: 120px;">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody id="tbody-catalogo-productos">
+                  <!-- Dinámico -->
+                </tbody>
+              </table>
+            </div>
+
+            <div id="catalogo-empty-state" class="hidden" style="text-align: center; padding: 40px 20px; color: #64748b; background: #f8fafc; border-radius: 8px; border: 1px dashed #cbd5e1; margin-top: 10px;">
+              <div style="font-size: 2.2rem; margin-bottom: 6px;">📦</div>
+              <h4 style="margin: 0; color: #334155; font-size: 1rem; font-weight: 700;">No hay productos en el catálogo</h4>
+              <p style="margin: 4px 0 12px 0; font-size: 0.84rem;">Crea un producto nuevo o agrégalo desde el selector al crear un crédito o pago.</p>
+              <button type="button" id="btn-empty-catalogo-nuevo" class="btn-primary-action" style="padding: 7px 16px; font-size: 0.85rem;">
+                ＋ Agregar Primer Producto
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <!-- 9. Respaldo / Backup (Fase 11) -->
       <section id="panel-backup" class="section-panel" aria-labelledby="heading-backup">
         <div class="module-header" style="margin-bottom: 24px;">
@@ -3547,6 +3934,15 @@
                     <option value="SESSION_CLOSE">Cierre de sesión / pestaña</option>
                     <option value="SERVICE_WORKER_STATUS">Service Worker</option>
                     <option value="NOTIFICATION_SENT">Notificación enviada</option>
+                    <option value="CREATE_GASTO">Crear gasto</option>
+                    <option value="UPDATE_GASTO">Modificar gasto</option>
+                    <option value="DELETE_GASTO">Eliminar gasto</option>
+                    <option value="CREATE_INGRESO">Crear ingreso</option>
+                    <option value="UPDATE_INGRESO">Modificar ingreso</option>
+                    <option value="DELETE_INGRESO">Eliminar ingreso</option>
+                    <option value="CREATE_PRODUCTO">Crear producto catálogo</option>
+                    <option value="UPDATE_PRODUCTO">Modificar producto catálogo</option>
+                    <option value="DELETE_PRODUCTO">Eliminar producto catálogo</option>
                   </select>
                 </div>
 
@@ -3700,6 +4096,119 @@
           </div>
         </div>
       </div>
+      <!-- ========================================================
+           DRAWER LATERAL: NUEVO PRODUCTO AL CATÁLOGO (NO MODAL BLOQUEANTE)
+           ======================================================== -->
+      <aside id="product-catalog-drawer" class="product-catalog-drawer" aria-label="Nuevo producto al catálogo" aria-hidden="true">
+        <div class="product-drawer-header">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 1.3rem;">📦</span>
+            <div>
+              <h3 id="product-drawer-title" style="margin: 0; font-size: 1.05rem; font-weight: 700; color: #1e293b;">
+                Nuevo Producto
+              </h3>
+              <small style="color: #64748b; font-size: 0.78rem;">Catálogo de referencia (sin cantidad)</small>
+            </div>
+          </div>
+          <button type="button" id="btn-close-product-drawer" class="drawer-close-btn" aria-label="Cerrar drawer">&times;</button>
+        </div>
+
+        <form id="form-product-drawer" class="product-drawer-body" autocomplete="off">
+          <input type="hidden" id="drawer-product-id" value="">
+
+          <!-- Nombre -->
+          <div class="form-group" style="margin-bottom: 14px;">
+            <label for="drawer-prod-nombre" class="form-label" style="font-weight: 600; font-size: 0.84rem;">Nombre del Producto *</label>
+            <input type="text" id="drawer-prod-nombre" class="form-input" placeholder="Ej: Nevera Mabe 12 Pies" required>
+          </div>
+
+          <!-- Distribuidor -->
+          <div class="form-group" style="margin-bottom: 14px;">
+            <label for="drawer-prod-distribuidor" class="form-label" style="font-weight: 600; font-size: 0.84rem;">Distribuidor (Quién lo vende)</label>
+            <input type="text" id="drawer-prod-distribuidor" class="form-input" placeholder="Ej: Distribuidora Caracas C.A.">
+          </div>
+
+          <!-- Precios -->
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px;">
+            <div class="form-group" style="margin: 0;">
+              <label for="drawer-prod-precio-compra" class="form-label" style="font-weight: 600; font-size: 0.84rem;">Precio compra (Bs)</label>
+              <input type="number" id="drawer-prod-precio-compra" class="form-input" min="0" step="0.01" placeholder="0.00">
+            </div>
+            <div class="form-group" style="margin: 0;">
+              <label for="drawer-prod-precio-venta" class="form-label" style="font-weight: 600; font-size: 0.84rem;">Precio venta (Bs)</label>
+              <input type="number" id="drawer-prod-precio-venta" class="form-input" min="0" step="0.01" placeholder="0.00">
+            </div>
+          </div>
+
+          <!-- Imagen (opcional base64) -->
+          <div class="form-group" style="margin-bottom: 16px;">
+            <label class="form-label" style="font-weight: 600; font-size: 0.84rem;">Imagen del Producto (Opcional)</label>
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <div id="drawer-image-preview-wrap" style="width: 56px; height: 56px; border-radius: 8px; border: 1px dashed #cbd5e1; background: #f8fafc; display: flex; align-items: center; justify-content: center; overflow: hidden; flex-shrink: 0;">
+                <span id="drawer-image-placeholder" style="font-size: 1.4rem; color: #94a3b8;">📷</span>
+                <img id="drawer-image-preview" src="" alt="Miniatura" class="hidden" style="width: 100%; height: 100%; object-fit: cover;">
+              </div>
+              <div style="flex: 1;">
+                <input type="file" id="drawer-prod-foto" accept="image/*" class="form-input" style="padding: 6px; font-size: 0.78rem;">
+                <button type="button" id="btn-drawer-clear-photo" class="hidden" style="background: none; border: none; color: #dc2626; font-size: 0.75rem; cursor: pointer; padding: 2px 0;">Eliminar foto</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Opción de gasto de inventario -->
+          <div id="drawer-inventory-expense-box" style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px; margin-bottom: 16px;">
+            <label style="display: flex; align-items: flex-start; gap: 8px; cursor: pointer; font-size: 0.82rem; font-weight: 600; color: #1e293b; line-height: 1.4;">
+              <input type="checkbox" id="drawer-chk-gasto-inventario" style="margin-top: 2px; accent-color: var(--color-primary);">
+              <span>¿Deseas registrar el costo de este producto como gasto de inventario?</span>
+            </label>
+            <div id="drawer-gasto-costo-wrap" class="hidden" style="margin-top: 10px;">
+              <label for="drawer-costo-real-bs" class="form-label" style="font-size: 0.78rem; font-weight: 600; color: #475569;">Costo real (Bs) — para registrar en Gastos</label>
+              <input type="number" id="drawer-costo-real-bs" class="form-input" min="0" step="0.01" placeholder="0.00" style="height: 36px; font-size: 0.86rem;">
+            </div>
+          </div>
+
+          <div class="product-drawer-footer">
+            <button type="submit" id="btn-drawer-guardar-prod" class="btn-primary-action" style="flex: 1; padding: 10px 14px; font-size: 0.88rem; justify-content: center;">
+              💾 Guardar al Catálogo
+            </button>
+            <button type="button" id="btn-drawer-cerrar-prod" class="btn-modal-cancel" style="padding: 10px 14px; font-size: 0.88rem;">
+              Cerrar
+            </button>
+          </div>
+        </form>
+      </aside>
+
+      <!-- Modal "¿El producto está en tu catálogo?" -->
+      <div id="modal-product-catalog-prompt" class="modal-backdrop hidden" style="z-index: 3100;" role="dialog" aria-modal="true">
+        <div class="modal-card" style="max-width: 460px; width: 92%;">
+          <div class="modal-header" style="background: var(--color-primary); color: #fff;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 1.3rem;">📦</span>
+              <h3 class="modal-title" style="color: #fff; font-size: 1.05rem; margin: 0;">Consulta de Catálogo</h3>
+            </div>
+          </div>
+          <div class="modal-body" style="padding: 22px;">
+            <p id="catalog-prompt-question" style="margin: 0 0 12px; font-size: 0.96rem; color: #1e293b; font-weight: 600; line-height: 1.45;">
+              ¿El producto está en tu catálogo?
+            </p>
+            <p style="margin: 0; font-size: 0.84rem; color: #64748b; line-height: 1.4;">
+              Puedes guardarlo en el catálogo para tener la referencia del distribuidor y costo, o continuar normalmente.
+            </p>
+          </div>
+          <div class="modal-footer-actions" style="padding: 14px 20px; border-top: 1px solid #e2e8f0; display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; background: #f8fafc;">
+            <button type="button" id="btn-catalog-prompt-omitir" class="btn-modal-cancel" style="padding: 8px 14px; font-size: 0.84rem;">
+              ⏭ Omitir
+            </button>
+            <button type="button" id="btn-catalog-prompt-si" class="btn-primary-action" style="padding: 8px 14px; font-size: 0.84rem; background: #059669;">
+              ✅ Sí, continuar
+            </button>
+            <button type="button" id="btn-catalog-prompt-agregar" class="btn-primary-action" style="padding: 8px 14px; font-size: 0.84rem;">
+              📦 Agregar al catálogo
+            </button>
+          </div>
+        </div>
+      </div>
+
     </main>
   </div>
 

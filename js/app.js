@@ -120,6 +120,7 @@ document.addEventListener("DOMContentLoaded", () => {
   initBackupModule();
   initSystemLogsModule();
   initCierresModule();
+  initGastosIngresosModule();
   auditCreditStatuses();
 });
 
@@ -283,6 +284,9 @@ function switchSection(sectionName) {
   }
   if (sectionName === "cierres") {
     renderCierresModule();
+  }
+  if (sectionName === "gastos-ingresos") {
+    renderGastosIngresosModule();
   }
   if (sectionName === "backup") {
     renderBackupSection();
@@ -1892,6 +1896,19 @@ function initCreditsModule() {
   // Añadir producto al crédito
   btnAddProductToCredit.addEventListener("click", handleAddProductToCredit);
 
+  // Escuchar selector de producto para abrir drawer si selecciona ＋ Nuevo producto
+  const creditProductSelect = document.getElementById("credit-product-select");
+  if (creditProductSelect) {
+    creditProductSelect.addEventListener("change", (e) => {
+      if (e.target.value === "__NEW_PRODUCT__") {
+        e.target.value = "";
+        if (typeof openProductCatalogDrawer === "function") {
+          openProductCatalogDrawer({ originSelectId: "credit-product-select" });
+        }
+      }
+    });
+  }
+
   // Delegación para eliminar producto de la lista en el formulario
   creditItemsTbody.addEventListener("click", (e) => {
     const removeBtn = e.target.closest(".btn-remove-item");
@@ -2158,14 +2175,18 @@ function openCreateCreditModal() {
   clientSelect.innerHTML = '<option value="">-- Seleccionar cliente registrado --</option>' +
     clients.map((c) => `<option value="${c.id}">${escapeHtml(c.name)} (${escapeHtml(c.dni)})</option>`).join("");
 
-  // Poblar select de productos con cantidad informativa (opcional: si no tiene cantidad definida, no muestra ese campo)
-  const products = getStoredProducts();
-  productSelect.innerHTML = '<option value="">-- Seleccionar producto --</option>' +
-    products.map((p) => {
-      const hasQty = p.quantity !== null && p.quantity !== undefined && p.quantity !== "";
-      const stockInfo = hasQty ? ` (Disponibles: ${p.quantity})` : "";
-      return `<option value="${p.id}" data-price="${p.price}" data-name="${escapeHtml(p.name)}">${escapeHtml(p.name)} - $${parseFloat(p.price).toFixed(2)}${stockInfo}</option>`;
-    }).join("");
+  // Poblar select de productos con soporte para catálogo y opción fija ＋ Nuevo producto
+  if (typeof populateProductSelectWithCatalog === "function") {
+    populateProductSelectWithCatalog(productSelect);
+  } else {
+    const products = getStoredProducts();
+    productSelect.innerHTML = '<option value="">-- Seleccionar producto --</option>' +
+      products.map((p) => {
+        const hasQty = p.quantity !== null && p.quantity !== undefined && p.quantity !== "";
+        const stockInfo = hasQty ? ` (Disponibles: ${p.quantity})` : "";
+        return `<option value="${p.id}" data-price="${p.price}" data-name="${escapeHtml(p.name)}">${escapeHtml(p.name)} - $${parseFloat(p.price).toFixed(2)}${stockInfo}</option>`;
+      }).join("");
+  }
 
   // Valores predeterminados de inicial
   const downpaymentCurrencySelect = document.getElementById("credit-downpayment-currency");
@@ -2779,25 +2800,32 @@ function handleCreditFormSubmit(e) {
 
   const activeCount = activeCredits.length;
 
-  if (activeCount >= 1) {
-    if (typeof addSystemLog === "function") {
-      addSystemLog({
-        level: "WARNING",
-        action: "CREDIT_LIMIT_EXCEEDED",
-        details: {
-          clientId: clientObj.id,
-          clientName: clientObj.name,
-          activeCreditsCount: activeCount
-        },
-        status: "failed",
-        errorMessage: `El cliente ${clientObj.name} ya tiene ${activeCount} crédito(s) activo(s)`
-      });
+  const proceedWithCreditSave = () => {
+    if (activeCount >= 1) {
+      if (typeof addSystemLog === "function") {
+        addSystemLog({
+          level: "WARNING",
+          action: "CREDIT_LIMIT_EXCEEDED",
+          details: {
+            clientId: clientObj.id,
+            clientName: clientObj.name,
+            activeCreditsCount: activeCount
+          },
+          status: "failed",
+          errorMessage: `El cliente ${clientObj.name} ya tiene ${activeCount} crédito(s) activo(s)`
+        });
+      }
+      showActiveCreditsWarningModal(activeCount, performSaveCredit);
+      return;
     }
-    showActiveCreditsWarningModal(activeCount, performSaveCredit);
-    return;
-  }
+    performSaveCredit();
+  };
 
-  performSaveCredit();
+  if (typeof checkItemsCatalogStatus === "function") {
+    checkItemsCatalogStatus(currentCreditItems, proceedWithCreditSave, "credit-product-select", "credito");
+  } else {
+    proceedWithCreditSave();
+  }
 }
 
 // ============================================================
@@ -5738,6 +5766,19 @@ function initVentasModule() {
     });
   }
 
+  // Escuchar selector de producto para abrir drawer si selecciona ＋ Nuevo producto
+  const saleProductSelect = document.getElementById("sale-product-select");
+  if (saleProductSelect) {
+    saleProductSelect.addEventListener("change", (e) => {
+      if (e.target.value === "__NEW_PRODUCT__") {
+        e.target.value = "";
+        if (typeof openProductCatalogDrawer === "function") {
+          openProductCatalogDrawer({ originSelectId: "sale-product-select", context: "pago" });
+        }
+      }
+    });
+  }
+
   // Render inicial de la vista
   renderVentasSection();
 }
@@ -6015,13 +6056,17 @@ function populateSaleClientSelect() {
 function populateSaleProductSelect() {
   const select = document.getElementById("sale-product-select");
   if (!select) return;
-  const products = getStoredProducts();
-  select.innerHTML = '<option value="">-- Seleccionar producto --</option>' +
-    products.map((p) => {
-      const hasQty = p.quantity !== null && p.quantity !== undefined && p.quantity !== "";
-      const stockInfo = hasQty ? ` (Disponibles: ${p.quantity})` : "";
-      return `<option value="${p.id}" data-price="${p.price}" data-name="${escapeHtml(p.name)}">${escapeHtml(p.name)} - $${parseFloat(p.price).toFixed(2)}${stockInfo}</option>`;
-    }).join("");
+  if (typeof populateProductSelectWithCatalog === "function") {
+    populateProductSelectWithCatalog(select);
+  } else {
+    const products = getStoredProducts();
+    select.innerHTML = '<option value="">-- Seleccionar producto --</option>' +
+      products.map((p) => {
+        const hasQty = p.quantity !== null && p.quantity !== undefined && p.quantity !== "";
+        const stockInfo = hasQty ? ` (Disponibles: ${p.quantity})` : "";
+        return `<option value="${p.id}" data-price="${p.price}" data-name="${escapeHtml(p.name)}">${escapeHtml(p.name)} - $${parseFloat(p.price).toFixed(2)}${stockInfo}</option>`;
+      }).join("");
+  }
 }
 
 // Añadir producto a la lista temporal de la venta directa
@@ -6307,17 +6352,25 @@ function handleSaleFormSubmit(e) {
     sales.unshift(newSale);
   }
 
-  // Guardar productos con stock actualizado
-  saveProductsToStorage(storedProducts);
-  renderProducts();
+  const performSaveSale = () => {
+    // Guardar productos con stock actualizado
+    saveProductsToStorage(storedProducts);
+    renderProducts();
 
-  // Guardar ventas
-  saveSalesToStorage(sales);
+    // Guardar ventas
+    saveSalesToStorage(sales);
 
-  closeSaleModal();
-  renderVentasSection();
+    closeSaleModal();
+    renderVentasSection();
 
-  alert(currentEditingSaleId ? "¡Venta directa actualizada con éxito!" : "¡Venta directa registrada exitosamente y stock de productos actualizado!");
+    alert(currentEditingSaleId ? "¡Venta directa actualizada con éxito!" : "¡Venta directa registrada exitosamente y stock de productos actualizado!");
+  };
+
+  if (typeof checkItemsCatalogStatus === "function") {
+    checkItemsCatalogStatus(currentSaleItems, performSaveSale, "sale-product-select", "pago");
+  } else {
+    performSaveSale();
+  }
 }
 
 // Abrir modal de detalle completo de una venta directa
@@ -10708,6 +10761,38 @@ async function exportToGoogleSheets(isSilent = false) {
       ])
     ];
 
+    // Hoja 10: Gastos (Módulo 8)
+    const gastosList = typeof getStoredGastos === "function" ? getStoredGastos() : [];
+    const gastosData = [
+      ["id", "fecha", "descripcion", "categoria", "monto_original", "moneda", "monto_bs", "tasa_bcv_usada", "origen"],
+      ...gastosList.map((g) => [
+        g.id || "",
+        g.fecha || "",
+        g.descripcion || "",
+        g.categoria || "Operativo",
+        parseFloat(g.monto_original || g.monto_bs || 0) || 0,
+        g.moneda || "Bs",
+        parseFloat(g.monto_bs || 0) || 0,
+        parseFloat(g.tasa_bcv_usada || 0) || 0,
+        g.origen || "manual"
+      ])
+    ];
+
+    // Hoja 11: Ingresos (Módulo 8)
+    const ingresosList = typeof getStoredIngresos === "function" ? getStoredIngresos() : [];
+    const ingresosData = [
+      ["id", "fecha", "descripcion", "monto_original", "moneda", "monto_bs", "tasa_bcv_usada"],
+      ...ingresosList.map((i) => [
+        i.id || "",
+        i.fecha || "",
+        i.descripcion || "",
+        parseFloat(i.monto_original || i.monto_bs || 0) || 0,
+        i.moneda || "Bs",
+        parseFloat(i.monto_bs || 0) || 0,
+        parseFloat(i.tasa_bcv_usada || 0) || 0
+      ])
+    ];
+
     // 2. Enviar datos completos al Google Apps Script (POST)
     const payload = {
       action: "write",
@@ -10720,7 +10805,9 @@ async function exportToGoogleSheets(isSilent = false) {
         Facturas: invoicesData,
         Productos: productsData,
         Config: configData,
-        Cierres: cierresData
+        Cierres: cierresData,
+        Gastos: gastosData,
+        Ingresos: ingresosData
       }
     };
 
@@ -10892,6 +10979,8 @@ async function importFromGoogleSheets(isSilent = false) {
     const productsRows = sheetsData["Productos"] || [];
     const configRows = sheetsData["Config"] || [];
     const cierresRows = sheetsData["Cierres"] || [];
+    const gastosRows = sheetsData["Gastos"] || [];
+    const ingresosRows = sheetsData["Ingresos"] || [];
 
     // Modo REPLACE: limpiar completamente las claves del localStorage correspondientes antes de importar
     localStorage.setItem(CLIENTS_STORAGE_KEY, JSON.stringify([]));
@@ -10902,6 +10991,8 @@ async function importFromGoogleSheets(isSilent = false) {
     localStorage.setItem(SUPPLIERS_STORAGE_KEY, JSON.stringify([]));
     localStorage.setItem(PRODUCTS_STORAGE_KEY, JSON.stringify([]));
     localStorage.setItem("hogarflex_cierres", JSON.stringify([]));
+    localStorage.setItem("hogarflex_gastos", JSON.stringify([]));
+    localStorage.setItem("hogarflex_ingresos", JSON.stringify([]));
 
     // Validar si las pestañas tienen filas con datos más allá del encabezado
     const hasData = clientsRows.length > 1 || creditsRows.length > 1 || salesRows.length > 1 ||
@@ -11331,6 +11422,47 @@ async function importFromGoogleSheets(isSilent = false) {
     localStorage.setItem(INVOICES_STORAGE_KEY, JSON.stringify(importedInvoices));
     localStorage.setItem(PRODUCTS_STORAGE_KEY, JSON.stringify(importedProducts));
     localStorage.setItem("hogarflex_cierres", JSON.stringify(importedCierres));
+
+    // Procesar GASTOS (hoja Gastos) -> hogarflex_gastos (Módulo 8)
+    if (gastosRows.length > 1) {
+      const importedGastos = [];
+      for (let gIdx = 1; gIdx < gastosRows.length; gIdx++) {
+        const row = gastosRows[gIdx];
+        if (!row || !row[0]) continue;
+        importedGastos.push({
+          id: String(row[0] || ""),
+          fecha: String(row[1] || ""),
+          descripcion: String(row[2] || ""),
+          categoria: String(row[3] || "Operativo"),
+          monto_original: parseFloat(row[4]) || 0,
+          moneda: String(row[5] || "Bs"),
+          monto_bs: parseFloat(row[6]) || 0,
+          tasa_bcv_usada: parseFloat(row[7]) || 0,
+          origen: String(row[8] || "manual")
+        });
+      }
+      localStorage.setItem("hogarflex_gastos", JSON.stringify(importedGastos));
+    }
+
+    // Procesar INGRESOS (hoja Ingresos) -> hogarflex_ingresos (Módulo 8)
+    if (ingresosRows.length > 1) {
+      const importedIngresos = [];
+      for (let iIdx = 1; iIdx < ingresosRows.length; iIdx++) {
+        const row = ingresosRows[iIdx];
+        if (!row || !row[0]) continue;
+        importedIngresos.push({
+          id: String(row[0] || ""),
+          fecha: String(row[1] || ""),
+          descripcion: String(row[2] || ""),
+          monto_original: parseFloat(row[3]) || 0,
+          moneda: String(row[4] || "Bs"),
+          monto_bs: parseFloat(row[5]) || 0,
+          tasa_bcv_usada: parseFloat(row[6]) || 0
+        });
+      }
+      localStorage.setItem("hogarflex_ingresos", JSON.stringify(importedIngresos));
+    }
+
     if (Object.keys(importedConfig).length > 0) {
       localStorage.setItem("hogarflex_config", JSON.stringify(importedConfig));
       if (importedConfig["Fecha Último Respaldo"]) {
@@ -11349,6 +11481,7 @@ async function importFromGoogleSheets(isSilent = false) {
     if (typeof renderDashboardSection === "function") renderDashboardSection();
     if (typeof renderBackupSection === "function") renderBackupSection();
     if (typeof renderCierresModule === "function") renderCierresModule();
+    if (typeof renderGastosIngresosModule === "function") renderGastosIngresosModule();
     if (typeof updateDashboardCierresKPIs === "function") updateDashboardCierresKPIs();
 
     const successSummary = `✅ Sincronizado (Reemplazo total): ${importedClients.length} clientes, ${importedCredits.length} créditos, ${importedSales.length} ventas, ${importedProducts.length} productos, ${importedSuppliers.length} proveedores, ${importedInvoices.length} facturas, ${importedCierres.length} cierres.`;
@@ -12607,6 +12740,45 @@ function getEnLaCalleTotal() {
   return total;
 }
 
+// Función auxiliar: verifica si una fecha cae en el período de un corte quincenal (Módulo 8 <-> Módulo 7)
+function isExpenseInCierrePeriod(expenseDateStr, corte) {
+  if (!expenseDateStr || !corte) return false;
+  const expDate = new Date(expenseDateStr + "T00:00:00");
+  if (isNaN(expDate.getTime())) return false;
+
+  const expYear = expDate.getFullYear();
+  const expMonth = expDate.getMonth();
+  const expDay = expDate.getDate();
+
+  // Comparar año
+  const corteYear = parseInt(corte.año || (corte.fecha ? new Date(corte.fecha + "T00:00:00").getFullYear() : 0), 10);
+  if (corteYear && expYear !== corteYear) return false;
+
+  // Comparar mes
+  let corteMonthIdx = -1;
+  if (corte.mes) {
+    corteMonthIdx = CIERRES_MONTH_NAMES.findIndex(m => m.toLowerCase() === String(corte.mes).trim().toLowerCase());
+  }
+  if (corteMonthIdx === -1 && corte.fecha) {
+    const cd = new Date(corte.fecha + "T00:00:00");
+    if (!isNaN(cd.getTime())) corteMonthIdx = cd.getMonth();
+  }
+  if (corteMonthIdx !== -1 && expMonth !== corteMonthIdx) return false;
+
+  // Comparar quincena (1ra quincena: días 1-15, 2da quincena: días 16 en adelante)
+  const quincenaStr = String(corte.quincena || "").toLowerCase();
+  const is1ra = quincenaStr.includes("primera") || quincenaStr.includes("1");
+  const is2da = quincenaStr.includes("segunda") || quincenaStr.includes("2");
+
+  if (is1ra) {
+    return expDay <= 15;
+  } else if (is2da) {
+    return expDay > 15;
+  }
+
+  return true;
+}
+
 // ============================================================
 // CÁLCULO DEL BLOQUE DE ANÁLISIS (REQUERIMIENTO C)
 // ============================================================
@@ -12657,7 +12829,7 @@ function calculateCierreAnalysis(corte, allCierresList) {
 
   // Alerta de tope superado:
   // "La alerta de tope superado se activa si los gastos categorizados como 'Personal' en el Módulo 8
-  // del mismo período superan el tope calculado (si el Módulo 8 aún no existe, omitir la comparación sin romper)"
+  // del mismo período superan el tope calculado"
   let gastosPersonalesPeriodo = 0;
 
   // 1. Gastos propios del corte que tengan descripción o categoría "personal"
@@ -12668,24 +12840,18 @@ function calculateCierreAnalysis(corte, allCierresList) {
     }
   });
 
-  // 2. Revisión segura de Módulo 8 si existe en localStorage
+  // 2. Revisión de Módulo 8 con datos reales de hogarflex_gastos
   try {
-    const rawM8 = localStorage.getItem("hogarflex_gastos") ||
-                  localStorage.getItem("hogarflex_gastos_personales") ||
-                  localStorage.getItem("hogarflex_gastos_operativos");
+    const rawM8 = localStorage.getItem("hogarflex_gastos");
     if (rawM8) {
       const parsed = JSON.parse(rawM8);
       if (Array.isArray(parsed)) {
         parsed.forEach(item => {
-          const cat = String(item.categoria || item.category || item.tipo || "").toLowerCase();
-          const desc = String(item.descripcion || item.description || "").toLowerCase();
-          const esPersonal = cat.includes("personal") || desc.includes("personal");
-          const esMismoPeriodo = (
-            (item.quincena && item.quincena === corte.quincena && item.mes === corte.mes) ||
-            (item.fecha && corte.fecha && String(item.fecha).substring(0, 7) === String(corte.fecha).substring(0, 7))
-          );
-          if (esPersonal && esMismoPeriodo) {
-            gastosPersonalesPeriodo += (parseFloat(item.monto || item.amount) || 0);
+          const cat = String(item.categoria || "").trim().toLowerCase();
+          if (cat === "personal") {
+            if (isExpenseInCierrePeriod(item.fecha, corte)) {
+              gastosPersonalesPeriodo += (parseFloat(item.monto_bs || item.monto) || 0);
+            }
           }
         });
       }
@@ -12751,7 +12917,7 @@ function renderAnalysisBlockHtml(analysis) {
         <span style="font-size: 1.4rem;">⚠️</span>
         <div style="flex: 1;">
           <div style="font-size: 0.92rem; font-weight: 700;">
-            Superaste tu tope en Bs. ${formatCierreCurrency(montoExceso)}
+            ⚠️ Superaste tu tope de gasto personal en Bs. ${formatCierreCurrency(montoExceso)}
           </div>
           <div style="font-size: 0.8rem; font-weight: 500; opacity: 0.9; margin-top: 2px;">
             Gastos personales registrados: Bs. ${formatCierreCurrency(gastosPersonalesPeriodo)} (Límite permitido del ${topePercent}%: Bs. ${formatCierreCurrency(puedesUsar)})
@@ -13505,7 +13671,7 @@ function updateDashboardCierresKPIs() {
   const currentMonthName = CIERRES_MONTH_NAMES[currentMonthIdx];
   const currentYear = now.getFullYear();
 
-  // 1. Gastos del Mes — suma de los gastos de los cortes del mes en curso. Si no hay cortes: muestra —
+  // 1. Gastos del Mes — suma de los gastos de los cortes del mes en curso + gastos manuales de hogarflex_gastos del mes en curso
   const cortesMesActual = cierres.filter((c) => {
     const isSameYear = parseInt(c.año, 10) === currentYear;
     const isSameMonthName = String(c.mes || "").trim().toLowerCase() === currentMonthName.toLowerCase();
@@ -13518,14 +13684,32 @@ function updateDashboardCierresKPIs() {
     }
     return isSameYear && (isSameMonthName || isSameDateMonth);
   });
+  const totalGastosCortes = cortesMesActual.reduce((acc, c) => acc + (parseFloat(c.total_gastos) || 0), 0);
 
-  if (cortesMesActual.length > 0) {
-    const totalGastosMes = cortesMesActual.reduce((acc, c) => acc + (parseFloat(c.total_gastos) || 0), 0);
-    if (kpiGastosVal) kpiGastosVal.textContent = `Bs. ${formatCierreCurrency(totalGastosMes)}`;
-    if (kpiGastosSub) kpiGastosSub.textContent = `${cortesMesActual.length} corte(s) en ${currentMonthName} ${currentYear}`;
+  // Gastos manuales de hogarflex_gastos del mes en curso
+  let gastosManualesMes = [];
+  try {
+    const storedGastos = typeof getStoredGastos === "function" ? getStoredGastos() : JSON.parse(localStorage.getItem("hogarflex_gastos") || "[]");
+    gastosManualesMes = storedGastos.filter(g => {
+      if (!g.fecha) return false;
+      const d = new Date(g.fecha + "T00:00:00");
+      return !isNaN(d.getTime()) && d.getFullYear() === currentYear && d.getMonth() === currentMonthIdx;
+    });
+  } catch (e) {}
+  const totalGastosManuales = gastosManualesMes.reduce((acc, g) => acc + (parseFloat(g.monto_bs) || 0), 0);
+  const totalGastosCombinados = totalGastosCortes + totalGastosManuales;
+
+  if (cortesMesActual.length > 0 || gastosManualesMes.length > 0) {
+    if (kpiGastosVal) kpiGastosVal.textContent = `Bs. ${formatCierreCurrency(totalGastosCombinados)}`;
+    if (kpiGastosSub) {
+      const parts = [];
+      if (cortesMesActual.length > 0) parts.push(`${cortesMesActual.length} corte(s)`);
+      if (gastosManualesMes.length > 0) parts.push(`${gastosManualesMes.length} gasto(s) manual(es)`);
+      kpiGastosSub.textContent = `${parts.join(" + ")} en ${currentMonthName} ${currentYear}`;
+    }
   } else {
     if (kpiGastosVal) kpiGastosVal.textContent = "—";
-    if (kpiGastosSub) kpiGastosSub.textContent = `Sin cortes en ${currentMonthName} ${currentYear}`;
+    if (kpiGastosSub) kpiGastosSub.textContent = `Sin gastos en ${currentMonthName} ${currentYear}`;
   }
 
   // 2. Capital del Último Corte — capital neto del corte más reciente registrado. Si no hay cortes: muestra —
@@ -13881,5 +14065,1512 @@ window.confirmDeleteCierre = confirmDeleteCierre;
 window.saveCierreToGoogleSheets = saveCierreToGoogleSheets;
 window.renderCierresModule = renderCierresModule;
 window.initCierresModule = initCierresModule;
+window.isExpenseInCierrePeriod = isExpenseInCierrePeriod;
+
+// ============================================================
+// MÓDULO 8: GASTOS, INGRESOS Y CATÁLOGO DE PRODUCTOS
+// ============================================================
+
+const GASTOS_STORAGE_KEY = "hogarflex_gastos";
+const INGRESOS_STORAGE_KEY = "hogarflex_ingresos";
+const PRODUCTOS_CATALOG_STORAGE_KEY = "hogarflex_productos";
+
+let currentGisSubtab = "gastos";
+let currentEditingGastoId = null;
+let currentEditingIngresoId = null;
+let currentEditingProductId = null;
+let drawerCurrentPhotoBase64 = "";
+let currentDrawerContext = null;
+let pendingCatalogPromptCallback = null;
+
+// Helper de acceso a LocalStorage
+function getStoredGastos() {
+  try {
+    const data = localStorage.getItem(GASTOS_STORAGE_KEY);
+    return data ? JSON.parse(data) : [];
+  } catch (err) {
+    console.error("Error al cargar gastos de localStorage:", err);
+    return [];
+  }
+}
+
+function saveStoredGastos(gastos) {
+  try {
+    localStorage.setItem(GASTOS_STORAGE_KEY, JSON.stringify(gastos));
+    if (typeof triggerAutoCloudBackup === "function") triggerAutoCloudBackup("gastos");
+  } catch (err) {
+    console.error("Error al guardar gastos en localStorage:", err);
+  }
+}
+
+function getStoredIngresos() {
+  try {
+    const data = localStorage.getItem(INGRESOS_STORAGE_KEY);
+    return data ? JSON.parse(data) : [];
+  } catch (err) {
+    console.error("Error al cargar ingresos de localStorage:", err);
+    return [];
+  }
+}
+
+function saveStoredIngresos(ingresos) {
+  try {
+    localStorage.setItem(INGRESOS_STORAGE_KEY, JSON.stringify(ingresos));
+    if (typeof triggerAutoCloudBackup === "function") triggerAutoCloudBackup("ingresos");
+  } catch (err) {
+    console.error("Error al guardar ingresos en localStorage:", err);
+  }
+}
+
+function getStoredProductosCatalog() {
+  try {
+    const data = localStorage.getItem(PRODUCTOS_CATALOG_STORAGE_KEY);
+    return data ? JSON.parse(data) : [];
+  } catch (err) {
+    console.error("Error al cargar catálogo de productos de localStorage:", err);
+    return [];
+  }
+}
+
+function saveStoredProductosCatalog(productos) {
+  try {
+    localStorage.setItem(PRODUCTOS_CATALOG_STORAGE_KEY, JSON.stringify(productos));
+    if (typeof triggerAutoCloudBackup === "function") triggerAutoCloudBackup("productos");
+  } catch (err) {
+    console.error("Error al guardar catálogo de productos en localStorage:", err);
+  }
+}
+
+// Sincronización en la nube con Google Sheets (doPost)
+async function saveGastoToGoogleSheets(gasto) {
+  const url = typeof getSheetsUrl === "function" ? getSheetsUrl() : "";
+  if (!url) return;
+  try {
+    await fetch(url, {
+      method: "POST",
+      mode: "no-cors",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({ action: "save_gasto", data: gasto })
+    });
+  } catch (err) {
+    console.warn("No se pudo sincronizar gasto con Google Sheets:", err);
+  }
+}
+
+async function saveIngresoToGoogleSheets(ingreso) {
+  const url = typeof getSheetsUrl === "function" ? getSheetsUrl() : "";
+  if (!url) return;
+  try {
+    await fetch(url, {
+      method: "POST",
+      mode: "no-cors",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({ action: "save_ingreso", data: ingreso })
+    });
+  } catch (err) {
+    console.warn("No se pudo sincronizar ingreso con Google Sheets:", err);
+  }
+}
+
+async function saveProductoToGoogleSheets(producto) {
+  const url = typeof getSheetsUrl === "function" ? getSheetsUrl() : "";
+  if (!url) return;
+  try {
+    // Excluir imagen_base64 para no saturar Sheets
+    const cleanProd = { ...producto };
+    delete cleanProd.imagen_base64;
+    delete cleanProd.imagen;
+    await fetch(url, {
+      method: "POST",
+      mode: "no-cors",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({ action: "save_producto", data: cleanProd })
+    });
+  } catch (err) {
+    console.warn("No se pudo sincronizar producto con Google Sheets:", err);
+  }
+}
+
+// Poblador de selectores de producto con opción fija "＋ Nuevo producto"
+function populateProductSelectWithCatalog(selectEl, selectedId) {
+  if (!selectEl) return;
+  const currentVal = selectedId !== undefined ? selectedId : selectEl.value;
+
+  const catalog = getStoredProductosCatalog();
+  const legacyProducts = typeof getStoredProducts === "function" ? getStoredProducts() : [];
+
+  const itemsMap = new Map();
+
+  // 1. Agregar productos del catálogo
+  catalog.forEach(p => {
+    const rateBcv = typeof getLastBcvRate === "function" ? getLastBcvRate() : 0;
+    const priceVentaBs = parseFloat(p.precio_venta_bs) || 0;
+    const priceUSD = rateBcv > 0 ? (priceVentaBs / rateBcv) : 0;
+    itemsMap.set(String(p.id), {
+      id: p.id,
+      nombre: p.nombre,
+      priceUSD: priceUSD,
+      priceBs: priceVentaBs,
+      costBs: parseFloat(p.precio_compra_bs) || 0,
+      stockInfo: ""
+    });
+  });
+
+  // 2. Agregar productos de inventario existentes que no se repitan
+  legacyProducts.forEach(p => {
+    const exists = Array.from(itemsMap.values()).some(it => it.nombre.toLowerCase().trim() === (p.name || "").toLowerCase().trim());
+    if (!exists) {
+      const hasQty = p.quantity !== null && p.quantity !== undefined && p.quantity !== "";
+      const stockInfo = hasQty ? ` (Disp: ${p.quantity})` : "";
+      const priceUSD = parseFloat(p.price) || 0;
+      const rateBcv = typeof getLastBcvRate === "function" ? getLastBcvRate() : 0;
+      itemsMap.set(String(p.id), {
+        id: p.id,
+        nombre: p.name,
+        priceUSD: priceUSD,
+        priceBs: priceUSD * rateBcv,
+        costBs: 0,
+        stockInfo: stockInfo
+      });
+    }
+  });
+
+  const sortedList = Array.from(itemsMap.values()).sort((a, b) => a.nombre.localeCompare(b.nombre));
+
+  let html = '<option value="">-- Seleccionar producto --</option>';
+  sortedList.forEach(item => {
+    const isSelected = String(item.id) === String(currentVal) ? 'selected' : '';
+    const priceLabel = item.priceBs > 0 ? ` - Bs. ${formatCierreCurrency(item.priceBs)}` : (item.priceUSD > 0 ? ` - $${item.priceUSD.toFixed(2)} USD` : '');
+    html += `<option value="${escapeHtml(item.id)}" data-name="${escapeHtml(item.nombre)}" data-price="${item.priceUSD.toFixed(2)}" data-price-bs="${item.priceBs}" data-cost-bs="${item.costBs}" ${isSelected}>${escapeHtml(item.nombre)}${priceLabel}${item.stockInfo}</option>`;
+  });
+
+  // Opción fija al final
+  html += '<option value="__NEW_PRODUCT__" style="font-weight: 700; color: #1a3a6b;">＋ Nuevo producto</option>';
+
+  selectEl.innerHTML = html;
+  if (currentVal && currentVal !== "__NEW_PRODUCT__") {
+    selectEl.value = currentVal;
+  }
+}
+
+// Drawer Lateral de Producto (Non-modal)
+function openProductCatalogDrawer(options = {}) {
+  currentDrawerContext = options;
+  const drawer = document.getElementById("product-catalog-drawer");
+  const form = document.getElementById("form-product-drawer");
+  const title = document.getElementById("product-drawer-title");
+  const idInput = document.getElementById("drawer-product-id");
+  const nameInput = document.getElementById("drawer-prod-nombre");
+  const distInput = document.getElementById("drawer-prod-distribuidor");
+  const costInput = document.getElementById("drawer-prod-precio-compra");
+  const saleInput = document.getElementById("drawer-prod-precio-venta");
+  const imgPreview = document.getElementById("drawer-image-preview");
+  const imgPlaceholder = document.getElementById("drawer-image-placeholder");
+  const btnClearPhoto = document.getElementById("btn-drawer-clear-photo");
+  const fileInput = document.getElementById("drawer-prod-foto");
+
+  const invExpenseBox = document.getElementById("drawer-inventory-expense-box");
+  const invChk = document.getElementById("drawer-chk-gasto-inventario");
+  const invCostWrap = document.getElementById("drawer-gasto-costo-wrap");
+  const invCostInput = document.getElementById("drawer-costo-real-bs");
+
+  if (!drawer) return;
+
+  if (form) form.reset();
+  drawerCurrentPhotoBase64 = "";
+  if (fileInput) fileInput.value = "";
+
+  if (options.product) {
+    // Modo edición
+    currentEditingProductId = options.product.id;
+    if (idInput) idInput.value = options.product.id;
+    if (title) title.textContent = "✏️ Editar Producto del Catálogo";
+    if (nameInput) nameInput.value = options.product.nombre || "";
+    if (distInput) distInput.value = options.product.distribuidor || "";
+    if (costInput) costInput.value = options.product.precio_compra_bs !== undefined && options.product.precio_compra_bs !== null ? options.product.precio_compra_bs : "";
+    if (saleInput) saleInput.value = options.product.precio_venta_bs !== undefined && options.product.precio_venta_bs !== null ? options.product.precio_venta_bs : "";
+
+    if (options.product.imagen_base64) {
+      drawerCurrentPhotoBase64 = options.product.imagen_base64;
+      if (imgPreview) {
+        imgPreview.src = options.product.imagen_base64;
+        imgPreview.classList.remove("hidden");
+      }
+      if (imgPlaceholder) imgPlaceholder.classList.add("hidden");
+      if (btnClearPhoto) btnClearPhoto.classList.remove("hidden");
+    } else {
+      if (imgPreview) {
+        imgPreview.src = "";
+        imgPreview.classList.add("hidden");
+      }
+      if (imgPlaceholder) imgPlaceholder.classList.remove("hidden");
+      if (btnClearPhoto) btnClearPhoto.classList.add("hidden");
+    }
+
+    if (invExpenseBox) invExpenseBox.classList.add("hidden");
+  } else {
+    // Modo creación
+    currentEditingProductId = null;
+    if (idInput) idInput.value = "";
+    if (title) title.textContent = "📦 Nuevo Producto al Catálogo";
+    if (nameInput) nameInput.value = options.prefillName || "";
+    if (distInput) distInput.value = "";
+    if (costInput) costInput.value = "";
+    if (saleInput) {
+      let saleBs = "";
+      if (options.prefillSalePrice) {
+        const rate = typeof getLastBcvRate === "function" ? getLastBcvRate() : 0;
+        saleBs = rate > 0 ? (parseFloat(options.prefillSalePrice) * rate).toFixed(2) : options.prefillSalePrice;
+      }
+      saleInput.value = saleBs;
+    }
+
+    if (imgPreview) {
+      imgPreview.src = "";
+      imgPreview.classList.add("hidden");
+    }
+    if (imgPlaceholder) imgPlaceholder.classList.remove("hidden");
+    if (btnClearPhoto) btnClearPhoto.classList.add("hidden");
+
+    if (invExpenseBox) invExpenseBox.classList.remove("hidden");
+    if (invChk) invChk.checked = false;
+    if (invCostWrap) invCostWrap.classList.add("hidden");
+    if (invCostInput) invCostInput.value = "";
+  }
+
+  drawer.classList.add("active");
+  drawer.setAttribute("aria-hidden", "false");
+  if (nameInput) nameInput.focus();
+}
+
+function closeProductCatalogDrawer() {
+  const drawer = document.getElementById("product-catalog-drawer");
+  if (drawer) {
+    drawer.classList.remove("active");
+    drawer.setAttribute("aria-hidden", "true");
+  }
+
+  // Restaurar select si quedó en __NEW_PRODUCT__
+  if (currentDrawerContext && currentDrawerContext.originSelectId) {
+    const originSelect = document.getElementById(currentDrawerContext.originSelectId);
+    if (originSelect && originSelect.value === "__NEW_PRODUCT__") {
+      originSelect.value = "";
+    }
+  }
+
+  currentDrawerContext = null;
+  currentEditingProductId = null;
+  drawerCurrentPhotoBase64 = "";
+}
+
+function handleDrawerProductSubmit(e) {
+  if (e) e.preventDefault();
+
+  const nameInput = document.getElementById("drawer-prod-nombre");
+  const distInput = document.getElementById("drawer-prod-distribuidor");
+  const costInput = document.getElementById("drawer-prod-precio-compra");
+  const saleInput = document.getElementById("drawer-prod-precio-venta");
+  const invChk = document.getElementById("drawer-chk-gasto-inventario");
+  const invCostInput = document.getElementById("drawer-costo-real-bs");
+
+  const nombre = (nameInput?.value || "").trim();
+  if (!nombre) {
+    alert("Por favor ingresa el nombre del producto.");
+    nameInput?.focus();
+    return;
+  }
+
+  const distribuidor = (distInput?.value || "").trim();
+  const precioCompraBs = parseFloat(costInput?.value) || 0;
+  const precioVentaBs = parseFloat(saleInput?.value) || 0;
+
+  const catalog = getStoredProductosCatalog();
+  const isEditing = !!currentEditingProductId;
+  let productObj = null;
+
+  if (isEditing) {
+    const idx = catalog.findIndex(p => String(p.id) === String(currentEditingProductId));
+    if (idx !== -1) {
+      catalog[idx] = {
+        ...catalog[idx],
+        nombre,
+        distribuidor,
+        precio_compra_bs: precioCompraBs,
+        precio_venta_bs: precioVentaBs,
+        imagen_base64: drawerCurrentPhotoBase64 || catalog[idx].imagen_base64 || ""
+      };
+      productObj = catalog[idx];
+    }
+    saveStoredProductosCatalog(catalog);
+
+    if (typeof addSystemLog === "function" && productObj) {
+      addSystemLog({
+        level: "INFO",
+        action: "UPDATE_PRODUCTO",
+        details: { id: productObj.id, nombre, distribuidor, precio_compra_bs: precioCompraBs, precio_venta_bs: precioVentaBs },
+        status: "success"
+      });
+    }
+
+    if (productObj) saveProductoToGoogleSheets(productObj);
+  } else {
+    const id = "prod_" + Date.now() + "_" + Math.random().toString(36).substr(2, 5);
+    productObj = {
+      id,
+      nombre,
+      distribuidor,
+      precio_compra_bs: precioCompraBs,
+      precio_venta_bs: precioVentaBs,
+      imagen_base64: drawerCurrentPhotoBase64,
+      fecha_registro: new Date().toISOString().substring(0, 10)
+    };
+    catalog.unshift(productObj);
+    saveStoredProductosCatalog(catalog);
+
+    if (typeof addSystemLog === "function") {
+      addSystemLog({
+        level: "INFO",
+        action: "CREATE_PRODUCTO",
+        details: { id, nombre, distribuidor, precio_compra_bs: precioCompraBs, precio_venta_bs: precioVentaBs },
+        status: "success"
+      });
+    }
+
+    saveProductoToGoogleSheets(productObj);
+
+    // Registro opcional de gasto de inventario
+    if (invChk && invChk.checked) {
+      const costoReal = parseFloat(invCostInput?.value) || precioCompraBs;
+      if (costoReal > 0) {
+        const origen = currentDrawerContext?.context === "pago" ? "desde_pago" : (currentDrawerContext?.context === "credito" ? "desde_credito" : "manual");
+        const gastoObj = {
+          id: "gasto_" + Date.now() + "_" + Math.random().toString(36).substr(2, 5),
+          fecha: new Date().toISOString().substring(0, 10),
+          descripcion: `Inventario: ${nombre}`,
+          categoria: "Inventario",
+          monto_original: costoReal,
+          moneda: "Bs",
+          monto_bs: costoReal,
+          tasa_bcv_usada: typeof getLastBcvRate === "function" ? getLastBcvRate() : 0,
+          origen: origen
+        };
+        const gastos = getStoredGastos();
+        gastos.unshift(gastoObj);
+        saveStoredGastos(gastos);
+
+        if (typeof addSystemLog === "function") {
+          addSystemLog({
+            level: "INFO",
+            action: "CREATE_GASTO",
+            details: {
+              id: gastoObj.id,
+              descripcion: gastoObj.descripcion,
+              categoria: gastoObj.categoria,
+              monto_original: gastoObj.monto_original,
+              moneda: gastoObj.moneda,
+              monto_bs: gastoObj.monto_bs,
+              origen: gastoObj.origen
+            },
+            status: "success"
+          });
+        }
+
+        saveGastoToGoogleSheets(gastoObj);
+        renderGastosTable();
+        if (typeof updateDashboardCierresKPIs === "function") updateDashboardCierresKPIs();
+      }
+    }
+  }
+
+  // Refrescar selector de origen si aplica
+  const ctx = currentDrawerContext;
+  if (ctx && ctx.originSelectId) {
+    const originSelect = document.getElementById(ctx.originSelectId);
+    if (originSelect && productObj) {
+      populateProductSelectWithCatalog(originSelect, productObj.id);
+      originSelect.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+  }
+
+  if (ctx && typeof ctx.onSaved === "function" && productObj) {
+    ctx.onSaved(productObj);
+  }
+
+  closeProductCatalogDrawer();
+  renderCatalogoTable();
+
+  // Refrescar selectores abiertos
+  const creditSelect = document.getElementById("credit-product-select");
+  const saleSelect = document.getElementById("sale-product-select");
+  if (creditSelect && (!ctx || ctx.originSelectId !== "credit-product-select")) {
+    populateProductSelectWithCatalog(creditSelect);
+  }
+  if (saleSelect && (!ctx || ctx.originSelectId !== "sale-product-select")) {
+    populateProductSelectWithCatalog(saleSelect);
+  }
+
+  if (typeof showCloudSyncToast === "function") {
+    showCloudSyncToast(`📦 Producto "${nombre}" guardado en catálogo`, "success");
+  }
+}
+
+// Modal "¿El producto '[nombre]' está en tu catálogo?"
+function checkItemsCatalogStatus(items, onProceed, originSelectId, context = "credito") {
+  if (!Array.isArray(items) || items.length === 0) {
+    if (typeof onProceed === "function") onProceed();
+    return;
+  }
+
+  const catalog = getStoredProductosCatalog();
+
+  // Buscar primer producto que no esté en catálogo
+  const uncataloged = items.find(it => {
+    const itemName = String(it.nombre || it.name || "").trim().toLowerCase();
+    const itemId = String(it.productId || it.id || "").trim();
+    if (!itemName) return false;
+    const exists = catalog.some(p => {
+      if (itemId && String(p.id) === itemId) return true;
+      return String(p.nombre || "").trim().toLowerCase() === itemName;
+    });
+    return !exists;
+  });
+
+  // Si ya existe en el catálogo, ir directo sin preguntar
+  if (!uncataloged) {
+    if (typeof onProceed === "function") onProceed();
+    return;
+  }
+
+  // Mostrar modal de consulta
+  const modal = document.getElementById("modal-product-catalog-prompt");
+  const questionEl = document.getElementById("catalog-prompt-question");
+  const uncatalogedName = uncataloged.nombre || uncataloged.name;
+
+  if (questionEl) {
+    questionEl.textContent = `¿El producto "${uncatalogedName}" está en tu catálogo?`;
+  }
+
+  pendingCatalogPromptCallback = onProceed;
+
+  const btnSi = document.getElementById("btn-catalog-prompt-si");
+  const btnOmitir = document.getElementById("btn-catalog-prompt-omitir");
+  const btnAgregar = document.getElementById("btn-catalog-prompt-agregar");
+
+  const hidePromptModal = () => {
+    if (modal) modal.classList.add("hidden");
+  };
+
+  if (btnSi) {
+    btnSi.onclick = () => {
+      hidePromptModal();
+      if (typeof pendingCatalogPromptCallback === "function") {
+        pendingCatalogPromptCallback();
+      }
+    };
+  }
+
+  if (btnOmitir) {
+    btnOmitir.onclick = () => {
+      hidePromptModal();
+      if (typeof pendingCatalogPromptCallback === "function") {
+        pendingCatalogPromptCallback();
+      }
+    };
+  }
+
+  if (btnAgregar) {
+    btnAgregar.onclick = () => {
+      hidePromptModal();
+      const unitPrice = uncataloged.precioUnitario || uncataloged.price || uncataloged.priceUSD || "";
+      openProductCatalogDrawer({
+        prefillName: uncatalogedName,
+        prefillSalePrice: unitPrice,
+        originSelectId: originSelectId,
+        isFromCreditOrSale: true,
+        context: context,
+        onSaved: (createdProd) => {
+          uncataloged.productId = createdProd.id;
+          uncataloged.nombre = createdProd.nombre;
+          uncataloged.name = createdProd.nombre;
+          if (typeof pendingCatalogPromptCallback === "function") {
+            pendingCatalogPromptCallback();
+          }
+        }
+      });
+    };
+  }
+
+  if (modal) modal.classList.remove("hidden");
+}
+
+// ============================================================
+// SECCIÓN B: GASTOS MANUALES
+// ============================================================
+
+function updateGastoUsdConversion() {
+  const monedaSelect = document.getElementById("select-gasto-moneda");
+  const montoInput = document.getElementById("input-gasto-monto");
+  const conversionBox = document.getElementById("gasto-usd-conversion-box");
+  const conversionText = document.getElementById("gasto-usd-conversion-text");
+
+  if (!monedaSelect || !montoInput || !conversionBox || !conversionText) return;
+
+  const moneda = monedaSelect.value;
+  const monto = parseFloat(montoInput.value) || 0;
+
+  if (moneda === "USD" && monto > 0) {
+    const rateBcv = typeof getLastBcvRate === "function" ? getLastBcvRate() : 0;
+    const montoBs = monto * rateBcv;
+    conversionText.textContent = `≈ Bs. ${formatCierreCurrency(montoBs)} (Tasa BCV: Bs. ${rateBcv.toFixed(2)})`;
+    conversionBox.classList.remove("hidden");
+  } else {
+    conversionBox.classList.add("hidden");
+  }
+}
+
+function handleGastoFormSubmit(e) {
+  if (e) e.preventDefault();
+
+  const editIdInput = document.getElementById("gasto-edit-id");
+  const descInput = document.getElementById("input-gasto-descripcion");
+  const montoInput = document.getElementById("input-gasto-monto");
+  const monedaSelect = document.getElementById("select-gasto-moneda");
+  const catSelect = document.getElementById("select-gasto-categoria");
+  const fechaInput = document.getElementById("input-gasto-fecha");
+
+  const descripcion = (descInput?.value || "").trim();
+  const monto = parseFloat(montoInput?.value) || 0;
+  const moneda = monedaSelect?.value || "Bs";
+  const categoria = catSelect?.value || "Otro";
+  const fecha = fechaInput?.value || new Date().toISOString().substring(0, 10);
+  const editId = (editIdInput?.value || "").trim();
+
+  if (!descripcion) {
+    alert("Por favor ingresa la descripción del gasto.");
+    descInput?.focus();
+    return;
+  }
+  if (monto <= 0) {
+    alert("Por favor ingresa un monto válido mayor a cero.");
+    montoInput?.focus();
+    return;
+  }
+
+  const rateBcv = typeof getLastBcvRate === "function" ? getLastBcvRate() : 0;
+  const montoBs = moneda === "USD" ? (monto * rateBcv) : monto;
+
+  const gastos = getStoredGastos();
+  const isEditing = !!editId;
+  let gastoObj = null;
+
+  if (isEditing) {
+    const idx = gastos.findIndex(g => String(g.id) === String(editId));
+    if (idx !== -1) {
+      gastos[idx] = {
+        ...gastos[idx],
+        descripcion,
+        monto_original: monto,
+        moneda,
+        monto_bs: montoBs,
+        tasa_bcv_usada: rateBcv,
+        categoria,
+        fecha
+      };
+      gastoObj = gastos[idx];
+    }
+    saveStoredGastos(gastos);
+
+    if (typeof addSystemLog === "function" && gastoObj) {
+      addSystemLog({
+        level: "INFO",
+        action: "UPDATE_GASTO",
+        details: { id: gastoObj.id, descripcion, categoria, monto_bs: montoBs, moneda },
+        status: "success"
+      });
+    }
+
+    if (gastoObj) saveGastoToGoogleSheets(gastoObj);
+  } else {
+    const id = "gasto_" + Date.now() + "_" + Math.random().toString(36).substr(2, 5);
+    gastoObj = {
+      id,
+      fecha,
+      descripcion,
+      categoria,
+      monto_original: monto,
+      moneda,
+      monto_bs: montoBs,
+      tasa_bcv_usada: rateBcv,
+      origen: "manual"
+    };
+    gastos.unshift(gastoObj);
+    saveStoredGastos(gastos);
+
+    if (typeof addSystemLog === "function") {
+      addSystemLog({
+        level: "INFO",
+        action: "CREATE_GASTO",
+        details: {
+          id,
+          descripcion,
+          categoria,
+          monto_original: monto,
+          moneda,
+          monto_bs: montoBs,
+          origen: "manual"
+        },
+        status: "success"
+      });
+    }
+
+    saveGastoToGoogleSheets(gastoObj);
+  }
+
+  cancelEditGasto();
+  renderGastosTable();
+  if (typeof updateDashboardCierresKPIs === "function") updateDashboardCierresKPIs();
+
+  if (typeof showCloudSyncToast === "function") {
+    showCloudSyncToast(`💸 Gasto ${isEditing ? "actualizado" : "guardado"} correctamente`, "success");
+  }
+}
+
+function loadGastoIntoForm(id) {
+  const gastos = getStoredGastos();
+  const gasto = gastos.find(g => String(g.id) === String(id));
+  if (!gasto) return;
+
+  currentEditingGastoId = gasto.id;
+
+  const editIdInput = document.getElementById("gasto-edit-id");
+  const descInput = document.getElementById("input-gasto-descripcion");
+  const montoInput = document.getElementById("input-gasto-monto");
+  const monedaSelect = document.getElementById("select-gasto-moneda");
+  const catSelect = document.getElementById("select-gasto-categoria");
+  const fechaInput = document.getElementById("input-gasto-fecha");
+
+  const titleEl = document.getElementById("form-gasto-title");
+  const subEl = document.getElementById("form-gasto-subtitle");
+  const btnCancel = document.getElementById("btn-cancel-edit-gasto");
+  const btnSubmit = document.getElementById("btn-guardar-gasto");
+
+  if (editIdInput) editIdInput.value = gasto.id;
+  if (descInput) descInput.value = gasto.descripcion || "";
+  if (montoInput) montoInput.value = gasto.monto_original !== undefined ? gasto.monto_original : (gasto.monto_bs || "");
+  if (monedaSelect) monedaSelect.value = gasto.moneda || "Bs";
+  if (catSelect) catSelect.value = gasto.categoria || "Otro";
+  if (fechaInput) fechaInput.value = gasto.fecha || "";
+
+  if (titleEl) titleEl.textContent = "✏️ Editar Gasto";
+  if (subEl) subEl.textContent = "Modifica los datos del gasto y pulsa 'Actualizar Gasto'";
+  if (btnCancel) btnCancel.classList.remove("hidden");
+  if (btnSubmit) btnSubmit.innerHTML = "💾 Actualizar Gasto";
+
+  updateGastoUsdConversion();
+  descInput?.focus();
+}
+
+function cancelEditGasto() {
+  currentEditingGastoId = null;
+  const form = document.getElementById("form-gasto-manual");
+  if (form) form.reset();
+
+  const editIdInput = document.getElementById("gasto-edit-id");
+  const titleEl = document.getElementById("form-gasto-title");
+  const subEl = document.getElementById("form-gasto-subtitle");
+  const btnCancel = document.getElementById("btn-cancel-edit-gasto");
+  const btnSubmit = document.getElementById("btn-guardar-gasto");
+  const fechaInput = document.getElementById("input-gasto-fecha");
+  const convBox = document.getElementById("gasto-usd-conversion-box");
+
+  if (editIdInput) editIdInput.value = "";
+  if (titleEl) titleEl.textContent = "📝 Registrar Gasto Manual";
+  if (subEl) subEl.textContent = "Ingresa compras de inventario, gastos personales u operativos";
+  if (btnCancel) btnCancel.classList.add("hidden");
+  if (btnSubmit) btnSubmit.innerHTML = "💾 Guardar Gasto";
+  if (convBox) convBox.classList.add("hidden");
+
+  if (fechaInput) fechaInput.value = new Date().toISOString().substring(0, 10);
+}
+
+function deleteGasto(id) {
+  const gastos = getStoredGastos();
+  const gasto = gastos.find(g => String(g.id) === String(id));
+  if (!gasto) return;
+
+  if (!confirm(`¿Estás seguro de que deseas eliminar el gasto "${gasto.descripcion}" por Bs. ${formatCierreCurrency(gasto.monto_bs)}?`)) {
+    return;
+  }
+
+  const updated = gastos.filter(g => String(g.id) !== String(id));
+  saveStoredGastos(updated);
+
+  if (typeof addSystemLog === "function") {
+    addSystemLog({
+      level: "INFO",
+      action: "DELETE_GASTO",
+      details: { id: gasto.id, descripcion: gasto.descripcion, monto_bs: gasto.monto_bs },
+      status: "success"
+    });
+  }
+
+  if (currentEditingGastoId === id) cancelEditGasto();
+  renderGastosTable();
+  if (typeof updateDashboardCierresKPIs === "function") updateDashboardCierresKPIs();
+
+  if (typeof showCloudSyncToast === "function") {
+    showCloudSyncToast("🗑️ Gasto eliminado correctamente", "info");
+  }
+}
+
+function renderGastosTable() {
+  const tbody = document.getElementById("tbody-gastos");
+  const emptyState = document.getElementById("gastos-empty-state");
+  const totalDisplay = document.getElementById("display-total-gastos-mes");
+  if (!tbody) return;
+
+  const catFilter = document.getElementById("filter-gasto-categoria")?.value || "todas";
+  const mesFilter = document.getElementById("filter-gasto-mes")?.value || "todos";
+  const anoFilter = document.getElementById("filter-gasto-ano")?.value || "";
+
+  const allGastos = getStoredGastos();
+
+  // Filtrado
+  const filtered = allGastos.filter(g => {
+    // Categoría
+    if (catFilter !== "todas" && String(g.categoria || "").toLowerCase() !== catFilter.toLowerCase()) {
+      return false;
+    }
+
+    if (g.fecha) {
+      const d = new Date(g.fecha + "T00:00:00");
+      if (!isNaN(d.getTime())) {
+        if (mesFilter !== "todos") {
+          const m = d.getMonth() + 1;
+          if (m !== parseInt(mesFilter, 10)) return false;
+        }
+        if (anoFilter) {
+          if (d.getFullYear() !== parseInt(anoFilter, 10)) return false;
+        }
+      }
+    }
+    return true;
+  });
+
+  // Orden: más reciente arriba
+  filtered.sort((a, b) => {
+    const timeA = new Date((a.fecha || "") + "T00:00:00").getTime() || 0;
+    const timeB = new Date((b.fecha || "") + "T00:00:00").getTime() || 0;
+    return timeB - timeA;
+  });
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = "";
+    if (emptyState) emptyState.classList.remove("hidden");
+    if (totalDisplay) totalDisplay.textContent = "Bs. 0,00";
+    return;
+  }
+
+  if (emptyState) emptyState.classList.add("hidden");
+
+  let totalMontoBs = 0;
+
+  const rowsHtml = filtered.map(g => {
+    const montoBs = parseFloat(g.monto_bs) || 0;
+    totalMontoBs += montoBs;
+
+    const cat = String(g.categoria || "Otro").trim();
+    let badgeCatClass = "badge-cat-otro";
+    if (cat.toLowerCase() === "inventario") badgeCatClass = "badge-cat-inventario";
+    else if (cat.toLowerCase() === "personal") badgeCatClass = "badge-cat-personal";
+    else if (cat.toLowerCase() === "operativo") badgeCatClass = "badge-cat-operativo";
+
+    const origen = String(g.origen || "manual").trim();
+    let badgeOrigenClass = "badge-origen-manual";
+    let origenLabel = "Manual";
+    if (origen === "desde_credito") {
+      badgeOrigenClass = "badge-origen-credito";
+      origenLabel = "Desde Crédito";
+    } else if (origen === "desde_pago") {
+      badgeOrigenClass = "badge-origen-pago";
+      origenLabel = "Desde Pago";
+    }
+
+    const subMoneda = g.moneda === "USD" ? `<span style="font-size: 0.76rem; color: #64748b; display: block;">($${parseFloat(g.monto_original).toFixed(2)} USD)</span>` : "";
+
+    return `
+      <tr>
+        <td style="font-family: monospace; white-space: nowrap; color: #475569;">${escapeHtml(g.fecha || "—")}</td>
+        <td style="font-weight: 600; color: #1e293b;">${escapeHtml(g.descripcion || "Sin concepto")}</td>
+        <td><span class="badge ${badgeCatClass}">${escapeHtml(cat)}</span></td>
+        <td style="text-align: right; font-family: monospace; font-weight: 700; color: #e11d48;">
+          Bs. ${formatCierreCurrency(montoBs)}
+          ${subMoneda}
+        </td>
+        <td><span class="badge ${badgeOrigenClass}">${origenLabel}</span></td>
+        <td style="text-align: center; white-space: nowrap;">
+          <div style="display: flex; gap: 4px; justify-content: center;">
+            <button type="button" class="btn-action-edit-gasto" data-id="${escapeHtml(g.id)}" title="Editar gasto" style="background: none; border: 1px solid #cbd5e1; border-radius: 4px; padding: 4px 8px; cursor: pointer; font-size: 0.85rem;">✏️</button>
+            <button type="button" class="btn-action-delete-gasto" data-id="${escapeHtml(g.id)}" title="Eliminar gasto" style="background: none; border: 1px solid #fecaca; border-radius: 4px; padding: 4px 8px; cursor: pointer; font-size: 0.85rem; color: #dc2626;">🗑️</button>
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join("");
+
+  tbody.innerHTML = rowsHtml;
+  if (totalDisplay) totalDisplay.textContent = `Bs. ${formatCierreCurrency(totalMontoBs)}`;
+
+  // Listeners de acciones
+  tbody.querySelectorAll(".btn-action-edit-gasto").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const id = btn.getAttribute("data-id");
+      if (id) loadGastoIntoForm(id);
+    });
+  });
+
+  tbody.querySelectorAll(".btn-action-delete-gasto").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const id = btn.getAttribute("data-id");
+      if (id) deleteGasto(id);
+    });
+  });
+}
+
+// ============================================================
+// SECCIÓN C: INGRESOS MANUALES
+// ============================================================
+
+function updateIngresoUsdConversion() {
+  const monedaSelect = document.getElementById("select-ingreso-moneda");
+  const montoInput = document.getElementById("input-gasto-monto");
+  const conversionBox = document.getElementById("ingreso-usd-conversion-box");
+  const conversionText = document.getElementById("ingreso-usd-conversion-text");
+
+  if (!monedaSelect || !montoInput || !conversionBox || !conversionText) return;
+
+  const moneda = monedaSelect.value;
+  const monto = parseFloat(montoInput.value) || 0;
+
+  if (moneda === "USD" && monto > 0) {
+    const rateBcv = typeof getLastBcvRate === "function" ? getLastBcvRate() : 0;
+    const montoBs = monto * rateBcv;
+    conversionText.textContent = `≈ Bs. ${formatCierreCurrency(montoBs)} (Tasa BCV: Bs. ${rateBcv.toFixed(2)})`;
+    conversionBox.classList.remove("hidden");
+  } else {
+    conversionBox.classList.add("hidden");
+  }
+}
+
+function handleIngresoFormSubmit(e) {
+  if (e) e.preventDefault();
+
+  const editIdInput = document.getElementById("ingreso-edit-id");
+  const descInput = document.getElementById("input-ingreso-descripcion");
+  const montoInput = document.getElementById("input-ingreso-monto");
+  const monedaSelect = document.getElementById("select-ingreso-moneda");
+  const fechaInput = document.getElementById("input-ingreso-fecha");
+
+  const descripcion = (descInput?.value || "").trim();
+  const monto = parseFloat(montoInput?.value) || 0;
+  const moneda = monedaSelect?.value || "Bs";
+  const fecha = fechaInput?.value || new Date().toISOString().substring(0, 10);
+  const editId = (editIdInput?.value || "").trim();
+
+  if (!descripcion) {
+    alert("Por favor ingresa la descripción del ingreso.");
+    descInput?.focus();
+    return;
+  }
+  if (monto <= 0) {
+    alert("Por favor ingresa un monto válido mayor a cero.");
+    montoInput?.focus();
+    return;
+  }
+
+  const rateBcv = typeof getLastBcvRate === "function" ? getLastBcvRate() : 0;
+  const montoBs = moneda === "USD" ? (monto * rateBcv) : monto;
+
+  const ingresos = getStoredIngresos();
+  const isEditing = !!editId;
+  let ingresoObj = null;
+
+  if (isEditing) {
+    const idx = ingresos.findIndex(i => String(i.id) === String(editId));
+    if (idx !== -1) {
+      ingresos[idx] = {
+        ...ingresos[idx],
+        descripcion,
+        monto_original: monto,
+        moneda,
+        monto_bs: montoBs,
+        tasa_bcv_usada: rateBcv,
+        fecha
+      };
+      ingresoObj = ingresos[idx];
+    }
+    saveStoredIngresos(ingresos);
+
+    if (typeof addSystemLog === "function" && ingresoObj) {
+      addSystemLog({
+        level: "INFO",
+        action: "UPDATE_INGRESO",
+        details: { id: ingresoObj.id, descripcion, monto_bs: montoBs, moneda },
+        status: "success"
+      });
+    }
+
+    if (ingresoObj) saveIngresoToGoogleSheets(ingresoObj);
+  } else {
+    const id = "ingreso_" + Date.now() + "_" + Math.random().toString(36).substr(2, 5);
+    ingresoObj = {
+      id,
+      fecha,
+      descripcion,
+      monto_original: monto,
+      moneda,
+      monto_bs: montoBs,
+      tasa_bcv_usada: rateBcv
+    };
+    ingresos.unshift(ingresoObj);
+    saveStoredIngresos(ingresos);
+
+    if (typeof addSystemLog === "function") {
+      addSystemLog({
+        level: "INFO",
+        action: "CREATE_INGRESO",
+        details: { id, descripcion, monto_original: monto, moneda, monto_bs: montoBs },
+        status: "success"
+      });
+    }
+
+    saveIngresoToGoogleSheets(ingresoObj);
+  }
+
+  cancelEditIngreso();
+  renderIngresosTable();
+
+  if (typeof showCloudSyncToast === "function") {
+    showCloudSyncToast(`💰 Ingreso ${isEditing ? "actualizado" : "guardado"} correctamente`, "success");
+  }
+}
+
+function loadIngresoIntoForm(id) {
+  const ingresos = getStoredIngresos();
+  const ingreso = ingresos.find(i => String(i.id) === String(id));
+  if (!ingreso) return;
+
+  currentEditingIngresoId = ingreso.id;
+
+  const editIdInput = document.getElementById("ingreso-edit-id");
+  const descInput = document.getElementById("input-ingreso-descripcion");
+  const montoInput = document.getElementById("input-ingreso-monto");
+  const monedaSelect = document.getElementById("select-ingreso-moneda");
+  const fechaInput = document.getElementById("input-ingreso-fecha");
+
+  const titleEl = document.getElementById("form-ingreso-title");
+  const subEl = document.getElementById("form-ingreso-subtitle");
+  const btnCancel = document.getElementById("btn-cancel-edit-ingreso");
+  const btnSubmit = document.getElementById("btn-guardar-ingreso");
+
+  if (editIdInput) editIdInput.value = ingreso.id;
+  if (descInput) descInput.value = ingreso.descripcion || "";
+  if (montoInput) montoInput.value = ingreso.monto_original !== undefined ? ingreso.monto_original : (ingreso.monto_bs || "");
+  if (monedaSelect) monedaSelect.value = ingreso.moneda || "Bs";
+  if (fechaInput) fechaInput.value = ingreso.fecha || "";
+
+  if (titleEl) titleEl.textContent = "✏️ Editar Ingreso";
+  if (subEl) subEl.textContent = "Modifica los datos del ingreso y pulsa 'Actualizar Ingreso'";
+  if (btnCancel) btnCancel.classList.remove("hidden");
+  if (btnSubmit) btnSubmit.innerHTML = "💾 Actualizar Ingreso";
+
+  updateIngresoUsdConversion();
+  descInput?.focus();
+}
+
+function cancelEditIngreso() {
+  currentEditingIngresoId = null;
+  const form = document.getElementById("form-ingreso-manual");
+  if (form) form.reset();
+
+  const editIdInput = document.getElementById("ingreso-edit-id");
+  const titleEl = document.getElementById("form-ingreso-title");
+  const subEl = document.getElementById("form-ingreso-subtitle");
+  const btnCancel = document.getElementById("btn-cancel-edit-ingreso");
+  const btnSubmit = document.getElementById("btn-guardar-ingreso");
+  const fechaInput = document.getElementById("input-ingreso-fecha");
+  const convBox = document.getElementById("ingreso-usd-conversion-box");
+
+  if (editIdInput) editIdInput.value = "";
+  if (titleEl) titleEl.textContent = "📝 Registrar Ingreso";
+  if (subEl) subEl.textContent = "Ingresos externos o inyecciones que no provienen de la empresa";
+  if (btnCancel) btnCancel.classList.add("hidden");
+  if (btnSubmit) btnSubmit.innerHTML = "💾 Guardar Ingreso";
+  if (convBox) convBox.classList.add("hidden");
+
+  if (fechaInput) fechaInput.value = new Date().toISOString().substring(0, 10);
+}
+
+function deleteIngreso(id) {
+  const ingresos = getStoredIngresos();
+  const ingreso = ingresos.find(i => String(i.id) === String(id));
+  if (!ingreso) return;
+
+  if (!confirm(`¿Estás seguro de que deseas eliminar el ingreso "${ingreso.descripcion}" por Bs. ${formatCierreCurrency(ingreso.monto_bs)}?`)) {
+    return;
+  }
+
+  const updated = ingresos.filter(i => String(i.id) !== String(id));
+  saveStoredIngresos(updated);
+
+  if (typeof addSystemLog === "function") {
+    addSystemLog({
+      level: "INFO",
+      action: "DELETE_INGRESO",
+      details: { id: ingreso.id, descripcion: ingreso.descripcion, monto_bs: ingreso.monto_bs },
+      status: "success"
+    });
+  }
+
+  if (currentEditingIngresoId === id) cancelEditIngreso();
+  renderIngresosTable();
+
+  if (typeof showCloudSyncToast === "function") {
+    showCloudSyncToast("🗑️ Ingreso eliminado correctamente", "info");
+  }
+}
+
+function renderIngresosTable() {
+  const tbody = document.getElementById("tbody-ingresos");
+  const emptyState = document.getElementById("ingresos-empty-state");
+  const totalDisplay = document.getElementById("display-total-ingresos-mes");
+  if (!tbody) return;
+
+  const mesFilter = document.getElementById("filter-ingreso-mes")?.value || "todos";
+  const anoFilter = document.getElementById("filter-ingreso-ano")?.value || "";
+
+  const allIngresos = getStoredIngresos();
+
+  const filtered = allIngresos.filter(i => {
+    if (i.fecha) {
+      const d = new Date(i.fecha + "T00:00:00");
+      if (!isNaN(d.getTime())) {
+        if (mesFilter !== "todos") {
+          const m = d.getMonth() + 1;
+          if (m !== parseInt(mesFilter, 10)) return false;
+        }
+        if (anoFilter) {
+          if (d.getFullYear() !== parseInt(anoFilter, 10)) return false;
+        }
+      }
+    }
+    return true;
+  });
+
+  filtered.sort((a, b) => {
+    const timeA = new Date((a.fecha || "") + "T00:00:00").getTime() || 0;
+    const timeB = new Date((b.fecha || "") + "T00:00:00").getTime() || 0;
+    return timeB - timeA;
+  });
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = "";
+    if (emptyState) emptyState.classList.remove("hidden");
+    if (totalDisplay) totalDisplay.textContent = "Bs. 0,00";
+    return;
+  }
+
+  if (emptyState) emptyState.classList.add("hidden");
+
+  let totalMontoBs = 0;
+
+  const rowsHtml = filtered.map(i => {
+    const montoBs = parseFloat(i.monto_bs) || 0;
+    totalMontoBs += montoBs;
+
+    const subMoneda = i.moneda === "USD" ? `<span style="font-size: 0.76rem; color: #64748b; display: block;">($${parseFloat(i.monto_original).toFixed(2)} USD)</span>` : "";
+
+    return `
+      <tr>
+        <td style="font-family: monospace; white-space: nowrap; color: #475569;">${escapeHtml(i.fecha || "—")}</td>
+        <td style="font-weight: 600; color: #1e293b;">${escapeHtml(i.descripcion || "Sin concepto")}</td>
+        <td style="text-align: right; font-family: monospace; font-weight: 700; color: #047857;">
+          Bs. ${formatCierreCurrency(montoBs)}
+          ${subMoneda}
+        </td>
+        <td style="text-align: center; white-space: nowrap;">
+          <div style="display: flex; gap: 4px; justify-content: center;">
+            <button type="button" class="btn-action-edit-ingreso" data-id="${escapeHtml(i.id)}" title="Editar ingreso" style="background: none; border: 1px solid #cbd5e1; border-radius: 4px; padding: 4px 8px; cursor: pointer; font-size: 0.85rem;">✏️</button>
+            <button type="button" class="btn-action-delete-ingreso" data-id="${escapeHtml(i.id)}" title="Eliminar ingreso" style="background: none; border: 1px solid #fecaca; border-radius: 4px; padding: 4px 8px; cursor: pointer; font-size: 0.85rem; color: #dc2626;">🗑️</button>
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join("");
+
+  tbody.innerHTML = rowsHtml;
+  if (totalDisplay) totalDisplay.textContent = `Bs. ${formatCierreCurrency(totalMontoBs)}`;
+
+  tbody.querySelectorAll(".btn-action-edit-ingreso").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const id = btn.getAttribute("data-id");
+      if (id) loadIngresoIntoForm(id);
+    });
+  });
+
+  tbody.querySelectorAll(".btn-action-delete-ingreso").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const id = btn.getAttribute("data-id");
+      if (id) deleteIngreso(id);
+    });
+  });
+}
+
+// ============================================================
+// SECCIÓN A: CATÁLOGO DE PRODUCTOS (VISTA DE TABLA)
+// ============================================================
+
+function deleteProductoCatalog(id) {
+  const catalog = getStoredProductosCatalog();
+  const prod = catalog.find(p => String(p.id) === String(id));
+  if (!prod) return;
+
+  if (!confirm(`¿Estás seguro de que deseas eliminar "${prod.nombre}" del catálogo?`)) {
+    return;
+  }
+
+  const updated = catalog.filter(p => String(p.id) !== String(id));
+  saveStoredProductosCatalog(updated);
+
+  if (typeof addSystemLog === "function") {
+    addSystemLog({
+      level: "INFO",
+      action: "DELETE_PRODUCTO",
+      details: { id: prod.id, nombre: prod.nombre },
+      status: "success"
+    });
+  }
+
+  renderCatalogoTable();
+
+  // Refrescar selectores de venta / crédito
+  const creditSelect = document.getElementById("credit-product-select");
+  const saleSelect = document.getElementById("sale-product-select");
+  if (creditSelect) populateProductSelectWithCatalog(creditSelect);
+  if (saleSelect) populateProductSelectWithCatalog(saleSelect);
+
+  if (typeof showCloudSyncToast === "function") {
+    showCloudSyncToast("🗑️ Producto eliminado del catálogo", "info");
+  }
+}
+
+function renderCatalogoTable() {
+  const tbody = document.getElementById("tbody-catalogo-productos");
+  const emptyState = document.getElementById("catalogo-empty-state");
+  const searchInput = document.getElementById("filter-catalogo-search");
+  if (!tbody) return;
+
+  const catalog = getStoredProductosCatalog();
+  const query = (searchInput?.value || "").trim().toLowerCase();
+
+  const filtered = catalog.filter(p => {
+    if (!query) return true;
+    const n = String(p.nombre || "").toLowerCase();
+    const d = String(p.distribuidor || "").toLowerCase();
+    return n.includes(query) || d.includes(query);
+  });
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = "";
+    if (emptyState) emptyState.classList.remove("hidden");
+    return;
+  }
+
+  if (emptyState) emptyState.classList.add("hidden");
+
+  const rowsHtml = filtered.map(p => {
+    const imgHtml = p.imagen_base64
+      ? `<img src="${p.imagen_base64}" alt="${escapeHtml(p.nombre)}" style="width: 38px; height: 38px; object-fit: cover; border-radius: 6px; border: 1px solid #e2e8f0; display: block; margin: 0 auto;">`
+      : `<span style="font-size: 1.4rem; display: block; text-align: center;">📦</span>`;
+
+    const compraText = p.precio_compra_bs ? `Bs. ${formatCierreCurrency(p.precio_compra_bs)}` : "—";
+    const ventaText = p.precio_venta_bs ? `Bs. ${formatCierreCurrency(p.precio_venta_bs)}` : "—";
+
+    return `
+      <tr>
+        <td style="text-align: center; width: 56px;">${imgHtml}</td>
+        <td style="font-weight: 700; color: #1e293b;">${escapeHtml(p.nombre || "—")}</td>
+        <td style="color: #475569;">${escapeHtml(p.distribuidor || "—")}</td>
+        <td style="text-align: right; font-family: monospace; color: #0284c7; font-weight: 600;">${compraText}</td>
+        <td style="text-align: right; font-family: monospace; color: #15803d; font-weight: 700;">${ventaText}</td>
+        <td style="text-align: center; white-space: nowrap;">
+          <div style="display: flex; gap: 4px; justify-content: center;">
+            <button type="button" class="btn-action-edit-prod" data-id="${escapeHtml(p.id)}" title="Editar producto" style="background: none; border: 1px solid #cbd5e1; border-radius: 4px; padding: 4px 8px; cursor: pointer; font-size: 0.85rem;">✏️</button>
+            <button type="button" class="btn-action-delete-prod" data-id="${escapeHtml(p.id)}" title="Eliminar producto" style="background: none; border: 1px solid #fecaca; border-radius: 4px; padding: 4px 8px; cursor: pointer; font-size: 0.85rem; color: #dc2626;">🗑️</button>
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join("");
+
+  tbody.innerHTML = rowsHtml;
+
+  tbody.querySelectorAll(".btn-action-edit-prod").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const id = btn.getAttribute("data-id");
+      const prod = catalog.find(p => String(p.id) === String(id));
+      if (prod) openProductCatalogDrawer({ product: prod });
+    });
+  });
+
+  tbody.querySelectorAll(".btn-action-delete-prod").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const id = btn.getAttribute("data-id");
+      if (id) deleteProductoCatalog(id);
+    });
+  });
+}
+
+// ============================================================
+// NAVEGACIÓN Y CARGA DEL MÓDULO 8
+// ============================================================
+
+function switchGisSubtab(targetSubtab) {
+  currentGisSubtab = targetSubtab;
+  const tabs = document.querySelectorAll(".gis-subnav .subnav-tab");
+  tabs.forEach(t => {
+    if (t.getAttribute("data-gissubtab") === targetSubtab) {
+      t.classList.add("active");
+    } else {
+      t.classList.remove("active");
+    }
+  });
+
+  const views = [
+    { id: "subtab-content-gis-gastos", name: "gastos" },
+    { id: "subtab-content-gis-ingresos", name: "ingresos" },
+    { id: "subtab-content-gis-catalogo", name: "catalogo" }
+  ];
+
+  views.forEach(v => {
+    const el = document.getElementById(v.id);
+    if (el) {
+      if (v.name === targetSubtab) {
+        el.classList.remove("hidden");
+      } else {
+        el.classList.add("hidden");
+      }
+    }
+  });
+
+  if (targetSubtab === "gastos") renderGastosTable();
+  if (targetSubtab === "ingresos") renderIngresosTable();
+  if (targetSubtab === "catalogo") renderCatalogoTable();
+}
+
+function renderGastosIngresosModule() {
+  switchGisSubtab(currentGisSubtab || "gastos");
+}
+
+function initGastosIngresosModule() {
+  // 1. Subtabs de navegación
+  const subnavBtns = document.querySelectorAll(".gis-subnav .subnav-tab");
+  subnavBtns.forEach(btn => {
+    btn.addEventListener("click", () => {
+      const target = btn.getAttribute("data-gissubtab");
+      if (target) switchGisSubtab(target);
+    });
+  });
+
+  // 2. Pre-llenar fechas de hoy
+  const todayStr = new Date().toISOString().substring(0, 10);
+  const gastoFechaInput = document.getElementById("input-gasto-fecha");
+  const ingresoFechaInput = document.getElementById("input-ingreso-fecha");
+  if (gastoFechaInput) gastoFechaInput.value = todayStr;
+  if (ingresoFechaInput) ingresoFechaInput.value = todayStr;
+
+  // 3. Pre-llenar filtros de mes y año actuales
+  const now = new Date();
+  const currentMonth = String(now.getMonth() + 1);
+  const currentYear = String(now.getFullYear());
+
+  const filterGastoMes = document.getElementById("filter-gasto-mes");
+  const filterGastoAno = document.getElementById("filter-gasto-ano");
+  const filterIngresoMes = document.getElementById("filter-ingreso-mes");
+  const filterIngresoAno = document.getElementById("filter-ingreso-ano");
+
+  if (filterGastoMes) filterGastoMes.value = currentMonth;
+  if (filterGastoAno) filterGastoAno.value = currentYear;
+  if (filterIngresoMes) filterIngresoMes.value = currentMonth;
+  if (filterIngresoAno) filterIngresoAno.value = currentYear;
+
+  // 4. Listeners de conversión USD
+  const selectGastoMoneda = document.getElementById("select-gasto-moneda");
+  const inputGastoMonto = document.getElementById("input-gasto-monto");
+  if (selectGastoMoneda) selectGastoMoneda.addEventListener("change", updateGastoUsdConversion);
+  if (inputGastoMonto) inputGastoMonto.addEventListener("input", updateGastoUsdConversion);
+
+  const selectIngresoMoneda = document.getElementById("select-ingreso-moneda");
+  const inputIngresoMonto = document.getElementById("input-ingreso-monto");
+  if (selectIngresoMoneda) selectIngresoMoneda.addEventListener("change", updateIngresoUsdConversion);
+  if (inputIngresoMonto) inputIngresoMonto.addEventListener("input", updateIngresoUsdConversion);
+
+  // 5. Formularios
+  const formGasto = document.getElementById("form-gasto-manual");
+  if (formGasto) formGasto.addEventListener("submit", handleGastoFormSubmit);
+
+  const btnCancelGasto = document.getElementById("btn-cancel-edit-gasto");
+  if (btnCancelGasto) btnCancelGasto.addEventListener("click", cancelEditGasto);
+
+  const formIngreso = document.getElementById("form-ingreso-manual");
+  if (formIngreso) formIngreso.addEventListener("submit", handleIngresoFormSubmit);
+
+  const btnCancelIngreso = document.getElementById("btn-cancel-edit-ingreso");
+  if (btnCancelIngreso) btnCancelIngreso.addEventListener("click", cancelEditIngreso);
+
+  // 6. Drawer de Catálogo de Productos
+  const formDrawer = document.getElementById("form-product-drawer");
+  if (formDrawer) formDrawer.addEventListener("submit", handleDrawerProductSubmit);
+
+  const btnCloseDrawer = document.getElementById("btn-close-product-drawer");
+  if (btnCloseDrawer) btnCloseDrawer.addEventListener("click", closeProductCatalogDrawer);
+
+  const btnDrawerCerrar = document.getElementById("btn-drawer-cerrar-prod");
+  if (btnDrawerCerrar) btnDrawerCerrar.addEventListener("click", closeProductCatalogDrawer);
+
+  const btnOpenDrawerCat = document.getElementById("btn-open-drawer-catalogo");
+  if (btnOpenDrawerCat) btnOpenDrawerCat.addEventListener("click", () => openProductCatalogDrawer());
+
+  const btnEmptyCatNuevo = document.getElementById("btn-empty-catalogo-nuevo");
+  if (btnEmptyCatNuevo) btnEmptyCatNuevo.addEventListener("click", () => openProductCatalogDrawer());
+
+  // Checkbox de gasto de inventario en drawer
+  const drawerChkInv = document.getElementById("drawer-chk-gasto-inventario");
+  const drawerGastoCostoWrap = document.getElementById("drawer-gasto-costo-wrap");
+  const drawerCostoRealInput = document.getElementById("drawer-costo-real-bs");
+  const drawerPrecioCompraInput = document.getElementById("drawer-prod-precio-compra");
+
+  if (drawerChkInv && drawerGastoCostoWrap) {
+    drawerChkInv.addEventListener("change", () => {
+      if (drawerChkInv.checked) {
+        drawerGastoCostoWrap.classList.remove("hidden");
+        if (drawerPrecioCompraInput && drawerCostoRealInput && !drawerCostoRealInput.value) {
+          drawerCostoRealInput.value = drawerPrecioCompraInput.value;
+        }
+      } else {
+        drawerGastoCostoWrap.classList.add("hidden");
+      }
+    });
+  }
+
+  // Carga de imagen en drawer
+  const drawerFileInput = document.getElementById("drawer-prod-foto");
+  const drawerImgPreview = document.getElementById("drawer-image-preview");
+  const drawerImgPlaceholder = document.getElementById("drawer-image-placeholder");
+  const btnDrawerClearPhoto = document.getElementById("btn-drawer-clear-photo");
+
+  if (drawerFileInput) {
+    drawerFileInput.addEventListener("change", (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = (loadEvt) => {
+          drawerCurrentPhotoBase64 = loadEvt.target.result;
+          if (drawerImgPreview) {
+            drawerImgPreview.src = drawerCurrentPhotoBase64;
+            drawerImgPreview.classList.remove("hidden");
+          }
+          if (drawerImgPlaceholder) drawerImgPlaceholder.classList.add("hidden");
+          if (btnDrawerClearPhoto) btnDrawerClearPhoto.classList.remove("hidden");
+        };
+        reader.readAsDataURL(file);
+      }
+    });
+  }
+
+  if (btnDrawerClearPhoto) {
+    btnDrawerClearPhoto.addEventListener("click", () => {
+      drawerCurrentPhotoBase64 = "";
+      if (drawerFileInput) drawerFileInput.value = "";
+      if (drawerImgPreview) {
+        drawerImgPreview.src = "";
+        drawerImgPreview.classList.add("hidden");
+      }
+      if (drawerImgPlaceholder) drawerImgPlaceholder.classList.remove("hidden");
+      btnDrawerClearPhoto.classList.add("hidden");
+    });
+  }
+
+  // 7. Botones de cabecera rápida
+  const btnHeaderNuevoGasto = document.getElementById("btn-header-nuevo-gasto");
+  if (btnHeaderNuevoGasto) {
+    btnHeaderNuevoGasto.addEventListener("click", () => {
+      switchGisSubtab("gastos");
+      document.getElementById("input-gasto-descripcion")?.focus();
+    });
+  }
+
+  const btnHeaderNuevoIngreso = document.getElementById("btn-header-nuevo-ingreso");
+  if (btnHeaderNuevoIngreso) {
+    btnHeaderNuevoIngreso.addEventListener("click", () => {
+      switchGisSubtab("ingresos");
+      document.getElementById("input-ingreso-descripcion")?.focus();
+    });
+  }
+
+  // 8. Listeners de filtros
+  const filterGastoCat = document.getElementById("filter-gasto-categoria");
+  if (filterGastoCat) filterGastoCat.addEventListener("change", renderGastosTable);
+  if (filterGastoMes) filterGastoMes.addEventListener("change", renderGastosTable);
+  if (filterGastoAno) filterGastoAno.addEventListener("input", renderGastosTable);
+
+  if (filterIngresoMes) filterIngresoMes.addEventListener("change", renderIngresosTable);
+  if (filterIngresoAno) filterIngresoAno.addEventListener("input", renderIngresosTable);
+
+  const filterCatSearch = document.getElementById("filter-catalogo-search");
+  if (filterCatSearch) filterCatSearch.addEventListener("input", renderCatalogoTable);
+
+  // Renderizar vistas iniciales
+  renderGastosTable();
+  renderIngresosTable();
+  renderCatalogoTable();
+}
+
+// Exportar funciones del Módulo 8 a window
+window.GASTOS_STORAGE_KEY = GASTOS_STORAGE_KEY;
+window.INGRESOS_STORAGE_KEY = INGRESOS_STORAGE_KEY;
+window.PRODUCTOS_CATALOG_STORAGE_KEY = PRODUCTOS_CATALOG_STORAGE_KEY;
+window.getStoredGastos = getStoredGastos;
+window.saveStoredGastos = saveStoredGastos;
+window.getStoredIngresos = getStoredIngresos;
+window.saveStoredIngresos = saveStoredIngresos;
+window.getStoredProductosCatalog = getStoredProductosCatalog;
+window.saveStoredProductosCatalog = saveStoredProductosCatalog;
+window.saveGastoToGoogleSheets = saveGastoToGoogleSheets;
+window.saveIngresoToGoogleSheets = saveIngresoToGoogleSheets;
+window.saveProductoToGoogleSheets = saveProductoToGoogleSheets;
+window.populateProductSelectWithCatalog = populateProductSelectWithCatalog;
+window.openProductCatalogDrawer = openProductCatalogDrawer;
+window.closeProductCatalogDrawer = closeProductCatalogDrawer;
+window.handleDrawerProductSubmit = handleDrawerProductSubmit;
+window.checkItemsCatalogStatus = checkItemsCatalogStatus;
+window.switchGisSubtab = switchGisSubtab;
+window.updateGastoUsdConversion = updateGastoUsdConversion;
+window.handleGastoFormSubmit = handleGastoFormSubmit;
+window.loadGastoIntoForm = loadGastoIntoForm;
+window.cancelEditGasto = cancelEditGasto;
+window.deleteGasto = deleteGasto;
+window.renderGastosTable = renderGastosTable;
+window.updateIngresoUsdConversion = updateIngresoUsdConversion;
+window.handleIngresoFormSubmit = handleIngresoFormSubmit;
+window.loadIngresoIntoForm = loadIngresoIntoForm;
+window.cancelEditIngreso = cancelEditIngreso;
+window.deleteIngreso = deleteIngreso;
+window.renderIngresosTable = renderIngresosTable;
+window.deleteProductoCatalog = deleteProductoCatalog;
+window.renderCatalogoTable = renderCatalogoTable;
+window.renderGastosIngresosModule = renderGastosIngresosModule;
+window.initGastosIngresosModule = initGastosIngresosModule;
+
 
 
