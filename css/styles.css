@@ -3418,3 +3418,236 @@ body {
   padding: 8px 12px;
   font-size: 0.82rem;
 }
+
+/* ============================================================
+   MÓDULO 7: CIERRE FINANCIERO QUINCENAL
+   ============================================================ */
+
+#panel-dashboard .dashboard-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)) !important;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+@media (max-width: 900px) {
+  #panel-dashboard .dashboard-kpi-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 12px;
+  }
+}
+
+@media (max-width: 540px) {
+  #panel-dashboard .dashboard-kpi-grid {
+    grid-template-columns: 1fr !important;
+    gap: 10px;
+  }
+}
+
+.kpi-card-cierres-gastos {
+  border-left: 4px solid #ef4444 !important;
+}
+
+.kpi-card-cierres-capital {
+  border-left: 4px solid #10b981 !important;
+}
+
+.cierres-subnav .subnav-tab {
+  background: #f1f5f9;
+  color: #475569;
+  border: 1px solid #cbd5e1;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 0.86rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.cierres-subnav .subnav-tab:hover {
+  background: #e2e8f0;
+  color: #1e293b;
+}
+
+.cierres-subnav .subnav-tab.active {
+  background: var(--color-primary);
+  color: #ffffff;
+  border-color: var(--color-primary);
+  box-shadow: 0 2px 4px rgba(26, 58, 107, 0.25);
+}
+
+.cierre-analysis-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+  overflow: hidden;
+  margin-top: 10px;
+}
+
+.cierre-analysis-header {
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+  color: #ffffff;
+  padding: 14px 18px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.cierre-analysis-body {
+  padding: 18px 20px;
+}
+
+.cierre-analysis-line {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  font-size: 0.9rem;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.cierre-analysis-line:last-child {
+  border-bottom: none;
+}
+
+.cierre-analysis-label {
+  color: #475569;
+  font-weight: 500;
+}
+
+.cierre-analysis-val {
+  font-weight: 700;
+  color: #0f172a;
+  font-family: monospace;
+  font-size: 0.96rem;
+}
+
+.cierre-analysis-val.highlight {
+  color: #0284c7;
+  font-size: 1.05rem;
+}
+
+.cierre-analysis-val.ganancia-pos {
+  color: #15803d;
+}
+
+.cierre-analysis-val.ganancia-neg {
+  color: #dc2626;
+}
+
+.cierre-tope-box {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-left: 4px solid var(--color-primary);
+  border-radius: 8px;
+  padding: 14px 16px;
+  margin-top: 14px;
+}
+
+.cierre-alerta-tope {
+  margin-top: 12px;
+  padding: 12px 14px;
+  background: #fef2f2;
+  border: 1px solid #f87171;
+  border-left: 4px solid #ef4444;
+  border-radius: 8px;
+  color: #991b1b;
+  font-size: 0.88rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.badge-rendimiento {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  font-family: monospace;
+}
+
+.badge-rendimiento-pos {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.badge-rendimiento-neg {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.badge-rendimiento-neutral {
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+.cierre-gasto-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  background: #ffffff;
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid #e2e8f0;
+}
+
+.cierre-gasto-row .gasto-desc {
+  flex: 1;
+}
+
+.cierre-gasto-row .gasto-monto {
+  width: 150px;
+}
+
+.cierre-gasto-row .btn-remove-gasto {
+  background: #fee2e2;
+  color: #b91c1c;
+  border: 1px solid #fca5a5;
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  font-size: 0.95rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.cierre-gasto-row .btn-remove-gasto:hover {
+  background: #ef4444;
+  color: #ffffff;
+}
+
+#table-resumen-mensual tbody tr {
+  border-bottom: 1px solid #e2e8f0;
+}
+
+#table-resumen-mensual tbody tr:last-child {
+  border-bottom: none;
+}
+
+#table-resumen-mensual tbody td {
+  padding: 10px 16px;
+}
+
+#table-cierres-history tbody tr {
+  border-bottom: 1px solid #f1f5f9;
+  transition: background-color 0.15s ease;
+}
+
+#table-cierres-history tbody tr:hover {
+  background-color: #f8fafc;
+}
+
+#table-cierres-history tbody td {
+  padding: 10px 14px;
+}

@@ -22,7 +22,8 @@ var SHEET_NAMES = {
   FACTURAS: "Facturas",
   PRODUCTOS: "Productos",
   CONFIG: "Config",
-  LOGS: "Logs"
+  LOGS: "Logs",
+  CIERRES: "Cierres"
 };
 
 // Encabezados por defecto para crear pestañas si están vacías
@@ -35,7 +36,8 @@ var DEFAULT_HEADERS = {
   Facturas: ["ID Factura", "Cliente", "Productos", "Total USD", "Fecha", "Estado"],
   Productos: ["ID", "Nombre", "Descripción", "Precio USD", "Categoría", "Stock"],
   Config: ["Parámetro", "Valor"],
-  Logs: ["timestamp", "username", "level", "action", "details", "status", "errorMessage"]
+  Logs: ["timestamp", "username", "level", "action", "details", "status", "errorMessage"],
+  Cierres: ["id", "fecha", "quincena", "mes", "año", "tasa_bcv", "bs_efectivo", "usd_efectivo", "usd_digital", "total_activos_bs", "gastos_detalle", "total_gastos", "capital_neto", "en_la_calle"]
 };
 
 /**
@@ -176,7 +178,8 @@ function doGet(e) {
       SHEET_NAMES.PROVEEDORES,
       SHEET_NAMES.FACTURAS,
       SHEET_NAMES.PRODUCTOS,
-      SHEET_NAMES.CONFIG
+      SHEET_NAMES.CONFIG,
+      SHEET_NAMES.CIERRES
     ];
 
     targetSheets.forEach(function(sheetName) {
@@ -362,6 +365,19 @@ function doPost(e) {
       });
     }
 
+    // Acción para guardar o actualizar corte quincenal en la pestaña Cierres
+    if (action === "save_cierre" || action === "savecierre") {
+      var cierrePayload = payload.data || payload.cierre || payload;
+      var savedCount = saveCierre(cierrePayload);
+      return jsonResponse_({
+        status: "success",
+        success: true,
+        action: "save_cierre",
+        rowsAffected: savedCount,
+        message: "Cierre financiero guardado exitosamente en Google Sheets."
+      });
+    }
+
     return errorResponse_("Acción no reconocida: " + action);
   } catch (err) {
     return errorResponse_("Error en doPost: " + err.toString());
@@ -404,6 +420,80 @@ function logToSheets(logsArray) {
   sheet.getRange(startRow, 1, rowsToInsert.length, headers.length).setValues(rowsToInsert);
   SpreadsheetApp.flush();
   return rowsToInsert.length;
+}
+
+/**
+ * Guarda o actualiza registros en la pestaña Cierres en Google Sheets
+ * Columnas: id | fecha | quincena | mes | año | tasa_bcv | bs_efectivo | usd_efectivo | usd_digital | total_activos_bs | gastos_detalle | total_gastos | capital_neto | en_la_calle
+ */
+function saveCierre(data) {
+  if (!data) return 0;
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = getOrCreateSheet_(ss, SHEET_NAMES.CIERRES || "Cierres");
+  var headers = DEFAULT_HEADERS.Cierres || [
+    "id", "fecha", "quincena", "mes", "año", "tasa_bcv",
+    "bs_efectivo", "usd_efectivo", "usd_digital", "total_activos_bs",
+    "gastos_detalle", "total_gastos", "capital_neto", "en_la_calle"
+  ];
+
+  if (sheet.getLastRow() === 0) {
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+  }
+
+  var items = Array.isArray(data) ? data : [data];
+  if (items.length === 0) return 0;
+
+  var currentValues = sheet.getDataRange().getValues();
+  var rowsToAppend = [];
+
+  items.forEach(function(item) {
+    var gastosStr = "";
+    if (item.gastos_detalle !== undefined && item.gastos_detalle !== null) {
+      gastosStr = typeof item.gastos_detalle === "object" ? JSON.stringify(item.gastos_detalle) : String(item.gastos_detalle);
+    } else if (item.gastos !== undefined && item.gastos !== null) {
+      gastosStr = typeof item.gastos === "object" ? JSON.stringify(item.gastos) : String(item.gastos);
+    }
+
+    var rowVals = [
+      String(item.id || ("cierre_" + Date.now())),
+      String(item.fecha || ""),
+      String(item.quincena || ""),
+      String(item.mes || ""),
+      String(item.año || item.ano || ""),
+      parseFloat(item.tasa_bcv) || 0,
+      parseFloat(item.bs_efectivo) || 0,
+      parseFloat(item.usd_efectivo) || 0,
+      parseFloat(item.usd_digital) || 0,
+      parseFloat(item.total_activos_bs) || 0,
+      gastosStr,
+      parseFloat(item.total_gastos) || 0,
+      parseFloat(item.capital_neto) || 0,
+      parseFloat(item.en_la_calle) || 0
+    ];
+
+    // Buscar si ya existe por ID para actualizar
+    var matchedRowIdx = -1;
+    for (var r = 1; r < currentValues.length; r++) {
+      if (String(currentValues[r][0]) === String(rowVals[0])) {
+        matchedRowIdx = r + 1; // 1-indexed para SpreadsheetApp
+        break;
+      }
+    }
+
+    if (matchedRowIdx > 0) {
+      sheet.getRange(matchedRowIdx, 1, 1, rowVals.length).setValues([rowVals]);
+    } else {
+      rowsToAppend.push(rowVals);
+    }
+  });
+
+  if (rowsToAppend.length > 0) {
+    var startRow = sheet.getLastRow() + 1;
+    sheet.getRange(startRow, 1, rowsToAppend.length, headers.length).setValues(rowsToAppend);
+  }
+
+  SpreadsheetApp.flush();
+  return items.length;
 }
 
 /**

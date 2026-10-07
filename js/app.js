@@ -119,6 +119,7 @@ document.addEventListener("DOMContentLoaded", () => {
   initFacturacionModule();
   initBackupModule();
   initSystemLogsModule();
+  initCierresModule();
   auditCreditStatuses();
 });
 
@@ -279,6 +280,9 @@ function switchSection(sectionName) {
   }
   if (sectionName === "facturacion") {
     renderFacturacionSection();
+  }
+  if (sectionName === "cierres") {
+    renderCierresModule();
   }
   if (sectionName === "backup") {
     renderBackupSection();
@@ -8309,6 +8313,11 @@ function renderDashboardSection() {
   if (typeof updateDashboardLogsUI === "function") {
     updateDashboardLogsUI();
   }
+
+  // Actualizar tarjetas de Cierre Financiero en el Dashboard (Módulo 7)
+  if (typeof updateDashboardCierresKPIs === "function") {
+    updateDashboardCierresKPIs();
+  }
 }
 
 // ============================================================
@@ -10673,7 +10682,30 @@ async function exportToGoogleSheets(isSilent = false) {
       ["Total Productos", String(products.length)],
       ["Total Facturas", String(invoices.length)],
       ["Total cobrado este mes", `$${totalCobradoMesUSD.toFixed(2)} USD`],
-      ["Total pendiente por cobrar", `$${totalPendienteUSD.toFixed(2)} USD`]
+      ["Total pendiente por cobrar", `$${totalPendienteUSD.toFixed(2)} USD`],
+      ["Total Cierres Quincenales", String(typeof getStoredCierres === "function" ? getStoredCierres().length : 0)]
+    ];
+
+    // Hoja 9: Cierres Quincenales (Módulo 7)
+    const cierres = typeof getStoredCierres === "function" ? getStoredCierres() : [];
+    const cierresData = [
+      ["id", "fecha", "quincena", "mes", "año", "tasa_bcv", "bs_efectivo", "usd_efectivo", "usd_digital", "total_activos_bs", "gastos_detalle", "total_gastos", "capital_neto", "en_la_calle"],
+      ...cierres.map((c) => [
+        c.id || "",
+        c.fecha || "",
+        c.quincena || "",
+        c.mes || "",
+        c.año || "",
+        parseFloat(c.tasa_bcv) || 0,
+        parseFloat(c.bs_efectivo) || 0,
+        parseFloat(c.usd_efectivo) || 0,
+        parseFloat(c.usd_digital) || 0,
+        parseFloat(c.total_activos_bs) || 0,
+        JSON.stringify(c.gastos || []),
+        parseFloat(c.total_gastos) || 0,
+        parseFloat(c.capital_neto) || 0,
+        parseFloat(c.en_la_calle) || 0
+      ])
     ];
 
     // 2. Enviar datos completos al Google Apps Script (POST)
@@ -10687,7 +10719,8 @@ async function exportToGoogleSheets(isSilent = false) {
         Proveedores: suppliersData,
         Facturas: invoicesData,
         Productos: productsData,
-        Config: configData
+        Config: configData,
+        Cierres: cierresData
       }
     };
 
@@ -10858,6 +10891,7 @@ async function importFromGoogleSheets(isSilent = false) {
     const invoicesRows = sheetsData["Facturas"] || [];
     const productsRows = sheetsData["Productos"] || [];
     const configRows = sheetsData["Config"] || [];
+    const cierresRows = sheetsData["Cierres"] || [];
 
     // Modo REPLACE: limpiar completamente las claves del localStorage correspondientes antes de importar
     localStorage.setItem(CLIENTS_STORAGE_KEY, JSON.stringify([]));
@@ -10867,6 +10901,7 @@ async function importFromGoogleSheets(isSilent = false) {
     localStorage.setItem(INVOICES_STORAGE_KEY, JSON.stringify([]));
     localStorage.setItem(SUPPLIERS_STORAGE_KEY, JSON.stringify([]));
     localStorage.setItem(PRODUCTS_STORAGE_KEY, JSON.stringify([]));
+    localStorage.setItem("hogarflex_cierres", JSON.stringify([]));
 
     // Validar si las pestañas tienen filas con datos más allá del encabezado
     const hasData = clientsRows.length > 1 || creditsRows.length > 1 || salesRows.length > 1 ||
@@ -11247,7 +11282,39 @@ async function importFromGoogleSheets(isSilent = false) {
       });
     }
 
-    // 8. Procesar CONFIGURACIÓN (hoja Config) -> hogarflex_config
+    // 8. Procesar CIERRES (hoja Cierres) -> hogarflex_cierres
+    const importedCierres = [];
+    for (let crIdx = 1; crIdx < cierresRows.length; crIdx++) {
+      const row = cierresRows[crIdx];
+      if (!row || row.length === 0) continue;
+      const cId = String(row[0] || "").trim();
+      if (!cId) continue;
+      let parsedGastos = [];
+      try {
+        const rawG = row[10];
+        parsedGastos = typeof rawG === "string" ? JSON.parse(rawG) : (Array.isArray(rawG) ? rawG : []);
+      } catch (e) {
+        parsedGastos = [];
+      }
+      importedCierres.push({
+        id: cId,
+        fecha: String(row[1] || ""),
+        quincena: String(row[2] || "Primera quincena"),
+        mes: String(row[3] || ""),
+        año: String(row[4] || ""),
+        tasa_bcv: parseFloat(row[5]) || 0,
+        bs_efectivo: parseFloat(row[6]) || 0,
+        usd_efectivo: parseFloat(row[7]) || 0,
+        usd_digital: parseFloat(row[8]) || 0,
+        total_activos_bs: parseFloat(row[9]) || 0,
+        gastos: parsedGastos,
+        total_gastos: parseFloat(row[11]) || 0,
+        capital_neto: parseFloat(row[12]) || 0,
+        en_la_calle: parseFloat(row[13]) || 0
+      });
+    }
+
+    // 9. Procesar CONFIGURACIÓN (hoja Config) -> hogarflex_config
     const importedConfig = {};
     for (let cfgIdx = 1; cfgIdx < configRows.length; cfgIdx++) {
       const row = configRows[cfgIdx];
@@ -11256,13 +11323,14 @@ async function importFromGoogleSheets(isSilent = false) {
       }
     }
 
-    // 9. Sobrescribir (REPLACE) localStorage directamente con los datos de Sheets
+    // 10. Sobrescribir (REPLACE) localStorage directamente con los datos de Sheets
     localStorage.setItem(CLIENTS_STORAGE_KEY, JSON.stringify(importedClients));
     localStorage.setItem(CREDITS_STORAGE_KEY, JSON.stringify(importedCredits));
     localStorage.setItem(SALES_STORAGE_KEY, JSON.stringify(importedSales));
     localStorage.setItem(SUPPLIERS_STORAGE_KEY, JSON.stringify(importedSuppliers));
     localStorage.setItem(INVOICES_STORAGE_KEY, JSON.stringify(importedInvoices));
     localStorage.setItem(PRODUCTS_STORAGE_KEY, JSON.stringify(importedProducts));
+    localStorage.setItem("hogarflex_cierres", JSON.stringify(importedCierres));
     if (Object.keys(importedConfig).length > 0) {
       localStorage.setItem("hogarflex_config", JSON.stringify(importedConfig));
       if (importedConfig["Fecha Último Respaldo"]) {
@@ -11270,7 +11338,7 @@ async function importFromGoogleSheets(isSilent = false) {
       }
     }
 
-    // 10. Actualizar todas las vistas activas
+    // 11. Actualizar todas las vistas activas
     if (typeof renderClients === "function") renderClients();
     if (typeof renderCredits === "function") renderCredits();
     if (typeof renderPagosSection === "function") renderPagosSection();
@@ -11280,8 +11348,10 @@ async function importFromGoogleSheets(isSilent = false) {
     if (typeof renderFacturacionSection === "function") renderFacturacionSection();
     if (typeof renderDashboardSection === "function") renderDashboardSection();
     if (typeof renderBackupSection === "function") renderBackupSection();
+    if (typeof renderCierresModule === "function") renderCierresModule();
+    if (typeof updateDashboardCierresKPIs === "function") updateDashboardCierresKPIs();
 
-    const successSummary = `✅ Sincronizado (Reemplazo total): ${importedClients.length} clientes, ${importedCredits.length} créditos, ${importedSales.length} ventas, ${importedProducts.length} productos, ${importedSuppliers.length} proveedores, ${importedInvoices.length} facturas.`;
+    const successSummary = `✅ Sincronizado (Reemplazo total): ${importedClients.length} clientes, ${importedCredits.length} créditos, ${importedSales.length} ventas, ${importedProducts.length} productos, ${importedSuppliers.length} proveedores, ${importedInvoices.length} facturas, ${importedCierres.length} cierres.`;
     if (typeof addSystemLog === "function") {
       addSystemLog({
         level: "INFO",
@@ -12374,4 +12444,1442 @@ window.closeSystemLogsModal = closeSystemLogsModal;
 window.updateDashboardLogsUI = updateDashboardLogsUI;
 window.setupBcvRateTracking = setupBcvRateTracking;
 window.initSystemLogsModule = initSystemLogsModule;
+
+// ============================================================
+// ============================================================
+// MÓDULO 7: CIERRE FINANCIERO QUINCENAL (LÓGICA COMPLETA)
+// ============================================================
+// ============================================================
+
+const CIERRES_STORAGE_KEY = "hogarflex_cierres";
+const CIERRES_TOPE_GASTO_KEY = "hogarflex_config_tope_gasto";
+const CIERRES_LAST_BCV_KEY = "hogarflex_last_bcv";
+
+const CIERRES_MONTH_NAMES = [
+  "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+  "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
+];
+
+let currentCierreSubtab = "historial";
+let currentEditingCierreId = null;
+let pendingDeleteCierreId = null;
+
+// ============================================================
+// FUNCIONES DE ALMACENAMIENTO Y CONFIGURACIÓN
+// ============================================================
+
+function getStoredCierres() {
+  try {
+    const raw = localStorage.getItem(CIERRES_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch (err) {
+    console.error("Error al leer cierres desde localStorage:", err);
+    return [];
+  }
+}
+
+function saveStoredCierres(cierres) {
+  try {
+    localStorage.setItem(CIERRES_STORAGE_KEY, JSON.stringify(cierres || []));
+  } catch (err) {
+    console.error("Error al guardar cierres en localStorage:", err);
+  }
+}
+
+function getTopeGastoPersonal() {
+  try {
+    const raw = localStorage.getItem(CIERRES_TOPE_GASTO_KEY);
+    if (raw !== null && raw !== undefined && raw !== "") {
+      const parsed = parseFloat(raw);
+      if (!isNaN(parsed) && parsed >= 1 && parsed <= 100) {
+        return parsed;
+      }
+    }
+  } catch (err) {}
+  return 20; // Valor por defecto especificado: 20%
+}
+
+function setTopeGastoPersonal(val) {
+  const num = parseFloat(val);
+  const clamped = isNaN(num) ? 20 : Math.min(100, Math.max(1, Math.round(num)));
+  localStorage.setItem(CIERRES_TOPE_GASTO_KEY, String(clamped));
+  return clamped;
+}
+
+function getLastBcvRate() {
+  try {
+    const raw = localStorage.getItem(CIERRES_LAST_BCV_KEY);
+    if (raw) {
+      const parsed = parseFloat(raw);
+      if (!isNaN(parsed) && parsed > 0) return parsed;
+    }
+  } catch (e) {}
+
+  // Buscar última tasa registrada en cierres
+  const cierres = getStoredCierres();
+  for (let i = cierres.length - 1; i >= 0; i--) {
+    const r = parseFloat(cierres[i].tasa_bcv);
+    if (!isNaN(r) && r > 0) return r;
+  }
+
+  // Buscar en pagos de créditos
+  if (typeof getStoredCredits === "function") {
+    const credits = getStoredCredits();
+    for (let c = credits.length - 1; c >= 0; c--) {
+      const payments = credits[c].payments || [];
+      for (let p = payments.length - 1; p >= 0; p--) {
+        const pr = parseFloat(payments[p].rateBCVToday);
+        if (!isNaN(pr) && pr > 0) return pr;
+      }
+      if (credits[c].downpaymentRateBCV) {
+        const dr = parseFloat(credits[c].downpaymentRateBCV);
+        if (!isNaN(dr) && dr > 0) return dr;
+      }
+    }
+  }
+
+  return 36.50; // Fallback razonable
+}
+
+function saveLastBcvRate(rate) {
+  const num = parseFloat(rate);
+  if (!isNaN(num) && num > 0) {
+    localStorage.setItem(CIERRES_LAST_BCV_KEY, String(num));
+  }
+}
+
+function formatCierreCurrency(amount) {
+  const num = parseFloat(amount);
+  if (isNaN(num)) return "0,00";
+  return num.toLocaleString("es-VE", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
+}
+
+function formatCierrePercent(amount) {
+  const num = parseFloat(amount);
+  if (isNaN(num)) return "—";
+  return num.toLocaleString("es-VE", {
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1
+  }) + "%";
+}
+
+// "En la calle = suma de saldo pendiente de todos los créditos con estado Activo o Pendiente (en tiempo real)"
+function getEnLaCalleTotal() {
+  const credits = typeof getStoredCredits === "function" ? getStoredCredits() : [];
+  let total = 0;
+
+  credits.forEach((cr) => {
+    const st = String(cr.status || "").trim().toLowerCase();
+    // Acepta créditos Activos, Pendientes, Solventes, Cortados o Al día (no pagados ni cancelados)
+    const isCreditActiveOrPending = (
+      st === "activo" ||
+      st === "activa" ||
+      st === "pendiente" ||
+      st === "solvente" ||
+      st === "cortado" ||
+      st === "al día" ||
+      st === "al dia" ||
+      (st !== "pagado" && st !== "cancelado" && st !== "anulado")
+    );
+
+    if (isCreditActiveOrPending) {
+      let bal = parseFloat(cr.remainingBalance);
+      if (isNaN(bal) || bal < 0) {
+        bal = 0;
+        if (Array.isArray(cr.installments)) {
+          cr.installments.forEach((inst) => {
+            if (inst.status !== "Pagada" && !inst.paid) {
+              const instAmt = inst.remainingUSD !== undefined ? parseFloat(inst.remainingUSD) : parseFloat(inst.amountUSD);
+              bal += (instAmt || 0);
+            }
+          });
+        }
+      }
+      if (bal > 0.001) {
+        total += bal;
+      }
+    }
+  });
+
+  return total;
+}
+
+// ============================================================
+// CÁLCULO DEL BLOQUE DE ANÁLISIS (REQUERIMIENTO C)
+// ============================================================
+
+function calculateCierreAnalysis(corte, allCierresList) {
+  if (!corte) return null;
+  const list = allCierresList || getStoredCierres();
+
+  // Ordenar cronológicamente ascendente (del más antiguo al más reciente)
+  const sortedAsc = [...list].sort((a, b) => {
+    const timeA = new Date((a.fecha || "") + "T00:00:00").getTime() || (a.createdAt || 0);
+    const timeB = new Date((b.fecha || "") + "T00:00:00").getTime() || (b.createdAt || 0);
+    if (timeA !== timeB) return timeA - timeB;
+    const yearDiff = (parseInt(a.año, 10) || 0) - (parseInt(b.año, 10) || 0);
+    if (yearDiff !== 0) return yearDiff;
+    return String(a.id).localeCompare(String(b.id));
+  });
+
+  const currentIndex = sortedAsc.findIndex(c => String(c.id) === String(corte.id));
+  const topePercent = getTopeGastoPersonal();
+  const capitalActual = parseFloat(corte.capital_neto) || 0;
+
+  let capitalAnterior = null;
+  let gananciaPeriodo = null;
+  let rendimiento = null;
+  let puedesUsar = null;
+  let recomendableReinvertir = null;
+
+  if (currentIndex > 0) {
+    const prevCorte = sortedAsc[currentIndex - 1];
+    capitalAnterior = parseFloat(prevCorte.capital_neto) || 0;
+    gananciaPeriodo = capitalActual - capitalAnterior;
+
+    if (capitalAnterior > 0) {
+      rendimiento = (gananciaPeriodo / capitalAnterior) * 100;
+    } else {
+      rendimiento = 0;
+    }
+
+    if (gananciaPeriodo > 0) {
+      puedesUsar = gananciaPeriodo * (topePercent / 100);
+      recomendableReinvertir = gananciaPeriodo - puedesUsar;
+    } else {
+      puedesUsar = 0;
+      recomendableReinvertir = 0;
+    }
+  }
+
+  // Alerta de tope superado:
+  // "La alerta de tope superado se activa si los gastos categorizados como 'Personal' en el Módulo 8
+  // del mismo período superan el tope calculado (si el Módulo 8 aún no existe, omitir la comparación sin romper)"
+  let gastosPersonalesPeriodo = 0;
+
+  // 1. Gastos propios del corte que tengan descripción o categoría "personal"
+  (corte.gastos || []).forEach(g => {
+    const desc = String(g.descripcion || "").toLowerCase();
+    if (desc.includes("personal") || desc.includes("retiro") || desc.includes("propio")) {
+      gastosPersonalesPeriodo += (parseFloat(g.monto) || 0);
+    }
+  });
+
+  // 2. Revisión segura de Módulo 8 si existe en localStorage
+  try {
+    const rawM8 = localStorage.getItem("hogarflex_gastos") ||
+                  localStorage.getItem("hogarflex_gastos_personales") ||
+                  localStorage.getItem("hogarflex_gastos_operativos");
+    if (rawM8) {
+      const parsed = JSON.parse(rawM8);
+      if (Array.isArray(parsed)) {
+        parsed.forEach(item => {
+          const cat = String(item.categoria || item.category || item.tipo || "").toLowerCase();
+          const desc = String(item.descripcion || item.description || "").toLowerCase();
+          const esPersonal = cat.includes("personal") || desc.includes("personal");
+          const esMismoPeriodo = (
+            (item.quincena && item.quincena === corte.quincena && item.mes === corte.mes) ||
+            (item.fecha && corte.fecha && String(item.fecha).substring(0, 7) === String(corte.fecha).substring(0, 7))
+          );
+          if (esPersonal && esMismoPeriodo) {
+            gastosPersonalesPeriodo += (parseFloat(item.monto || item.amount) || 0);
+          }
+        });
+      }
+    }
+  } catch (e) {}
+
+  let superoTope = false;
+  let montoExceso = 0;
+  if (puedesUsar !== null && puedesUsar > 0 && gastosPersonalesPeriodo > puedesUsar) {
+    superoTope = true;
+    montoExceso = gastosPersonalesPeriodo - puedesUsar;
+  }
+
+  return {
+    corte,
+    capitalAnterior,
+    capitalActual,
+    gananciaPeriodo,
+    rendimiento,
+    topePercent,
+    puedesUsar,
+    recomendableReinvertir,
+    superoTope,
+    montoExceso,
+    gastosPersonalesPeriodo
+  };
+}
+
+function renderAnalysisBlockHtml(analysis) {
+  if (!analysis) return "";
+
+  const {
+    corte,
+    capitalAnterior,
+    capitalActual,
+    gananciaPeriodo,
+    rendimiento,
+    topePercent,
+    puedesUsar,
+    recomendableReinvertir,
+    superoTope,
+    montoExceso,
+    gastosPersonalesPeriodo
+  } = analysis;
+
+  const capAntText = capitalAnterior !== null ? `Bs. ${formatCierreCurrency(capitalAnterior)}` : "—";
+  const capActText = `Bs. ${formatCierreCurrency(capitalActual)}`;
+  const gananciaText = gananciaPeriodo !== null ? `Bs. ${formatCierreCurrency(gananciaPeriodo)}` : "—";
+  const gananciaClass = gananciaPeriodo !== null ? (gananciaPeriodo >= 0 ? "ganancia-pos" : "ganancia-neg") : "";
+
+  let rendText = "—";
+  let rendClass = "badge-rendimiento-neutral";
+  if (rendimiento !== null) {
+    rendText = formatCierrePercent(rendimiento);
+    rendClass = rendimiento >= 0 ? "badge-rendimiento-pos" : "badge-rendimiento-neg";
+  }
+
+  const puedesUsarText = puedesUsar !== null ? `Bs. ${formatCierreCurrency(puedesUsar)}` : "—";
+  const reinvertirText = recomendableReinvertir !== null ? `Bs. ${formatCierreCurrency(recomendableReinvertir)}` : "—";
+
+  const alertaHtml = superoTope
+    ? `<div class="cierre-alerta-tope">
+        <span style="font-size: 1.4rem;">⚠️</span>
+        <div style="flex: 1;">
+          <div style="font-size: 0.92rem; font-weight: 700;">
+            Superaste tu tope en Bs. ${formatCierreCurrency(montoExceso)}
+          </div>
+          <div style="font-size: 0.8rem; font-weight: 500; opacity: 0.9; margin-top: 2px;">
+            Gastos personales registrados: Bs. ${formatCierreCurrency(gastosPersonalesPeriodo)} (Límite permitido del ${topePercent}%: Bs. ${formatCierreCurrency(puedesUsar)})
+          </div>
+        </div>
+      </div>`
+    : "";
+
+  return `
+    <div class="cierre-analysis-card">
+      <div class="cierre-analysis-header">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span style="font-size: 1.3rem;">📊</span>
+          <h3 style="margin: 0; font-size: 1.05rem; font-weight: 700;">Análisis del Corte</h3>
+        </div>
+        <span style="background: rgba(255,255,255,0.15); padding: 4px 10px; border-radius: 20px; font-size: 0.8rem; font-weight: 600;">
+          ${escapeHtml(corte.quincena)} — ${escapeHtml(corte.mes)} ${escapeHtml(String(corte.año))}
+        </span>
+      </div>
+      <div class="cierre-analysis-body">
+        <div class="cierre-analysis-line">
+          <span class="cierre-analysis-label">Capital neto anterior:</span>
+          <span class="cierre-analysis-val">${capAntText}</span>
+        </div>
+        <div class="cierre-analysis-line">
+          <span class="cierre-analysis-label">Capital neto actual:</span>
+          <span class="cierre-analysis-val highlight">${capActText}</span>
+        </div>
+        <div class="cierre-analysis-line">
+          <span class="cierre-analysis-label">Ganancia del período:</span>
+          <span class="cierre-analysis-val ${gananciaClass}">${gananciaText}</span>
+        </div>
+
+        <div class="cierre-analysis-line" style="margin-top: 6px; padding-top: 10px; border-top: 1px dashed #cbd5e1;">
+          <span class="cierre-analysis-label">📈 Rendimiento:</span>
+          <span class="badge-rendimiento ${rendClass}">${rendText}</span>
+        </div>
+
+        <div class="cierre-tope-box">
+          <div style="font-weight: 700; font-size: 0.88rem; color: #1e293b; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
+            <span>💡</span> Tu tope de gasto personal (${topePercent}%):
+          </div>
+          <div style="display: flex; justify-content: space-between; font-size: 0.86rem; margin-bottom: 6px;">
+            <span style="color: #475569;">Puedes usar:</span>
+            <strong style="color: #15803d; font-family: monospace;">${puedesUsarText}</strong>
+          </div>
+          <div style="display: flex; justify-content: space-between; font-size: 0.86rem;">
+            <span style="color: #475569;">Recomendable reinvertir:</span>
+            <strong style="color: #1a3a6b; font-family: monospace;">${reinvertirText}</strong>
+          </div>
+        </div>
+
+        ${alertaHtml}
+      </div>
+    </div>
+  `;
+}
+
+// ============================================================
+// NAVEGACIÓN ENTRE SUBPESTAÑAS DE CIERRES
+// ============================================================
+
+function switchCierresSubtab(targetSubtab) {
+  currentCierreSubtab = targetSubtab;
+  const subtabBtns = document.querySelectorAll(".cierres-subnav .subnav-tab");
+  subtabBtns.forEach((btn) => {
+    if (btn.getAttribute("data-cierresubtab") === targetSubtab) {
+      btn.classList.add("active");
+    } else {
+      btn.classList.remove("active");
+    }
+  });
+
+  const views = [
+    { id: "subtab-content-cierres-historial", name: "historial" },
+    { id: "subtab-content-cierres-resumen", name: "resumen" },
+    { id: "subtab-content-cierres-formulario", name: "formulario" },
+    { id: "subtab-content-cierres-config", name: "config" }
+  ];
+
+  views.forEach((v) => {
+    const el = document.getElementById(v.id);
+    if (el) {
+      if (v.name === targetSubtab) {
+        el.classList.remove("hidden");
+      } else {
+        el.classList.add("hidden");
+      }
+    }
+  });
+
+  if (targetSubtab === "historial") {
+    renderCierresHistory();
+  } else if (targetSubtab === "resumen") {
+    renderCierresResumenMensual();
+  } else if (targetSubtab === "formulario") {
+    updateCierreFormCalculations();
+  } else if (targetSubtab === "config") {
+    renderCierresConfig();
+  }
+}
+
+// ============================================================
+// FORMULARIO DE CORTE QUINCENAL (REQUERIMIENTO B)
+// ============================================================
+
+function addCierreGastoRow(descripcion = "", monto = "") {
+  const container = document.getElementById("cierre-gastos-items");
+  if (!container) return;
+
+  const row = document.createElement("div");
+  row.className = "cierre-gasto-row";
+  row.innerHTML = `
+    <input type="text" class="form-input gasto-desc" placeholder="Descripción del gasto (ej: Flete, Alquiler, Personal...)" value="${escapeHtml(descripcion)}">
+    <div style="position: relative; width: 160px;">
+      <span style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); font-weight: 700; color: #64748b; font-size: 0.8rem;">Bs.</span>
+      <input type="number" step="0.01" min="0" class="form-input gasto-monto" placeholder="0.00" value="${monto !== "" ? parseFloat(monto) : ""}" style="padding-left: 34px; font-weight: 600;">
+    </div>
+    <button type="button" class="btn-remove-gasto" title="Eliminar este gasto">&times;</button>
+  `;
+
+  const descInput = row.querySelector(".gasto-desc");
+  const montoInput = row.querySelector(".gasto-monto");
+  const btnRemove = row.querySelector(".btn-remove-gasto");
+
+  if (descInput) descInput.addEventListener("input", updateCierreFormCalculations);
+  if (montoInput) montoInput.addEventListener("input", updateCierreFormCalculations);
+  if (btnRemove) {
+    btnRemove.addEventListener("click", () => {
+      row.remove();
+      updateCierreFormCalculations();
+    });
+  }
+
+  container.appendChild(row);
+  updateCierreFormCalculations();
+}
+
+function updateCierreFormCalculations() {
+  const inputBs = document.getElementById("cierre-input-bs-efectivo");
+  const inputUsd = document.getElementById("cierre-input-usd-efectivo");
+  const inputDigital = document.getElementById("cierre-input-usd-digital");
+  const inputTasa = document.getElementById("cierre-input-tasa-bcv");
+
+  const bsEfectivo = parseFloat(inputBs ? inputBs.value : 0) || 0;
+  const usdEfectivo = parseFloat(inputUsd ? inputUsd.value : 0) || 0;
+  const usdDigital = parseFloat(inputDigital ? inputDigital.value : 0) || 0;
+  const tasaBcv = parseFloat(inputTasa ? inputTasa.value : 0) || 0;
+
+  // Cálculos por moneda
+  const totalDivisasUSD = usdEfectivo + usdDigital;
+  const usdEfectivoEnBs = usdEfectivo * tasaBcv;
+  const usdDigitalEnBs = usdDigital * tasaBcv;
+  const totalActivosBs = bsEfectivo + usdEfectivoEnBs + usdDigitalEnBs;
+
+  // Actualizar displays de desglose de activos
+  const dispBs = document.getElementById("display-activos-bs-efectivo");
+  const dispUsd = document.getElementById("display-activos-usd-efectivo");
+  const dispDigital = document.getElementById("display-activos-usd-digital");
+  const dispDivisas = document.getElementById("display-activos-total-divisas");
+  const dispTotalBs = document.getElementById("cierre-total-activos-bs-val");
+
+  if (dispBs) dispBs.textContent = `Bs. ${formatCierreCurrency(bsEfectivo)}`;
+  if (dispUsd) dispUsd.textContent = `$${usdEfectivo.toFixed(2)} USD (≈ Bs. ${formatCierreCurrency(usdEfectivoEnBs)})`;
+  if (dispDigital) dispDigital.textContent = `$${usdDigital.toFixed(2)} USD (≈ Bs. ${formatCierreCurrency(usdDigitalEnBs)})`;
+  if (dispDivisas) dispDivisas.textContent = `$${totalDivisasUSD.toFixed(2)} USD`;
+  if (dispTotalBs) dispTotalBs.textContent = `Bs. ${formatCierreCurrency(totalActivosBs)}`;
+
+  // Calcular total de gastos
+  let totalGastos = 0;
+  const rows = document.querySelectorAll("#cierre-gastos-items .cierre-gasto-row");
+  rows.forEach((r) => {
+    const montoEl = r.querySelector(".gasto-monto");
+    const val = parseFloat(montoEl ? montoEl.value : 0) || 0;
+    totalGastos += val;
+  });
+
+  const dispGastos = document.getElementById("cierre-total-gastos-display");
+  if (dispGastos) dispGastos.textContent = `Bs. ${formatCierreCurrency(totalGastos)}`;
+
+  // Capital neto = Total en Bs − Total gastos
+  const capitalNeto = totalActivosBs - totalGastos;
+  const dispCapitalNeto = document.getElementById("cierre-capital-neto-calc");
+  if (dispCapitalNeto) {
+    dispCapitalNeto.textContent = `Bs. ${formatCierreCurrency(capitalNeto)}`;
+    dispCapitalNeto.style.color = capitalNeto >= 0 ? "#0284c7" : "#dc2626";
+  }
+
+  // En la calle = suma de saldo pendiente de todos los créditos con estado Activo o Pendiente (en tiempo real)
+  const enLaCalle = getEnLaCalleTotal();
+  const dispEnLaCalle = document.getElementById("cierre-en-la-calle-calc");
+  if (dispEnLaCalle) {
+    const eqBs = tasaBcv > 0 ? ` (≈ Bs. ${formatCierreCurrency(enLaCalle * tasaBcv)})` : "";
+    dispEnLaCalle.textContent = `$${enLaCalle.toFixed(2)} USD${eqBs}`;
+  }
+}
+
+function resetCierreForm() {
+  currentEditingCierreId = null;
+  const form = document.getElementById("form-cierre-quincenal");
+  if (form) form.reset();
+
+  const editIdInput = document.getElementById("cierre-edit-id");
+  if (editIdInput) editIdInput.value = "";
+
+  const titleEl = document.getElementById("cierre-form-title");
+  const subEl = document.getElementById("cierre-form-subtitle");
+  const btnCancelEdit = document.getElementById("btn-cancel-edit-mode");
+  const submitBtn = document.getElementById("btn-guardar-cierre");
+
+  if (titleEl) titleEl.textContent = "📝 Registrar Corte Quincenal";
+  if (subEl) subEl.textContent = "Ingresa los saldos en efectivo y divisas, la tasa BCV y los gastos del período";
+  if (btnCancelEdit) btnCancelEdit.classList.add("hidden");
+  if (submitBtn) submitBtn.innerHTML = "💾 Guardar Corte";
+
+  // Pre-llenar fecha de hoy
+  const inputFecha = document.getElementById("cierre-input-fecha");
+  const now = new Date();
+  const yyyy = now.getFullYear();
+  const mm = String(now.getMonth() + 1).padStart(2, "0");
+  const dd = String(now.getDate()).padStart(2, "0");
+  if (inputFecha) inputFecha.value = `${yyyy}-${mm}-${dd}`;
+
+  // Pre-llenar mes y año actuales
+  const inputMes = document.getElementById("cierre-input-mes");
+  const inputAno = document.getElementById("cierre-input-ano");
+  const inputQuincena = document.getElementById("cierre-input-quincena");
+
+  if (inputMes) inputMes.value = CIERRES_MONTH_NAMES[now.getMonth()];
+  if (inputAno) inputAno.value = String(yyyy);
+  if (inputQuincena) inputQuincena.value = now.getDate() <= 15 ? "Primera quincena" : "Segunda quincena";
+
+  // Pre-llenar tasa BCV con la última guardada
+  const inputTasa = document.getElementById("cierre-input-tasa-bcv");
+  if (inputTasa) inputTasa.value = getLastBcvRate().toFixed(2);
+
+  // Limpiar gastos
+  const gastosContainer = document.getElementById("cierre-gastos-items");
+  if (gastosContainer) gastosContainer.innerHTML = "";
+
+  // Ocultar bloque post-guardado
+  const postSaveEl = document.getElementById("cierre-post-save-container");
+  if (postSaveEl) postSaveEl.classList.add("hidden");
+
+  updateCierreFormCalculations();
+}
+
+function loadCierreIntoForm(corteId) {
+  const cierres = getStoredCierres();
+  const corte = cierres.find(c => String(c.id) === String(corteId));
+  if (!corte) return;
+
+  currentEditingCierreId = corte.id;
+
+  const editIdInput = document.getElementById("cierre-edit-id");
+  if (editIdInput) editIdInput.value = corte.id;
+
+  const inputQuincena = document.getElementById("cierre-input-quincena");
+  const inputMes = document.getElementById("cierre-input-mes");
+  const inputAno = document.getElementById("cierre-input-ano");
+  const inputFecha = document.getElementById("cierre-input-fecha");
+  const inputTasa = document.getElementById("cierre-input-tasa-bcv");
+  const inputBs = document.getElementById("cierre-input-bs-efectivo");
+  const inputUsd = document.getElementById("cierre-input-usd-efectivo");
+  const inputDigital = document.getElementById("cierre-input-usd-digital");
+
+  if (inputQuincena) inputQuincena.value = corte.quincena || "Primera quincena";
+  if (inputMes) inputMes.value = corte.mes || "Octubre";
+  if (inputAno) inputAno.value = corte.año || new Date().getFullYear();
+  if (inputFecha) inputFecha.value = corte.fecha || "";
+  if (inputTasa) inputTasa.value = parseFloat(corte.tasa_bcv) || getLastBcvRate();
+  if (inputBs) inputBs.value = parseFloat(corte.bs_efectivo) || 0;
+  if (inputUsd) inputUsd.value = parseFloat(corte.usd_efectivo) || 0;
+  if (inputDigital) inputDigital.value = parseFloat(corte.usd_digital) || 0;
+
+  // Cargar lista dinámica de gastos
+  const gastosContainer = document.getElementById("cierre-gastos-items");
+  if (gastosContainer) {
+    gastosContainer.innerHTML = "";
+    const gastosArr = Array.isArray(corte.gastos) ? corte.gastos : [];
+    gastosArr.forEach(g => {
+      addCierreGastoRow(g.descripcion || "", g.monto || "");
+    });
+  }
+
+  // Títulos y botones
+  const titleEl = document.getElementById("cierre-form-title");
+  const subEl = document.getElementById("cierre-form-subtitle");
+  const btnCancelEdit = document.getElementById("btn-cancel-edit-mode");
+  const submitBtn = document.getElementById("btn-guardar-cierre");
+
+  if (titleEl) titleEl.textContent = `✏️ Editando Corte: ${corte.quincena} - ${corte.mes} ${corte.año}`;
+  if (subEl) subEl.textContent = `Modifica los valores y pulsa "Actualizar Corte" para guardar las correcciones.`;
+  if (btnCancelEdit) btnCancelEdit.classList.remove("hidden");
+  if (submitBtn) submitBtn.innerHTML = "💾 Actualizar Corte";
+
+  // Ocultar bloque post-guardado previo
+  const postSaveEl = document.getElementById("cierre-post-save-container");
+  if (postSaveEl) postSaveEl.classList.add("hidden");
+
+  updateCierreFormCalculations();
+  switchCierresSubtab("formulario");
+}
+
+function handleCierreFormSubmit(e) {
+  if (e) e.preventDefault();
+
+  const editId = (document.getElementById("cierre-edit-id")?.value || "").trim();
+  const quincena = document.getElementById("cierre-input-quincena")?.value || "Primera quincena";
+  const mes = document.getElementById("cierre-input-mes")?.value || CIERRES_MONTH_NAMES[new Date().getMonth()];
+  const ano = parseInt(document.getElementById("cierre-input-ano")?.value, 10) || new Date().getFullYear();
+  const fecha = document.getElementById("cierre-input-fecha")?.value || new Date().toISOString().substring(0, 10);
+  const tasaBcv = parseFloat(document.getElementById("cierre-input-tasa-bcv")?.value) || 0;
+
+  if (tasaBcv <= 0) {
+    alert("Por favor ingresa una tasa BCV válida mayor a cero.");
+    document.getElementById("cierre-input-tasa-bcv")?.focus();
+    return;
+  }
+
+  const bsEfectivo = parseFloat(document.getElementById("cierre-input-bs-efectivo")?.value) || 0;
+  const usdEfectivo = parseFloat(document.getElementById("cierre-input-usd-efectivo")?.value) || 0;
+  const usdDigital = parseFloat(document.getElementById("cierre-input-usd-digital")?.value) || 0;
+
+  // Recopilar gastos dinámicos
+  const gastosArr = [];
+  let totalGastos = 0;
+  const rows = document.querySelectorAll("#cierre-gastos-items .cierre-gasto-row");
+  rows.forEach((r) => {
+    const desc = (r.querySelector(".gasto-desc")?.value || "").trim();
+    const monto = parseFloat(r.querySelector(".gasto-monto")?.value) || 0;
+    if (desc || monto > 0) {
+      gastosArr.push({
+        descripcion: desc || "Gasto sin concepto",
+        monto: monto
+      });
+      totalGastos += monto;
+    }
+  });
+
+  const totalDivisasUSD = usdEfectivo + usdDigital;
+  const totalActivosBs = bsEfectivo + (usdEfectivo * tasaBcv) + (usdDigital * tasaBcv);
+  const capitalNeto = totalActivosBs - totalGastos;
+  const enLaCalle = getEnLaCalleTotal();
+
+  let cierres = getStoredCierres();
+  const isEditing = !!editId;
+  const idCierre = isEditing ? editId : ("cierre_" + Date.now() + "_" + Math.random().toString(36).substr(2, 5));
+
+  const corteObj = {
+    id: idCierre,
+    fecha: fecha,
+    quincena: quincena,
+    mes: mes,
+    año: ano,
+    tasa_bcv: tasaBcv,
+    bs_efectivo: bsEfectivo,
+    usd_efectivo: usdEfectivo,
+    usd_digital: usdDigital,
+    total_activos_bs: totalActivosBs,
+    gastos: gastosArr,
+    total_gastos: totalGastos,
+    capital_neto: capitalNeto,
+    en_la_calle: enLaCalle,
+    updatedAt: Date.now()
+  };
+
+  if (isEditing) {
+    const matchIndex = cierres.findIndex(c => String(c.id) === String(editId));
+    if (matchIndex !== -1) {
+      corteObj.createdAt = cierres[matchIndex].createdAt || corteObj.updatedAt;
+      cierres[matchIndex] = corteObj;
+    } else {
+      corteObj.createdAt = Date.now();
+      cierres.push(corteObj);
+    }
+
+    if (typeof addSystemLog === "function") {
+      addSystemLog({
+        level: "INFO",
+        action: "UPDATE_CIERRE",
+        details: {
+          id: corteObj.id,
+          periodo: `${corteObj.quincena} - ${corteObj.mes} ${corteObj.año}`,
+          fecha: corteObj.fecha,
+          capital_neto: corteObj.capital_neto,
+          tasa_bcv: corteObj.tasa_bcv
+        },
+        status: "success"
+      });
+    }
+  } else {
+    corteObj.createdAt = Date.now();
+    cierres.push(corteObj);
+
+    if (typeof addSystemLog === "function") {
+      addSystemLog({
+        level: "INFO",
+        action: "CREATE_CIERRE",
+        details: {
+          id: corteObj.id,
+          periodo: `${corteObj.quincena} - ${corteObj.mes} ${corteObj.año}`,
+          fecha: corteObj.fecha,
+          capital_neto: corteObj.capital_neto,
+          tasa_bcv: corteObj.tasa_bcv,
+          total_activos_bs: corteObj.total_activos_bs,
+          total_gastos: corteObj.total_gastos
+        },
+        status: "success"
+      });
+    }
+  }
+
+  // Guardar en localStorage
+  saveStoredCierres(cierres);
+  saveLastBcvRate(tasaBcv);
+
+  // Sincronizar con Google Sheets en segundo plano (pestaña Cierres)
+  saveCierreToGoogleSheets(corteObj);
+
+  // Toast
+  const successMsg = isEditing ? "✅ Corte quincenal actualizado correctamente" : "✅ Corte quincenal guardado con éxito";
+  if (typeof showCloudSyncToast === "function") {
+    showCloudSyncToast(successMsg, "success");
+  }
+
+  // Actualizar e inyectar Bloque de Análisis en el formulario
+  const analysis = calculateCierreAnalysis(corteObj, cierres);
+  const postSaveBlock = document.getElementById("cierre-post-save-analysis-block");
+  const postSaveContainer = document.getElementById("cierre-post-save-container");
+  if (postSaveBlock && postSaveContainer) {
+    postSaveBlock.innerHTML = renderAnalysisBlockHtml(analysis);
+    postSaveContainer.classList.remove("hidden");
+    postSaveContainer.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }
+
+  // Actualizar dashboard
+  if (typeof updateDashboardCierresKPIs === "function") {
+    updateDashboardCierresKPIs();
+  }
+
+  // Si estaba editando, restaurar estado del formulario a creación
+  if (isEditing) {
+    const titleEl = document.getElementById("cierre-form-title");
+    const subEl = document.getElementById("cierre-form-subtitle");
+    const btnCancelEdit = document.getElementById("btn-cancel-edit-mode");
+    const submitBtn = document.getElementById("btn-guardar-cierre");
+
+    if (titleEl) titleEl.textContent = "📝 Registrar Corte Quincenal";
+    if (subEl) subEl.textContent = "Ingresa los saldos en efectivo y divisas, la tasa BCV y los gastos del período";
+    if (btnCancelEdit) btnCancelEdit.classList.add("hidden");
+    if (submitBtn) submitBtn.innerHTML = "💾 Guardar Corte";
+    currentEditingCierreId = null;
+    const editIdInput = document.getElementById("cierre-edit-id");
+    if (editIdInput) editIdInput.value = "";
+  }
+}
+
+// ============================================================
+// HISTORIAL DE CORTES (REQUERIMIENTO E)
+// ============================================================
+
+function renderCierresHistory() {
+  const tbody = document.getElementById("tbody-cierres-history");
+  const emptyState = document.getElementById("cierres-history-empty");
+  const countEl = document.getElementById("cierres-history-count");
+
+  if (!tbody) return;
+
+  const cierres = getStoredCierres();
+
+  if (countEl) {
+    countEl.textContent = `${cierres.length} corte(s) registrado(s)`;
+  }
+
+  if (cierres.length === 0) {
+    tbody.innerHTML = "";
+    if (emptyState) emptyState.classList.remove("hidden");
+    return;
+  }
+
+  if (emptyState) emptyState.classList.add("hidden");
+
+  // Ordenar del más reciente al más antiguo para visualización
+  const sortedDesc = [...cierres].sort((a, b) => {
+    const timeA = new Date((a.fecha || "") + "T00:00:00").getTime() || (a.createdAt || 0);
+    const timeB = new Date((b.fecha || "") + "T00:00:00").getTime() || (b.createdAt || 0);
+    if (timeA !== timeB) return timeB - timeA;
+    const yearDiff = (parseInt(b.año, 10) || 0) - (parseInt(a.año, 10) || 0);
+    if (yearDiff !== 0) return yearDiff;
+    return String(b.id).localeCompare(String(a.id));
+  });
+
+  tbody.innerHTML = sortedDesc.map((corte) => {
+    const analysis = calculateCierreAnalysis(corte, cierres);
+
+    let rendText = "—";
+    let rendClass = "badge-rendimiento-neutral";
+    if (analysis && analysis.rendimiento !== null) {
+      rendText = formatCierrePercent(analysis.rendimiento);
+      rendClass = analysis.rendimiento >= 0 ? "badge-rendimiento-pos" : "badge-rendimiento-neg";
+    }
+
+    const fechaFormat = corte.fecha ? formatDateDisplay(new Date(corte.fecha + "T00:00:00")) : "—";
+    const periodoStr = `${corte.quincena || "Quincena"} • ${corte.mes || ""} ${corte.año || ""}`;
+    const capNetoStr = `Bs. ${formatCierreCurrency(corte.capital_neto)}`;
+    const enLaCalleStr = `$${(parseFloat(corte.en_la_calle) || 0).toFixed(2)} USD`;
+
+    return `
+      <tr data-cierre-id="${escapeHtml(corte.id)}">
+        <td style="font-weight: 600; color: #1e293b;">${fechaFormat}</td>
+        <td>
+          <div style="font-weight: 700; color: var(--color-primary);">${escapeHtml(periodoStr)}</div>
+          <small style="color: #64748b; font-size: 0.78rem;">Tasa BCV: Bs. ${parseFloat(corte.tasa_bcv || 0).toFixed(2)}</small>
+        </td>
+        <td style="text-align: right; font-weight: 800; font-family: monospace; font-size: 0.95rem; color: #0f172a;">
+          ${capNetoStr}
+        </td>
+        <td style="text-align: center;">
+          <span class="badge-rendimiento ${rendClass}">${rendText}</span>
+        </td>
+        <td style="text-align: right; font-weight: 700; color: #7c3aed; font-family: monospace;">
+          ${enLaCalleStr}
+        </td>
+        <td style="text-align: center;">
+          <div style="display: flex; gap: 6px; justify-content: center; flex-wrap: wrap;">
+            <button type="button" class="btn-primary-action btn-sm" onclick="openCierreDetailModal('${escapeHtml(corte.id)}')" style="padding: 4px 8px; font-size: 0.78rem; background: #0284c7;" title="Ver detalle y bloque de análisis completo">
+              👁️ Ver
+            </button>
+            <button type="button" class="btn-action-history btn-sm" onclick="loadCierreIntoForm('${escapeHtml(corte.id)}')" style="padding: 4px 8px; font-size: 0.78rem; background: #1e293b; color: #fff;" title="Editar datos del corte">
+              ✏️ Editar
+            </button>
+            <button type="button" class="btn-modal-cancel btn-modal-danger btn-sm" onclick="openCierreDeleteModal('${escapeHtml(corte.id)}')" style="padding: 4px 8px; font-size: 0.78rem;" title="Eliminar corte">
+              🗑️
+            </button>
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join("");
+}
+
+// ============================================================
+// RESUMEN MENSUAL CONSOLIDADO (REQUERIMIENTO D)
+// ============================================================
+
+function renderCierresResumenMensual() {
+  const selectMes = document.getElementById("select-resumen-mes");
+  const inputAno = document.getElementById("select-resumen-ano");
+  const tbody = document.getElementById("tbody-resumen-mensual");
+  const tableContainer = document.getElementById("resumen-table-container");
+  const cardGanancia = document.getElementById("card-ganancia-estimada-mes");
+  const emptyState = document.getElementById("resumen-empty-state");
+
+  if (!tbody || !selectMes || !inputAno) return;
+
+  const mesSeleccionado = selectMes.value;
+  const anoSeleccionado = parseInt(inputAno.value, 10) || new Date().getFullYear();
+
+  const cierres = getStoredCierres();
+
+  // Filtrar cortes del mes y año seleccionados
+  const cortesMes = cierres.filter((c) => {
+    const isSameYear = parseInt(c.año, 10) === anoSeleccionado;
+    const isSameMonthName = String(c.mes || "").trim().toLowerCase() === mesSeleccionado.toLowerCase();
+    let isSameDateMonth = false;
+    if (c.fecha) {
+      const d = new Date(c.fecha + "T00:00:00");
+      if (!isNaN(d.getTime())) {
+        const monthIdx = CIERRES_MONTH_NAMES.findIndex(m => m.toLowerCase() === mesSeleccionado.toLowerCase());
+        isSameDateMonth = (d.getFullYear() === anoSeleccionado && d.getMonth() === monthIdx);
+      }
+    }
+    return isSameYear && (isSameMonthName || isSameDateMonth);
+  });
+
+  if (cortesMes.length === 0) {
+    if (tableContainer) tableContainer.classList.add("hidden");
+    if (cardGanancia) cardGanancia.classList.add("hidden");
+    if (emptyState) {
+      emptyState.classList.remove("hidden");
+      emptyState.querySelector("p").textContent = `No hay cortes quincenales guardados para ${mesSeleccionado} ${anoSeleccionado}. Puedes registrar uno en el formulario.`;
+    }
+    return;
+  }
+
+  if (tableContainer) tableContainer.classList.remove("hidden");
+  if (cardGanancia) cardGanancia.classList.remove("hidden");
+  if (emptyState) emptyState.classList.add("hidden");
+
+  // Identificar 1ra Quincena y 2da Quincena
+  const corte1 = cortesMes.find(c => String(c.quincena || "").toLowerCase().includes("primera"));
+  const corte2 = cortesMes.find(c => String(c.quincena || "").toLowerCase().includes("segunda"));
+
+  const an1 = corte1 ? calculateCierreAnalysis(corte1, cierres) : null;
+  const an2 = corte2 ? calculateCierreAnalysis(corte2, cierres) : null;
+
+  // 1. Activos totales (Bs)
+  const act1Text = corte1 ? `Bs. ${formatCierreCurrency(corte1.total_activos_bs)}` : "—";
+  const act2Text = corte2 ? `Bs. ${formatCierreCurrency(corte2.total_activos_bs)}` : "—";
+
+  // 2. Gastos del período
+  const gast1 = corte1 ? (parseFloat(corte1.total_gastos) || 0) : 0;
+  const gast2 = corte2 ? (parseFloat(corte2.total_gastos) || 0) : 0;
+  const gast1Text = corte1 ? `Bs. ${formatCierreCurrency(gast1)}` : "—";
+  const gast2Text = corte2 ? `Bs. ${formatCierreCurrency(gast2)}` : "—";
+  const gastTotalText = `Bs. ${formatCierreCurrency(gast1 + gast2)}`;
+
+  // 3. Capital Neto
+  const cap1 = corte1 ? (parseFloat(corte1.capital_neto) || 0) : 0;
+  const cap2 = corte2 ? (parseFloat(corte2.capital_neto) || 0) : 0;
+  const cap1Text = corte1 ? `Bs. ${formatCierreCurrency(cap1)}` : "—";
+  const cap2Text = corte2 ? `Bs. ${formatCierreCurrency(cap2)}` : "—";
+
+  // 4. En la Calle (último valor en TOTAL/FINAL)
+  const calle1Text = corte1 ? `$${(parseFloat(corte1.en_la_calle) || 0).toFixed(2)} USD` : "—";
+  const calle2Text = corte2 ? `$${(parseFloat(corte2.en_la_calle) || 0).toFixed(2)} USD` : "—";
+  let calleUltimoText = "—";
+  if (corte2) {
+    calleUltimoText = `$${(parseFloat(corte2.en_la_calle) || 0).toFixed(2)} USD`;
+  } else if (corte1) {
+    calleUltimoText = `$${(parseFloat(corte1.en_la_calle) || 0).toFixed(2)} USD`;
+  }
+
+  // 5. Rendimiento: 1ra: "—", 2da: X%, TOTAL: "—"
+  let rend2Text = "—";
+  if (corte1 && corte2 && cap1 > 0) {
+    const rend2 = ((cap2 - cap1) / cap1) * 100;
+    rend2Text = formatCierrePercent(rend2);
+  } else if (an2 && an2.rendimiento !== null) {
+    rend2Text = formatCierrePercent(an2.rendimiento);
+  }
+
+  // 6. Tope gasto personal
+  const topePercent = getTopeGastoPersonal();
+  const tope1Text = an1 && an1.puedesUsar !== null ? `Bs. ${formatCierreCurrency(an1.puedesUsar)}` : "—";
+  let tope2Text = "—";
+  if (corte1 && corte2) {
+    const gananciaQuincenal = cap2 - cap1;
+    if (gananciaQuincenal > 0) {
+      tope2Text = `Bs. ${formatCierreCurrency(gananciaQuincenal * (topePercent / 100))}`;
+    } else {
+      tope2Text = "Bs. 0,00";
+    }
+  } else if (an2 && an2.puedesUsar !== null) {
+    tope2Text = `Bs. ${formatCierreCurrency(an2.puedesUsar)}`;
+  }
+
+  tbody.innerHTML = `
+    <tr>
+      <td style="font-weight: 700; color: #1e293b;">Activos totales (Bs)</td>
+      <td style="text-align: right; font-family: monospace; font-weight: 600;">${act1Text}</td>
+      <td style="text-align: right; font-family: monospace; font-weight: 600;">${act2Text}</td>
+      <td style="text-align: right; font-family: monospace; color: #64748b; background: rgba(26, 58, 107, 0.04);">—</td>
+    </tr>
+    <tr>
+      <td style="font-weight: 700; color: #1e293b;">Gastos del período</td>
+      <td style="text-align: right; font-family: monospace; color: #e11d48;">${gast1Text}</td>
+      <td style="text-align: right; font-family: monospace; color: #e11d48;">${gast2Text}</td>
+      <td style="text-align: right; font-family: monospace; font-weight: 800; color: #be123c; background: rgba(26, 58, 107, 0.04);">${gastTotalText}</td>
+    </tr>
+    <tr>
+      <td style="font-weight: 700; color: #1e293b;">Capital Neto</td>
+      <td style="text-align: right; font-family: monospace; font-weight: 700; color: #0284c7;">${cap1Text}</td>
+      <td style="text-align: right; font-family: monospace; font-weight: 700; color: #0284c7;">${cap2Text}</td>
+      <td style="text-align: right; font-family: monospace; color: #64748b; background: rgba(26, 58, 107, 0.04);">—</td>
+    </tr>
+    <tr>
+      <td style="font-weight: 700; color: #1e293b;">En la Calle</td>
+      <td style="text-align: right; font-family: monospace; color: #7c3aed;">${calle1Text}</td>
+      <td style="text-align: right; font-family: monospace; color: #7c3aed;">${calle2Text}</td>
+      <td style="text-align: right; font-family: monospace; font-weight: 800; color: #6d28d9; background: rgba(26, 58, 107, 0.04);">${calleUltimoText}</td>
+    </tr>
+    <tr>
+      <td style="font-weight: 700; color: #1e293b;">Rendimiento</td>
+      <td style="text-align: right; color: #64748b;">—</td>
+      <td style="text-align: right; font-weight: 700;">${rend2Text}</td>
+      <td style="text-align: right; color: #64748b; background: rgba(26, 58, 107, 0.04);">—</td>
+    </tr>
+    <tr>
+      <td style="font-weight: 700; color: #1e293b;">Tope gasto personal (${topePercent}%)</td>
+      <td style="text-align: right; font-family: monospace; color: #15803d;">${tope1Text}</td>
+      <td style="text-align: right; font-family: monospace; color: #15803d;">${tope2Text}</td>
+      <td style="text-align: right; color: #64748b; background: rgba(26, 58, 107, 0.04);">—</td>
+    </tr>
+  `;
+
+  // Tarjeta Destacada: Ganancia estimada del mes = Capital neto 2da quincena − Capital neto 1ra quincena (o el único corte si solo hay uno)
+  let gananciaMes = 0;
+  let subtextMes = "";
+
+  if (corte1 && corte2) {
+    gananciaMes = cap2 - cap1;
+    subtextMes = `Capital neto 2da quincena (Bs. ${formatCierreCurrency(cap2)}) − 1ra quincena (Bs. ${formatCierreCurrency(cap1)})`;
+  } else if (corte2) {
+    gananciaMes = cap2;
+    subtextMes = `Basado en el corte de la 2da quincena (único registrado en ${mesSeleccionado})`;
+  } else if (corte1) {
+    gananciaMes = cap1;
+    subtextMes = `Basado en el corte de la 1ra quincena (único registrado en ${mesSeleccionado})`;
+  }
+
+  const valEl = document.getElementById("resumen-ganancia-mes-val");
+  const subEl = document.getElementById("resumen-ganancia-mes-sub");
+  const badgeRendEl = document.getElementById("resumen-badge-rendimiento-mes");
+
+  if (valEl) {
+    valEl.textContent = `Bs. ${formatCierreCurrency(gananciaMes)}`;
+    valEl.style.color = gananciaMes >= 0 ? "#14532d" : "#991b1b";
+  }
+  if (subEl) subEl.textContent = subtextMes;
+
+  if (badgeRendEl) {
+    if (rend2Text !== "—") {
+      badgeRendEl.textContent = `Rendimiento: ${rend2Text}`;
+      badgeRendEl.style.display = "block";
+    } else {
+      badgeRendEl.style.display = "none";
+    }
+  }
+}
+
+// ============================================================
+// CONFIGURACIÓN DE TOPE (REQUERIMIENTO A)
+// ============================================================
+
+function renderCierresConfig() {
+  const inputEl = document.getElementById("input-cierre-tope-gasto");
+  const badgeHdr = document.getElementById("badge-current-tope-hdr");
+  const currentVal = getTopeGastoPersonal();
+
+  if (inputEl) inputEl.value = currentVal;
+  if (badgeHdr) badgeHdr.textContent = `${currentVal}%`;
+}
+
+// ============================================================
+// DASHBOARD INTEGRATION (REQUERIMIENTO F)
+// ============================================================
+
+function updateDashboardCierresKPIs() {
+  const kpiGastosVal = document.getElementById("kpi-cierres-gastos-mes");
+  const kpiGastosSub = document.getElementById("kpi-sub-cierres-gastos");
+  const kpiCapitalVal = document.getElementById("kpi-cierres-ultimo-capital");
+  const kpiCapitalSub = document.getElementById("kpi-sub-cierres-capital");
+
+  if (!kpiGastosVal && !kpiCapitalVal) return;
+
+  const cierres = getStoredCierres();
+  const now = new Date();
+  const currentMonthIdx = now.getMonth();
+  const currentMonthName = CIERRES_MONTH_NAMES[currentMonthIdx];
+  const currentYear = now.getFullYear();
+
+  // 1. Gastos del Mes — suma de los gastos de los cortes del mes en curso. Si no hay cortes: muestra —
+  const cortesMesActual = cierres.filter((c) => {
+    const isSameYear = parseInt(c.año, 10) === currentYear;
+    const isSameMonthName = String(c.mes || "").trim().toLowerCase() === currentMonthName.toLowerCase();
+    let isSameDateMonth = false;
+    if (c.fecha) {
+      const d = new Date(c.fecha + "T00:00:00");
+      if (!isNaN(d.getTime())) {
+        isSameDateMonth = (d.getFullYear() === currentYear && d.getMonth() === currentMonthIdx);
+      }
+    }
+    return isSameYear && (isSameMonthName || isSameDateMonth);
+  });
+
+  if (cortesMesActual.length > 0) {
+    const totalGastosMes = cortesMesActual.reduce((acc, c) => acc + (parseFloat(c.total_gastos) || 0), 0);
+    if (kpiGastosVal) kpiGastosVal.textContent = `Bs. ${formatCierreCurrency(totalGastosMes)}`;
+    if (kpiGastosSub) kpiGastosSub.textContent = `${cortesMesActual.length} corte(s) en ${currentMonthName} ${currentYear}`;
+  } else {
+    if (kpiGastosVal) kpiGastosVal.textContent = "—";
+    if (kpiGastosSub) kpiGastosSub.textContent = `Sin cortes en ${currentMonthName} ${currentYear}`;
+  }
+
+  // 2. Capital del Último Corte — capital neto del corte más reciente registrado. Si no hay cortes: muestra —
+  if (cierres.length > 0) {
+    const sortedDesc = [...cierres].sort((a, b) => {
+      const timeA = new Date((a.fecha || "") + "T00:00:00").getTime() || (a.createdAt || 0);
+      const timeB = new Date((b.fecha || "") + "T00:00:00").getTime() || (b.createdAt || 0);
+      return timeB - timeA;
+    });
+
+    const ultimoCorte = sortedDesc[0];
+    const capNeto = parseFloat(ultimoCorte.capital_neto) || 0;
+    if (kpiCapitalVal) kpiCapitalVal.textContent = `Bs. ${formatCierreCurrency(capNeto)}`;
+    if (kpiCapitalSub) kpiCapitalSub.textContent = `${ultimoCorte.quincena || "Corte"} (${ultimoCorte.mes || ""} ${ultimoCorte.año || ""})`;
+  } else {
+    if (kpiCapitalVal) kpiCapitalVal.textContent = "—";
+    if (kpiCapitalSub) kpiCapitalSub.textContent = "Sin cortes registrados aún";
+  }
+}
+
+// ============================================================
+// MODALES Y OPERACIONES
+// ============================================================
+
+function openCierreDetailModal(corteId) {
+  const modal = document.getElementById("modal-cierre-detail");
+  const modalBody = document.getElementById("modal-cierre-detail-body");
+  if (!modal || !modalBody) return;
+
+  const cierres = getStoredCierres();
+  const corte = cierres.find(c => String(c.id) === String(corteId));
+  if (!corte) return;
+
+  const analysis = calculateCierreAnalysis(corte, cierres);
+
+  const gastosRows = (corte.gastos || []).map((g) => `
+    <tr style="border-bottom: 1px solid #f1f5f9;">
+      <td style="padding: 6px 10px; color: #334155;">${escapeHtml(g.descripcion || "Gasto")}</td>
+      <td style="padding: 6px 10px; text-align: right; font-family: monospace; font-weight: 700; color: #e11d48;">
+        Bs. ${formatCierreCurrency(g.monto)}
+      </td>
+    </tr>
+  `).join("");
+
+  const gastosTableHtml = (corte.gastos && corte.gastos.length > 0)
+    ? `<div style="margin-top: 14px; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
+        <div style="background: #f8fafc; padding: 8px 12px; font-weight: 700; font-size: 0.82rem; color: #475569; text-transform: uppercase;">
+          Detalle de Gastos del Período (Total: Bs. ${formatCierreCurrency(corte.total_gastos)})
+        </div>
+        <table style="width: 100%; border-collapse: collapse; font-size: 0.84rem;">
+          <tbody>${gastosRows}</tbody>
+        </table>
+       </div>`
+    : `<div style="margin-top: 10px; font-size: 0.82rem; color: #64748b; font-style: italic;">Sin gastos registrados en este corte.</div>`;
+
+  modalBody.innerHTML = `
+    <!-- Bloque de Análisis Automático (Requerimiento C) -->
+    ${renderAnalysisBlockHtml(analysis)}
+
+    <!-- Desglose de Activos -->
+    <div style="margin-top: 16px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 14px;">
+      <h4 style="margin: 0 0 10px; font-size: 0.88rem; font-weight: 700; color: #1e293b; text-transform: uppercase;">
+        💼 Desglose de Activos y Caja
+      </h4>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px; font-size: 0.84rem;">
+        <div><strong>Bs Efectivo:</strong> Bs. ${formatCierreCurrency(corte.bs_efectivo)}</div>
+        <div><strong>USD Efectivo:</strong> $${(parseFloat(corte.usd_efectivo) || 0).toFixed(2)} USD</div>
+        <div><strong>USDT / Zelle:</strong> $${(parseFloat(corte.usd_digital) || 0).toFixed(2)} USD</div>
+        <div><strong>Tasa BCV:</strong> Bs. ${parseFloat(corte.tasa_bcv || 0).toFixed(2)}</div>
+        <div><strong>Total Activos en Bs:</strong> <span style="font-weight: 800; color: #1e293b;">Bs. ${formatCierreCurrency(corte.total_activos_bs)}</span></div>
+        <div><strong>En la Calle:</strong> <span style="font-weight: 800; color: #7c3aed;">$${(parseFloat(corte.en_la_calle) || 0).toFixed(2)} USD</span></div>
+      </div>
+    </div>
+
+    <!-- Gastos -->
+    ${gastosTableHtml}
+  `;
+
+  modal.classList.remove("hidden");
+}
+
+function closeCierreDetailModal() {
+  const modal = document.getElementById("modal-cierre-detail");
+  if (modal) modal.classList.add("hidden");
+}
+
+function openCierreDeleteModal(corteId) {
+  pendingDeleteCierreId = corteId;
+  const modal = document.getElementById("modal-cierre-confirm-delete");
+  const infoEl = document.getElementById("modal-cierre-delete-info");
+  if (!modal) return;
+
+  const cierres = getStoredCierres();
+  const corte = cierres.find(c => String(c.id) === String(corteId));
+
+  if (infoEl && corte) {
+    const fechaStr = corte.fecha ? formatDateDisplay(new Date(corte.fecha + "T00:00:00")) : "—";
+    infoEl.innerHTML = `
+      <div><strong>Período:</strong> ${escapeHtml(corte.quincena || "")} — ${escapeHtml(corte.mes || "")} ${escapeHtml(String(corte.año || ""))}</div>
+      <div><strong>Fecha:</strong> ${fechaStr}</div>
+      <div><strong>Capital Neto:</strong> Bs. ${formatCierreCurrency(corte.capital_neto)}</div>
+    `;
+  }
+
+  modal.classList.remove("hidden");
+}
+
+function closeCierreDeleteModal() {
+  pendingDeleteCierreId = null;
+  const modal = document.getElementById("modal-cierre-confirm-delete");
+  if (modal) modal.classList.add("hidden");
+}
+
+function confirmDeleteCierre() {
+  if (!pendingDeleteCierreId) return;
+
+  let cierres = getStoredCierres();
+  const deletedCorte = cierres.find(c => String(c.id) === String(pendingDeleteCierreId));
+  cierres = cierres.filter(c => String(c.id) !== String(pendingDeleteCierreId));
+
+  saveStoredCierres(cierres);
+
+  if (deletedCorte && typeof addSystemLog === "function") {
+    addSystemLog({
+      level: "WARNING",
+      action: "DELETE_CIERRE",
+      details: {
+        id: deletedCorte.id,
+        periodo: `${deletedCorte.quincena} - ${deletedCorte.mes} ${deletedCorte.año}`,
+        capital_neto: deletedCorte.capital_neto
+      },
+      status: "success"
+    });
+  }
+
+  closeCierreDeleteModal();
+
+  renderCierresHistory();
+  renderCierresResumenMensual();
+  updateDashboardCierresKPIs();
+
+  if (typeof showCloudSyncToast === "function") {
+    showCloudSyncToast("🗑️ Corte financiero eliminado correctamente", "info");
+  }
+}
+
+// Sincronizar corte individual con Apps Script (save_cierre)
+async function saveCierreToGoogleSheets(corte) {
+  const scriptUrl = getAppsScriptUrl();
+  if (!scriptUrl || !navigator.onLine || !corte) return;
+
+  try {
+    const res = await fetch(scriptUrl, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({
+        action: "save_cierre",
+        data: corte
+      })
+    });
+    if (!res.ok) throw new Error("HTTP error: " + res.status);
+    const json = await res.json();
+    console.log("[HogarFlex Cierres Sync] Guardado en Google Sheets:", json);
+  } catch (err) {
+    console.warn("[HogarFlex Cierres Sync] Fallo al sincronizar cierre con Sheets:", err);
+  }
+}
+
+// ============================================================
+// RENDERIZADO PRINCIPAL Y EVENT LISTENERS
+// ============================================================
+
+function renderCierresModule() {
+  renderCierresConfig();
+  switchCierresSubtab(currentCierreSubtab);
+  updateDashboardCierresKPIs();
+}
+
+function initCierresModule() {
+  // Configurar botones de subtabs
+  const subtabBtns = document.querySelectorAll(".cierres-subnav .subnav-tab");
+  subtabBtns.forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const targetSubtab = btn.getAttribute("data-cierresubtab");
+      switchCierresSubtab(targetSubtab);
+    });
+  });
+
+  // Botón superior "+ Nuevo Corte"
+  const btnHeaderNuevo = document.getElementById("btn-header-nuevo-corte");
+  if (btnHeaderNuevo) {
+    btnHeaderNuevo.addEventListener("click", () => {
+      resetCierreForm();
+      switchCierresSubtab("formulario");
+    });
+  }
+
+  // Botón superior "⚙️ Tope de Gasto"
+  const btnHeaderConfig = document.getElementById("btn-header-config-tope");
+  if (btnHeaderConfig) {
+    btnHeaderConfig.addEventListener("click", () => {
+      switchCierresSubtab("config");
+    });
+  }
+
+  // Botón estado vacío "Registrar Primer Corte"
+  const btnEmptyCreate = document.getElementById("btn-empty-create-cierre");
+  if (btnEmptyCreate) {
+    btnEmptyCreate.addEventListener("click", () => {
+      resetCierreForm();
+      switchCierresSubtab("formulario");
+    });
+  }
+
+  // Formulario de Corte: inputs con cálculo en tiempo real
+  const inputBs = document.getElementById("cierre-input-bs-efectivo");
+  const inputUsd = document.getElementById("cierre-input-usd-efectivo");
+  const inputDigital = document.getElementById("cierre-input-usd-digital");
+  const inputTasa = document.getElementById("cierre-input-tasa-bcv");
+
+  if (inputBs) inputBs.addEventListener("input", updateCierreFormCalculations);
+  if (inputUsd) inputUsd.addEventListener("input", updateCierreFormCalculations);
+  if (inputDigital) inputDigital.addEventListener("input", updateCierreFormCalculations);
+  if (inputTasa) inputTasa.addEventListener("input", updateCierreFormCalculations);
+
+  // Botón "＋ Agregar gasto"
+  const btnAddGasto = document.getElementById("btn-cierre-add-gasto");
+  if (btnAddGasto) {
+    btnAddGasto.addEventListener("click", () => {
+      addCierreGastoRow("", "");
+    });
+  }
+
+  // Envío del Formulario de Corte
+  const formCierre = document.getElementById("form-cierre-quincenal");
+  if (formCierre) {
+    formCierre.addEventListener("submit", handleCierreFormSubmit);
+  }
+
+  // Botón "Limpiar Formulario" / "Cancelar"
+  const btnCancelForm = document.getElementById("btn-cancel-cierre-form");
+  if (btnCancelForm) {
+    btnCancelForm.addEventListener("click", resetCierreForm);
+  }
+
+  // Botón "Cancelar Edición"
+  const btnCancelEditMode = document.getElementById("btn-cancel-edit-mode");
+  if (btnCancelEditMode) {
+    btnCancelEditMode.addEventListener("click", resetCierreForm);
+  }
+
+  // Filtros de Resumen Mensual (Select Mes y Año)
+  const selectResumenMes = document.getElementById("select-resumen-mes");
+  const inputResumenAno = document.getElementById("select-resumen-ano");
+
+  if (selectResumenMes) {
+    selectResumenMes.value = CIERRES_MONTH_NAMES[new Date().getMonth()];
+    selectResumenMes.addEventListener("change", renderCierresResumenMensual);
+  }
+  if (inputResumenAno) {
+    inputResumenAno.value = String(new Date().getFullYear());
+    inputResumenAno.addEventListener("input", renderCierresResumenMensual);
+    inputResumenAno.addEventListener("change", renderCierresResumenMensual);
+  }
+
+  // Formulario de Configuración de Tope
+  const formTope = document.getElementById("form-cierre-config-tope");
+  if (formTope) {
+    formTope.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const inputVal = document.getElementById("input-cierre-tope-gasto")?.value;
+      const savedVal = setTopeGastoPersonal(inputVal);
+
+      const feedback = document.getElementById("msg-cierre-config-feedback");
+      if (feedback) {
+        feedback.className = "";
+        feedback.style.background = "#dcfce7";
+        feedback.style.color = "#15803d";
+        feedback.style.border = "1px solid #86efac";
+        feedback.textContent = `✅ Tope de gasto personal actualizado al ${savedVal}%. Los análisis se han recalculado.`;
+        feedback.classList.remove("hidden");
+        setTimeout(() => feedback.classList.add("hidden"), 4000);
+      }
+
+      renderCierresConfig();
+      renderCierresHistory();
+      renderCierresResumenMensual();
+
+      if (typeof showCloudSyncToast === "function") {
+        showCloudSyncToast(`⚙️ Tope de gasto actualizado al ${savedVal}%`, "success");
+      }
+    });
+  }
+
+  // Event Listeners de Modales
+  const btnCloseModalDetail = document.getElementById("btn-close-modal-cierre-detail");
+  const btnCloseModalDetailBtn = document.getElementById("btn-close-modal-cierre-detail-btn");
+  const modalDetail = document.getElementById("modal-cierre-detail");
+
+  if (btnCloseModalDetail) btnCloseModalDetail.addEventListener("click", closeCierreDetailModal);
+  if (btnCloseModalDetailBtn) btnCloseModalDetailBtn.addEventListener("click", closeCierreDetailModal);
+  if (modalDetail) {
+    modalDetail.addEventListener("click", (e) => {
+      if (e.target === modalDetail) closeCierreDetailModal();
+    });
+  }
+
+  const btnCloseModalDelete = document.getElementById("btn-close-modal-cierre-delete");
+  const btnCancelModalDelete = document.getElementById("btn-cancel-modal-cierre-delete");
+  const btnConfirmDelete = document.getElementById("btn-confirm-delete-cierre-btn");
+  const modalDelete = document.getElementById("modal-cierre-confirm-delete");
+
+  if (btnCloseModalDelete) btnCloseModalDelete.addEventListener("click", closeCierreDeleteModal);
+  if (btnCancelModalDelete) btnCancelModalDelete.addEventListener("click", closeCierreDeleteModal);
+  if (btnConfirmDelete) btnConfirmDelete.addEventListener("click", confirmDeleteCierre);
+  if (modalDelete) {
+    modalDelete.addEventListener("click", (e) => {
+      if (e.target === modalDelete) closeCierreDeleteModal();
+    });
+  }
+
+  // Pre-llenar valores por defecto en el formulario
+  resetCierreForm();
+}
+
+// Exportar funciones del Módulo 7 a window
+window.CIERRES_STORAGE_KEY = CIERRES_STORAGE_KEY;
+window.CIERRES_TOPE_GASTO_KEY = CIERRES_TOPE_GASTO_KEY;
+window.getStoredCierres = getStoredCierres;
+window.saveStoredCierres = saveStoredCierres;
+window.getTopeGastoPersonal = getTopeGastoPersonal;
+window.setTopeGastoPersonal = setTopeGastoPersonal;
+window.getLastBcvRate = getLastBcvRate;
+window.saveLastBcvRate = saveLastBcvRate;
+window.getEnLaCalleTotal = getEnLaCalleTotal;
+window.calculateCierreAnalysis = calculateCierreAnalysis;
+window.renderAnalysisBlockHtml = renderAnalysisBlockHtml;
+window.switchCierresSubtab = switchCierresSubtab;
+window.addCierreGastoRow = addCierreGastoRow;
+window.updateCierreFormCalculations = updateCierreFormCalculations;
+window.resetCierreForm = resetCierreForm;
+window.loadCierreIntoForm = loadCierreIntoForm;
+window.handleCierreFormSubmit = handleCierreFormSubmit;
+window.renderCierresHistory = renderCierresHistory;
+window.renderCierresResumenMensual = renderCierresResumenMensual;
+window.renderCierresConfig = renderCierresConfig;
+window.updateDashboardCierresKPIs = updateDashboardCierresKPIs;
+window.openCierreDetailModal = openCierreDetailModal;
+window.closeCierreDetailModal = closeCierreDetailModal;
+window.openCierreDeleteModal = openCierreDeleteModal;
+window.closeCierreDeleteModal = closeCierreDeleteModal;
+window.confirmDeleteCierre = confirmDeleteCierre;
+window.saveCierreToGoogleSheets = saveCierreToGoogleSheets;
+window.renderCierresModule = renderCierresModule;
+window.initCierresModule = initCierresModule;
+
 
