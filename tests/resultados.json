@@ -1,0 +1,461 @@
+[
+  {
+    "id": "A-01",
+    "name": "Cálculo de cuotas",
+    "block": "A",
+    "status": "PASS",
+    "observation": "Crédito de Bs 1000 a 4 cuotas calcula exactamente Bs 250.00 por cuota (1000 / 4 = 250).",
+    "screenshot": "lab_01_calculo_cuotas.png",
+    "timestamp": "2026-10-07T21:56:15.614Z"
+  },
+  {
+    "id": "A-02",
+    "name": "Tasa implícita divisas",
+    "block": "A",
+    "status": "PASS",
+    "observation": "Compra simulada de 50 USD con 2500 Bs arroja una tasa implícita calculada de exactamente 50.00 Bs/USD.",
+    "screenshot": "lab_02_tasa_implicita.png",
+    "timestamp": "2026-10-07T21:56:15.874Z"
+  },
+  {
+    "id": "A-03",
+    "name": "Conversión BCV bidireccional",
+    "block": "A",
+    "status": "PASS",
+    "observation": "Con tasa BCV = 40.00: 200 USD → 8000 Bs y 8000 Bs → 200 USD. Ambos cálculos bidireccionales exactos.",
+    "screenshot": "lab_03_conversion_bcv.png",
+    "timestamp": "2026-10-07T21:56:16.178Z"
+  },
+  {
+    "id": "A-04",
+    "name": "Conversión tasa paralela",
+    "block": "A",
+    "status": "PASS",
+    "observation": "Con tasa Paralela = 45.00: 100 USDT → 4500 Bs y 4500 Bs → 100 USDT. Conversión verificada con precisión.",
+    "screenshot": "lab_04_conversion_paralela.png",
+    "timestamp": "2026-10-07T21:56:16.454Z"
+  },
+  {
+    "id": "A-05",
+    "name": "Estado de créditos",
+    "block": "A",
+    "status": "PASS",
+    "observation": "Auditoría de estados verificada: 0 vencidas = Solvente, vence hoy = Pendiente, vencida = Cortado. Transiciones correctas.",
+    "screenshot": "lab_05_estados_creditos.png",
+    "timestamp": "2026-10-07T21:56:16.748Z"
+  },
+  {
+    "id": "A-06",
+    "name": "Validación de duplicados",
+    "block": "A",
+    "status": "PASS",
+    "observation": "Validación de cédula duplicada detectó colisión con Primer Cliente e intercepta el guardado directo activando modal de advertencia.",
+    "screenshot": "lab_06_validacion_duplicados.png",
+    "timestamp": "2026-10-07T21:56:17.020Z"
+  },
+  {
+    "id": "A-07",
+    "name": "Service Worker registrado",
+    "block": "A",
+    "status": "PASS",
+    "observation": "Service Worker verificado en el navegador (Registrado: true, Controlador: true, Scope: http://localhost:3000/).",
+    "screenshot": "lab_07_service_worker.png",
+    "timestamp": "2026-10-07T21:56:17.255Z"
+  },
+  {
+    "id": "A-08",
+    "name": "localStorage integridad",
+    "block": "A",
+    "status": "PASS",
+    "observation": "Integridad de datos en hogarflex_clients confirmada tras recarga completa F5 (2 registros preservados en almacenamiento local).",
+    "screenshot": "lab_08_localstorage_integridad.png",
+    "timestamp": "2026-10-07T21:56:18.749Z"
+  },
+  {
+    "id": "B-02",
+    "name": "Login incorrecto",
+    "block": "B",
+    "status": "PASS",
+    "observation": "Contraseña errónea rechaza el acceso, muestra el mensaje de error en rojo y mantiene oculta la aplicación principal.",
+    "screenshot": "real_02_login_incorrecto.png",
+    "timestamp": "2026-10-07T21:56:19.709Z"
+  },
+  {
+    "id": "B-01",
+    "name": "Login correcto",
+    "block": "B",
+    "status": "PASS",
+    "observation": "Autenticación exitosa con usuario Yorgeh2023. Pantalla de login oculta y Dashboard principal desplegado correctamente.",
+    "screenshot": "real_01_login_correcto.png",
+    "timestamp": "2026-10-07T21:56:20.626Z"
+  },
+  {
+    "id": "B-03",
+    "name": "Crear cliente nuevo",
+    "block": "B",
+    "status": "PASS",
+    "observation": "Cliente creado exitosamente: Yorgelis Silva (V-28491023) y renderizado en la tabla principal de clientes.",
+    "screenshot": "real_03_crear_cliente.png",
+    "timestamp": "2026-10-07T21:56:22.245Z"
+  },
+  {
+    "id": "B-07",
+    "name": "Agregar producto al catálogo",
+    "block": "B",
+    "status": "PASS",
+    "observation": "Producto \"Juego de Sábanas King Premium\" agregado con éxito al catálogo desde el drawer con precio de venta $35.00 USD.",
+    "screenshot": "real_07_catalogo_producto.png",
+    "timestamp": "2026-10-07T21:56:23.641Z"
+  },
+  {
+    "id": "B-04",
+    "name": "Crear crédito",
+    "block": "B",
+    "status": "PASS",
+    "observation": "Crédito generado para Yorgelis Silva por $35 USD a 4 cuotas con estado inicial \"Solvente\".",
+    "screenshot": "real_04_crear_credito.png",
+    "timestamp": "2026-10-07T21:56:25.351Z"
+  },
+  {
+    "id": "B-05",
+    "name": "Registrar pago de cuota",
+    "block": "B",
+    "status": "PASS",
+    "observation": "Pago de cuota registrado exitosamente. Saldo restante actualizado a $26.25 USD y cuota marcada como Pagada.",
+    "screenshot": "real_05_registrar_pago_cuota.png",
+    "timestamp": "2026-10-07T21:56:26.285Z"
+  },
+  {
+    "id": "B-06",
+    "name": "Pago normal (venta directa)",
+    "block": "B",
+    "status": "PASS",
+    "observation": "Venta directa al contado registrada en el sistema. Total de ventas registradas en historial: 8.",
+    "screenshot": "real_06_venta_directa.png",
+    "timestamp": "2026-10-07T21:56:27.879Z"
+  },
+  {
+    "id": "B-08",
+    "name": "Registrar gasto",
+    "block": "B",
+    "status": "PASS",
+    "observation": "Gasto registrado en categoría \"Operativo\" por Bs 180 correctamente en la tabla de Gastos.",
+    "screenshot": "real_08_registrar_gasto.png",
+    "timestamp": "2026-10-07T21:56:29.650Z"
+  },
+  {
+    "id": "B-09",
+    "name": "Registrar ingreso",
+    "block": "B",
+    "status": "PASS",
+    "observation": "Ingreso de $50 USD registrado con conversión automática a Bs (monto Bs: 2000).",
+    "screenshot": "real_09_registrar_ingreso.png",
+    "timestamp": "2026-10-07T21:56:31.314Z"
+  },
+  {
+    "id": "B-10",
+    "name": "Compra de divisas",
+    "block": "B",
+    "status": "PASS",
+    "observation": "Compra de divisas por 50 USD (Bs 2500) guardada exitosamente en el historial de operaciones.",
+    "screenshot": "real_10_compra_divisas.png",
+    "timestamp": "2026-10-07T21:56:33.165Z"
+  },
+  {
+    "id": "B-11",
+    "name": "Solo calculando (no registrar)",
+    "block": "B",
+    "status": "PASS",
+    "observation": "Acción \"Solo estaba calculando\" no modificó el historial de compras de divisas (se mantuvo en 1 registros).",
+    "screenshot": "real_11_solo_calculando_divisas.png",
+    "timestamp": "2026-10-07T21:56:34.039Z"
+  },
+  {
+    "id": "B-12",
+    "name": "Cierre financiero",
+    "block": "B",
+    "status": "PASS",
+    "observation": "Corte quincenal guardado con éxito. Métricas financieras y balance calculados en el historial de cierres.",
+    "screenshot": "real_12_cierre_financiero.png",
+    "timestamp": "2026-10-07T21:56:35.573Z"
+  },
+  {
+    "id": "B-13",
+    "name": "Editar un registro",
+    "block": "B",
+    "status": "PASS",
+    "observation": "Cliente editado exitosamente. Nuevo teléfono actualizado en almacenamiento y tabla: 0414-9998877.",
+    "screenshot": "real_13_editar_registro.png",
+    "timestamp": "2026-10-07T21:56:36.928Z"
+  },
+  {
+    "id": "B-14",
+    "name": "Eliminar con confirmación",
+    "block": "B",
+    "status": "PASS",
+    "observation": "Modal de confirmación de 2 pasos verificado: Cancelar preservó el registro, escribir \"borrar\" confirmó y eliminó correctamente.",
+    "screenshot": "real_14_eliminar_confirmacion.png",
+    "timestamp": "2026-10-07T21:56:39.191Z"
+  },
+  {
+    "id": "B-15",
+    "name": "Sincronizar con Google Sheets",
+    "block": "B",
+    "status": "PASS",
+    "observation": "Sincronización en la nube iniciada vía botón de cabecera con Apps Script configurado. Encola y sincroniza datos sin bloquear la UI.",
+    "screenshot": "real_15_sync_sheets.png",
+    "timestamp": "2026-10-07T21:56:40.065Z"
+  },
+  {
+    "id": "C-01",
+    "name": "Manifest y PWA",
+    "block": "C",
+    "status": "PASS",
+    "observation": "Manifest PWA validado: name=\"HOGARFLEX NOELUIS\", short_name=\"HogarFlex\", display=standalone, 2 iconos configurados.",
+    "screenshot": "campo_01_manifest_pwa.png",
+    "timestamp": "2026-10-07T21:56:40.296Z"
+  },
+  {
+    "id": "C-02",
+    "name": "Caché del SW",
+    "block": "C",
+    "status": "PASS",
+    "observation": "Cache Storage verificado: caché hogarflex-v24 existe con 8 recursos precacheados (HTML, JS, CSS, assets).",
+    "screenshot": "campo_02_cache_sw.png",
+    "timestamp": "2026-10-07T21:56:40.375Z"
+  },
+  {
+    "id": "C-03",
+    "name": "Pantalla completa en móvil (viewport)",
+    "block": "C",
+    "status": "PASS",
+    "observation": "Viewport móvil (390×844 iPhone 14) validado. Layout adaptado sin desbordamiento horizontal (390px de ancho).",
+    "screenshot": "campo_03_viewport_movil.png",
+    "timestamp": "2026-10-07T21:56:40.930Z"
+  },
+  {
+    "id": "C-04",
+    "name": "Viewport tablet",
+    "block": "C",
+    "status": "PASS",
+    "observation": "Viewport tablet (768×1024 iPad) validado. Distribución fluida de tarjetas y tablas sin solapamientos.",
+    "screenshot": "campo_04_viewport_tablet.png",
+    "timestamp": "2026-10-07T21:56:41.486Z"
+  },
+  {
+    "id": "C-05",
+    "name": "Todas las secciones de navegación",
+    "block": "C",
+    "status": "PASS",
+    "observation": "Navegación completa por las 12 secciones ejecutada con éxito y sin excepciones en consola.",
+    "screenshot": "campo_05_navegacion_secciones.png",
+    "timestamp": "2026-10-07T21:56:46.057Z"
+  },
+  {
+    "id": "C-06",
+    "name": "Logs del sistema",
+    "block": "C",
+    "status": "PASS",
+    "observation": "Módulo de auditoría activo: 33 eventos registrados con timestamp, acción y detalles completos.",
+    "screenshot": "campo_06_logs_sistema.png",
+    "timestamp": "2026-10-07T21:56:47.147Z"
+  },
+  {
+    "id": "D-01",
+    "name": "Dashboard KPIs",
+    "block": "D",
+    "status": "PASS",
+    "observation": "KPIs del Dashboard validados en tiempo real: Clientes (1), Cobrado Mes ($16.11 USD), Saldo Pendiente ($26.25 USD).",
+    "screenshot": "rutina_01_dashboard_kpis.png",
+    "timestamp": "2026-10-07T21:56:48.021Z"
+  },
+  {
+    "id": "D-02",
+    "name": "Filtros de tabla",
+    "block": "D",
+    "status": "PASS",
+    "observation": "Filtro de tabla de Gastos aplicado (Categoría: Operativo). Tabla filtrada correctamente mostrando registros coincidentes.",
+    "screenshot": "rutina_02_filtros_tabla.png",
+    "timestamp": "2026-10-07T21:56:49.135Z"
+  },
+  {
+    "id": "D-03",
+    "name": "Búsqueda de cliente",
+    "block": "D",
+    "status": "PASS",
+    "observation": "Buscador reactivo de clientes filtró en vivo y encontró al cliente \"Yorgelis Silva\".",
+    "screenshot": "rutina_03_busqueda_cliente.png",
+    "timestamp": "2026-10-07T21:56:49.691Z"
+  },
+  {
+    "id": "D-04",
+    "name": "Resumen mensual de cierres",
+    "block": "D",
+    "status": "PASS",
+    "observation": "Subpestaña \"Resumen Mensual\" renderiza correctamente el balance consolidado del mes en curso y comparativa.",
+    "screenshot": "rutina_04_resumen_cierres.png",
+    "timestamp": "2026-10-07T21:56:51.023Z"
+  },
+  {
+    "id": "D-05",
+    "name": "Persistencia después de recarga",
+    "block": "D",
+    "status": "PASS",
+    "observation": "Persistencia íntegra comprobada tras recarga F5: 2 clientes, 1 créditos y 8 gastos preservados en memoria.",
+    "screenshot": "rutina_05_persistencia_recarga.png",
+    "timestamp": "2026-10-07T21:56:58.000Z"
+  },
+  {
+    "id": "D-06",
+    "name": "Botón de historial",
+    "block": "D",
+    "status": "PASS",
+    "observation": "Modal de historial de pagos desplegado con la relación cronológica de cuotas pagadas, montos en divisas y comprobantes.",
+    "screenshot": "rutina_06_historial_pagos.png",
+    "timestamp": "2026-10-07T21:56:58.989Z"
+  },
+  {
+    "id": "E-01",
+    "name": "Campos vacíos",
+    "block": "E",
+    "status": "PASS",
+    "observation": "Envío de crédito con campos vacíos bloqueado. Mensaje de validación: \"Por favor selecciona un cliente para el crédito.\".",
+    "screenshot": "estres_01_campos_vacios.png",
+    "timestamp": "2026-10-07T21:56:59.691Z"
+  },
+  {
+    "id": "E-02",
+    "name": "Monto cero",
+    "block": "E",
+    "status": "PASS",
+    "observation": "Gasto con monto 0 rechazado correctamente por validación de importe positivo obligatorio.",
+    "screenshot": "estres_02_monto_cero.png",
+    "timestamp": "2026-10-07T21:57:01.339Z"
+  },
+  {
+    "id": "E-03",
+    "name": "Tasa BCV cero",
+    "block": "E",
+    "status": "PASS",
+    "observation": "Cálculo con Tasa BCV = 0 protegido contra división por cero (retorna 0 sin generar Infinity ni excepción).",
+    "screenshot": "estres_03_tasa_cero.png",
+    "timestamp": "2026-10-07T21:57:01.611Z"
+  },
+  {
+    "id": "E-04",
+    "name": "Tasa BCV modo automático — con conexión",
+    "block": "E",
+    "status": "PASS",
+    "observation": "Selector en modo 🌐 BCV Oficial consultó la tasa o activó el último valor guardado ( Bs/$).",
+    "screenshot": "estres_04_tasa_bcv_auto.png",
+    "timestamp": "2026-10-07T21:57:03.239Z"
+  },
+  {
+    "id": "E-05",
+    "name": "Tasa BCV modo automático — fallo simulado",
+    "block": "E",
+    "status": "PASS",
+    "observation": "Fallo simulado en API manejado limpiamente con fallback: muestra aviso amigable con la última tasa guardada.",
+    "screenshot": "estres_05_tasa_fallback_error.png",
+    "timestamp": "2026-10-07T21:57:03.758Z"
+  },
+  {
+    "id": "E-06",
+    "name": "Selector de modo de tasa completo",
+    "block": "E",
+    "status": "PASS",
+    "observation": "Los 10 selectores de tasa del sistema contienen íntegros los 4 modos: 🌐 BCV Oficial, 💵 USDT, 🏦 Zelle y ✏️ Manual.",
+    "screenshot": "estres_06_selectores_tasa.png",
+    "timestamp": "2026-10-07T21:57:04.012Z"
+  },
+  {
+    "id": "E-07",
+    "name": "Texto muy largo en nombre",
+    "block": "E",
+    "status": "PASS",
+    "observation": "Nombre de 80 caracteres renderizado en tabla con elipsis y sin desbordar el contenedor ni romper el layout.",
+    "screenshot": "estres_07_texto_largo.png",
+    "timestamp": "2026-10-07T21:57:04.880Z"
+  },
+  {
+    "id": "E-08",
+    "name": "Muchos registros",
+    "block": "E",
+    "status": "PASS",
+    "observation": "Inyección de 10 clientes adicionales ejecutada con éxito. Tabla responde con agilidad (13 filas totales) y scroll fluido.",
+    "screenshot": "estres_08_muchos_registros.png",
+    "timestamp": "2026-10-07T21:57:05.399Z"
+  },
+  {
+    "id": "E-09",
+    "name": "Modal de catálogo durante crédito",
+    "block": "E",
+    "status": "PASS",
+    "observation": "El drawer de catálogo se abrió y cerró durante la creación del crédito preservando íntegros los datos del formulario.",
+    "screenshot": "estres_09_drawer_durante_credito.png",
+    "timestamp": "2026-10-07T21:57:07.015Z"
+  },
+  {
+    "id": "E-10",
+    "name": "Eliminación en cascada",
+    "block": "E",
+    "status": "PASS",
+    "observation": "Integridad referencial validada: Clientes con créditos activos son protegidos mediante doble advertencia y confirmación en cascada.",
+    "screenshot": "estres_10_eliminacion_cascada.png",
+    "timestamp": "2026-10-07T21:57:07.750Z"
+  },
+  {
+    "id": "F-01",
+    "name": "La app carga offline",
+    "block": "F",
+    "status": "PASS",
+    "observation": "App cargada íntegramente desde la caché del Service Worker en modo desconectado (sin pantalla en blanco ni dinosaurio).",
+    "screenshot": "offline_01_app_carga.png",
+    "timestamp": "2026-10-07T21:57:08.851Z"
+  },
+  {
+    "id": "F-02",
+    "name": "Navegación offline",
+    "block": "F",
+    "status": "PASS",
+    "observation": "Navegación offline verificada en las 6 secciones clave: todas las vistas responden de inmediato desde memoria local.",
+    "screenshot": "offline_02_navegacion_offline.png",
+    "timestamp": "2026-10-07T21:57:10.710Z"
+  },
+  {
+    "id": "F-03",
+    "name": "Crear datos offline",
+    "block": "F",
+    "status": "PASS",
+    "observation": "Nuevo cliente \"Cliente Creado Sin Internet\" guardado localmente en offline y disponible en la tabla de inmediato.",
+    "screenshot": "offline_03_crear_datos_offline.png",
+    "timestamp": "2026-10-07T21:57:11.901Z"
+  },
+  {
+    "id": "F-04",
+    "name": "BCV fallback offline",
+    "block": "F",
+    "status": "PASS",
+    "observation": "Consulta BCV offline ejecutó el fallback automático protegiendo el flujo sin colgarse: \"⚠️ Sin conexión. Usando última tasa guardada: 40,00 Bs\".",
+    "screenshot": "offline_04_bcv_fallback_offline.png",
+    "timestamp": "2026-10-07T21:57:13.431Z"
+  },
+  {
+    "id": "F-05",
+    "name": "Sync falla graciosamente offline",
+    "block": "F",
+    "status": "PASS",
+    "observation": "Sincronización en modo offline gestionada limpiamente sin congelar la interfaz ni bucles infinitos.",
+    "screenshot": "offline_05_sync_falla_graciosa.png",
+    "timestamp": "2026-10-07T21:57:14.477Z"
+  },
+  {
+    "id": "F-06",
+    "name": "Restaurar conexión",
+    "block": "F",
+    "status": "PASS",
+    "observation": "Conectividad restablecida exitosamente (navigator.onLine = true). La app continúa operando con normalidad.",
+    "screenshot": "offline_06_restaurar_conexion.png",
+    "timestamp": "2026-10-07T21:57:14.860Z"
+  }
+]
